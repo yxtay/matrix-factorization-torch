@@ -1,0 +1,24 @@
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "matrix-factorization-pytorch"
+version = "0.1.0"
+description = "Matrix Factorization Recommender Models in PyTorch with MovieLens"
+authors = ["YuXuan Tay <wyextay@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+loguru = "^0.7.2"
+pandas = "^2.2.0"
+requests = "^2.31.0"
+torch = "^2.2.0"
+torchdata = "^0.7.1"
+pytorch-lightning = "^2.2.0"
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^3.6.1"
+ruff = "^0.2.1"
