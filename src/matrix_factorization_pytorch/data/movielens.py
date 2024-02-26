@@ -13,6 +13,7 @@ import ray
 import requests
 import torch
 from loguru import logger
+from rich import print
 
 MOVIELENS_1M_URL = "https://files.grouplens.org/datasets/movielens/ml-1m.zip"
 DATA_DIR = "data"
@@ -183,7 +184,7 @@ def ordered_split(
             is_val=(train_threshold < pl.col("p")) & (pl.col("p") <= valid_threshold),
             is_test=valid_threshold < pl.col("p"),
         )
-        .drop(columns="p")
+        .drop("p")
     )
     return data
 
@@ -435,3 +436,13 @@ class Movielens1mDataModule(L.LightningDataModule):
 
     def predict_dataloader(self) -> ray.data.Dataset:
         return self.dataloader("predict")
+
+
+if __name__ == "__main__":
+    dm = Movielens1mDataModule(batch_size=2)
+    dm.prepare_data()
+
+    load_dense_movielens().head().collect().glimpse()
+
+    print(next(iter(dm.train_dataloader())))
+    print(next(iter(dm.val_dataloader())))
