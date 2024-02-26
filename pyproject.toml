@@ -12,12 +12,15 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
+lightning = "^2.2.0.post0"
 loguru = "^0.7.2"
-pandas = "^2.2.0"
+mmh3 = "^4.1.0"
+pandas = "~=2.1.4"
+polars = "^0.20.10"
+ray = { extras = ["data"], version = "^2.9.3" }
 requests = "^2.31.0"
+rich = "^13.7.0"
 torch = "^2.2.0"
-torchdata = "^0.7.1"
-pytorch-lightning = "^2.2.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.6.1"
