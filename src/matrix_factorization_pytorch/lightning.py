@@ -45,7 +45,9 @@ class LitMatrixFactorization(L.LightningModule):
             item_feature_weights=item_feature_weights,
         )
 
-    def compute_losses(self, batch, step_name="train"):
+    def compute_losses(
+        self, batch: dict[str, torch.Tensor], step_name: str = "train"
+    ) -> dict[str, torch.Tensor]:
         label = batch["label"]
         sample_weight = batch["weight"]
         user_features = batch["user_features"]
@@ -72,7 +74,9 @@ class LitMatrixFactorization(L.LightningModule):
 
         return losses
 
-    def update_metrics(self, batch, step_name):
+    def update_metrics(
+        self, batch: dict[str, torch.Tensor], step_name: str = "train"
+    ) -> torchmetrics.MetricCollection:
         user_idx = batch["user_idx"].long()
         label = batch["label"]
         score = self(batch)
@@ -83,18 +87,20 @@ class LitMatrixFactorization(L.LightningModule):
     def on_fit_start(self) -> None:
         self.logger.log_graph(self)
 
-    def training_step(self, batch: dict[str, torch.Tensor], batch_idx: int):
+    def training_step(
+        self, batch: dict[str, torch.Tensor], batch_idx: int
+    ) -> torch.Tensor:
         losses = self.compute_losses(batch, step_name="train")
         self.log_dict(losses)
         return losses[f"train/{self.hparams.train_loss}"]
 
-    def validation_step(self, batch: dict[str, torch.Tensor], batch_idx: int):
+    def validation_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> None:
         losses = self.compute_losses(batch, step_name="val")
         self.log_dict(losses)
         metrics = self.update_metrics(batch, step_name="val")
         self.log_dict(metrics)
 
-    def test_step(self, batch: dict[str, torch.Tensor], batch_idx: int):
+    def test_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> None:
         losses = self.compute_losses(batch, step_name="test")
         self.log_dict(losses)
         metrics = self.update_metrics(batch, step_name="test")
@@ -105,7 +111,7 @@ class LitMatrixFactorization(L.LightningModule):
     ) -> torch.Tensor:
         return self(batch)
 
-    def on_validation_end(self):
+    def on_validation_end(self) -> None:
         if self.current_epoch == 0 and self.global_step > 0:
             metrics = {
                 key.replace("val/", "metric/"): value
@@ -136,7 +142,7 @@ class LitMatrixFactorization(L.LightningModule):
         )
         return [early_stop, checkpoint]
 
-    def get_loss_fns(self) -> torch.nn.Module:
+    def get_loss_fns(self) -> torch.nn.ModuleList:
         loss_fns = [
             mf_losses.AlignmentLoss(),
             mf_losses.AlignmentUniformityLoss(),
@@ -151,7 +157,7 @@ class LitMatrixFactorization(L.LightningModule):
         ]
         return torch.nn.ModuleList(loss_fns)
 
-    def get_metrics(self, top_k: int = 20) -> torch.nn.Module:
+    def get_metrics(self, top_k: int = 20) -> torch.nn.ModuleDict:
         metrics = {
             step_name: torchmetrics.MetricCollection(
                 tm_retrieval.RetrievalNormalizedDCG(top_k=top_k),
