@@ -31,6 +31,7 @@ def hash_features(
 ) -> np.ndarray:
     feature_values = []
     feature_weights = []
+    num_features = 0
     # categorical features
     cat_features = [
         f"{key}:{row[key]}" for key in feature_names if isinstance(row[key], (int, str))
@@ -38,12 +39,14 @@ def hash_features(
     if len(cat_features) > 0:
         feature_values.extend(cat_features)
         feature_weights.append(np.ones(len(cat_features)))
+        num_features += len(cat_features)
 
     # float features
     float_features = [key for key in feature_names if isinstance(row[key], float)]
     if len(float_features) > 0:
         feature_values.extend(float_features)
         feature_weights.append(np.array([row[key] for key in float_features]))
+        num_features += len(float_features)
 
     # multi categorical features
     for key in feature_names:
@@ -58,6 +61,7 @@ def hash_features(
 
             feature_values.extend(iter_feature_values)
             feature_weights.append(iter_feature_weights)
+            num_features += 1
 
     feature_hashes = [
         mmh3.hash(values, seed)
@@ -65,7 +69,9 @@ def hash_features(
         for values in feature_values
     ]
     feature_hashes = np.array(feature_hashes) % (num_buckets - 1) + 1
-    feature_weights = np.tile(np.concatenate(feature_weights), num_hashes)
+    feature_weights = np.tile(np.concatenate(feature_weights), num_hashes) / (
+        num_features + num_hashes
+    )
 
     row[f"{out_prefix}features"] = feature_hashes.astype("int32")
     row[f"{out_prefix}feature_weights"] = feature_weights.astype("float32")
@@ -94,25 +100,6 @@ def gather_inputs(
     return inputs
 
 
-def collate_fn(
-    batch: np.ndarray | dict[str, np.ndarray],
-) -> torch.Tensor | dict[str, torch.Tensor]:
-    if isinstance(batch, dict):
-        return {
-            col_name: collate_fn(col_batch) for col_name, col_batch in batch.items()
-        }
-
-    # batch is np.ndarray
-    if batch.dtype.type is np.object_ and isinstance(batch[0], np.ndarray):
-        # batch is ndarray of ndarray if shape is different
-        padded = torch.nn.utils.rnn.pad_sequence(
-            [torch.as_tensor(arr) for arr in batch], batch_first=True
-        )
-        return padded
-
-    return torch.as_tensor(batch)
-
-
 def collate_tensor_fn(
     batch: Iterable[torch.Tensor], *, collate_fn_map: dict | None = None
 ) -> torch.Tensor:
@@ -126,6 +113,25 @@ def collate_tensor_fn(
 torch_collate.default_collate_fn_map[torch.Tensor] = collate_tensor_fn
 
 
+def ray_collate_fn(
+    batch: np.ndarray | dict[str, np.ndarray],
+) -> torch.Tensor | dict[str, torch.Tensor]:
+    if isinstance(batch, dict):
+        return {
+            col_name: ray_collate_fn(col_batch) for col_name, col_batch in batch.items()
+        }
+
+    # batch is np.ndarray
+    if batch.dtype.type is np.object_ and isinstance(batch[0], np.ndarray):
+        # batch is ndarray of ndarray if shape is different
+        padded = torch.nn.utils.rnn.pad_sequence(
+            [torch.as_tensor(arr) for arr in batch], batch_first=True
+        )
+        return padded
+
+    return torch.as_tensor(batch)
+
+
 class ParquetIterDataPipe(dp.datapipe.IterDataPipe):
     def __init__(
         self,
@@ -137,20 +143,20 @@ class ParquetIterDataPipe(dp.datapipe.IterDataPipe):
     ) -> None:
         super().__init__()
         self.sources = sources
-        self.columns = set(columns) or None
+        self.columns = set(columns or []) or None
         self.filter_col = filter_col
         self.batch_size = batch_size
 
         # if both columns and filter_col are specified
         # add filer_col into columns
-        if columns and filter_col:
+        if self.columns and filter_col:
             self.columns.add(filter_col)
 
-    def __len__(self):
+    def __len__(self) -> int:
         filter_expr = ds.field(self.filter_col) if self.filter_col else None
         return ds.dataset(self.sources).count_rows(filter=filter_expr)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterable[dict]:
         dataset = ds.dataset(self.sources)
         if self.filter_col:
             dataset = dataset.filter(ds.field(self.filter_col))
@@ -166,8 +172,8 @@ class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
     item_idx: str = "movie_idx"
     label: str = "rating"
     weight: str = "rating"
-    user_features: list[str] = ["user_id", "gender", "age", "occupation", "zipcode"]
-    item_features: list[str] = ["movie_id", "genres"]
+    user_features: list[str] = ["user_id"]  # , "gender", "age", "occupation", "zipcode"
+    item_features: list[str] = ["movie_id"]  # , "genres"
     in_columns: list[str] = [
         user_idx,
         item_idx,
@@ -343,7 +349,7 @@ class Movielens1mRayDataModule(Movielens1mBaseDataModule):
     def get_dataloader(self, dataset: ray.data.Dataset) -> ray.data.Dataset:
         return dataset.iter_torch_batches(
             batch_size=self.batch_size,
-            collate_fn=collate_fn,
+            collate_fn=ray_collate_fn,
             local_shuffle_buffer_size=self.batch_size * 2**4,
         )
 
