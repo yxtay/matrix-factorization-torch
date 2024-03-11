@@ -420,8 +420,3 @@ class PairwiseLogisticLoss(PairwiseEmbeddingLoss):
 class PairwiseHingeLoss(PairwiseEmbeddingLoss):
     def score_loss_fn(self, score: torch.Tensor) -> torch.Tensor:
         return (-score).relu()
-
-
-class PairwiseExponentialLoss(PairwiseEmbeddingLoss):
-    def score_loss_fn(self, score: torch.Tensor) -> torch.Tensor:
-        return (-score).exp()
