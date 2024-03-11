@@ -17,8 +17,8 @@ class LitMatrixFactorization(L.LightningModule):
         train_loss: str = "PairwiseLogisticLoss",
         max_norm: float = None,
         sparse: bool = True,
-        learning_rate: float = 1.0,
         normalize: bool = True,
+        learning_rate: float = 1.0,
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
@@ -185,7 +185,6 @@ class LitMatrixFactorization(L.LightningModule):
 
 if __name__ == "__main__":
     import datetime
-    import itertools
 
     from lightning.pytorch import loggers as pl_loggers
 
@@ -193,13 +192,13 @@ if __name__ == "__main__":
 
     train_losses = [
         "PairwiseLogisticLoss",
-        "MutualInformationNeuralEstimatorLoss",
-        "AlignmentUniformityLoss",
-        "AlignmentContrastiveLoss",
         "PairwiseHingeLoss",
+        "AlignmentContrastiveLoss",
+        "AlignmentUniformityLoss",
+        "MutualInformationNeuralEstimatorLoss",
     ]
 
-    for normalize, train_loss in itertools.product([True, False], train_losses):
+    for train_loss in train_losses:
         tb_logger = pl_loggers.TensorBoardLogger(
             ".", log_graph=True, default_hp_metric=False
         )
@@ -212,6 +211,6 @@ if __name__ == "__main__":
             max_time=datetime.timedelta(hours=1),
             # fast_dev_run=True,
         )
-        model = LitMatrixFactorization(train_loss=train_loss, normalize=normalize)
+        model = LitMatrixFactorization(train_loss=train_loss)
         datamodule = dm.Movielens1mPipeDataModule(batch_size=2**10)
         trainer.fit(model=model, datamodule=datamodule)

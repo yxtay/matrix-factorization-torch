@@ -132,38 +132,42 @@ def ray_collate_fn(
     return torch.as_tensor(batch)
 
 
-class ParquetIterDataPipe(dp.datapipe.IterDataPipe):
+class PyArrowDatasetDictLoaderIterDataPipe(dp.datapipe.IterDataPipe):
     def __init__(
         self,
         sources: Iterable[str | Path],
         *,
         columns: Iterable[str] | None = None,
-        filter_col: str = "",
+        filter_expr: ds.Expression | None = None,
         batch_size: int = 2**10,
     ) -> None:
         super().__init__()
         self.sources = sources
-        self.columns = set(columns or []) or None
-        self.filter_col = filter_col
+        self.columns = columns
+        self.filter_expr = filter_expr
         self.batch_size = batch_size
 
-        # if both columns and filter_col are specified
-        # add filer_col into columns
-        if self.columns and filter_col:
-            self.columns.add(filter_col)
-
     def __len__(self) -> int:
-        filter_expr = ds.field(self.filter_col) if self.filter_col else None
-        return ds.dataset(self.sources).count_rows(filter=filter_expr)
+        num_rows = sum(
+            ds.dataset(source).count_rows(filter=self.filter_expr)
+            for source in self.sources
+        )
+        return num_rows
 
     def __iter__(self) -> Iterable[dict]:
-        dataset = ds.dataset(self.sources)
-        if self.filter_col:
-            dataset = dataset.filter(ds.field(self.filter_col))
-        for batch in dataset.to_batches(
-            columns=list(self.columns), batch_size=self.batch_size
-        ):
-            yield from batch.to_pylist()
+        for source in self.sources:
+            dataset = ds.dataset(source)
+            for batch in dataset.to_batches(
+                columns=self.columns,
+                filter=self.filter_expr,
+                batch_size=self.batch_size,
+            ):
+                yield from batch.to_pylist()
+
+
+dp.datapipe.IterDataPipe.register_datapipe_as_function(
+    "load_pyarrow_dataset_as_dict", PyArrowDatasetDictLoaderIterDataPipe
+)
 
 
 class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
@@ -172,8 +176,8 @@ class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
     item_idx: str = "movie_idx"
     label: str = "rating"
     weight: str = "rating"
-    user_features: list[str] = ["user_id"]  # , "gender", "age", "occupation", "zipcode"
-    item_features: list[str] = ["movie_id"]  # , "genres"
+    user_features: list[str] = ["user_id", "gender", "age", "occupation", "zipcode"]  #
+    item_features: list[str] = ["movie_id", "genres"]  #
     in_columns: list[str] = [
         user_idx,
         item_idx,
@@ -246,11 +250,11 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
         parquet_path = Path(self.data_dir, "ml-1m", parquet_file)
         filter_col = f"is_{subset}"
 
-        ds = (
-            ParquetIterDataPipe(
-                [parquet_path],
-                columns=self.in_columns,
-                filter_col=filter_col,
+        datapipe = (
+            dp.iter.IterableWrapper([parquet_path])
+            .load_pyarrow_dataset_as_dict(
+                columns=list({*self.in_columns}),
+                filter_expr=ds.field(filter_col),
                 batch_size=self.batch_size,
             )
             .shuffle(buffer_size=self.batch_size * 2**4)
@@ -283,7 +287,7 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
                 )
             )
         )
-        return ds
+        return datapipe
 
     def get_dataloader(
         self, dataset: torch.utils.data.Dataset
@@ -308,7 +312,7 @@ class Movielens1mRayDataModule(Movielens1mBaseDataModule):
         parquet_path = Path(self.data_dir, "ml-1m", parquet_file)
         filter_col = f"is_{subset}"
 
-        ds = (
+        dataset = (
             ray.data.read_parquet(
                 parquet_path,
                 columns=list({*self.in_columns}),
@@ -343,8 +347,8 @@ class Movielens1mRayDataModule(Movielens1mBaseDataModule):
             )
         )
         if materialize:
-            ds = ds.materialize()
-        return ds
+            dataset = dataset.materialize()
+        return dataset
 
     def get_dataloader(self, dataset: ray.data.Dataset) -> ray.data.Dataset:
         return dataset.iter_torch_batches(
