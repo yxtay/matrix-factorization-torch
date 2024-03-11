@@ -151,7 +151,6 @@ class LitMatrixFactorization(L.LightningModule):
             mf_losses.ContrastiveLoss(),
             mf_losses.AlignmentContrastiveLoss(),
             mf_losses.MutualInformationNeuralEstimatorLoss(),
-            mf_losses.PairwiseExponentialLoss(),
             mf_losses.PairwiseHingeLoss(),
             mf_losses.PairwiseLogisticLoss(),
         ]
