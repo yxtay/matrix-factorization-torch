@@ -205,14 +205,12 @@ class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
         return load_dense_movielens(self.data_dir, overwrite=overwrite)
 
     @abc.abstractclassmethod
-    def get_dataset(self, subset: str) -> torch.utils.data.Dataset:
-        ...
+    def get_dataset(self, subset: str) -> torch.utils.data.Dataset: ...
 
     @abc.abstractmethod
     def get_dataloader(
         self, dataset: torch.utils.data.Dataset
-    ) -> torch.utils.data.DataLoader:
-        ...
+    ) -> torch.utils.data.DataLoader: ...
 
     def setup(self, stage: str) -> None:
         if stage == "fit":
