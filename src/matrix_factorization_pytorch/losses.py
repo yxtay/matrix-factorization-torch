@@ -32,8 +32,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         sample_weight: torch.Tensor | None = None,
         user_idx: torch.Tensor | None = None,
         item_idx: torch.Tensor | None = None,
-    ):
-        ...
+    ): ...
 
     @staticmethod
     def _check_embeds(user_embed: torch.Tensor, item_embed: torch.Tensor) -> None:
@@ -351,8 +350,7 @@ class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
         self.margin = margin
 
     @abc.abstractmethod
-    def score_loss_fn(self, score) -> torch.Tensor:
-        ...
+    def score_loss_fn(self, score) -> torch.Tensor: ...
 
     def pariwise_loss(
         self,
