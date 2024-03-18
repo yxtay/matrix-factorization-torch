@@ -159,5 +159,8 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+data.lock
 /data
 /lightning_logs
+/mlruns
+/ray_results

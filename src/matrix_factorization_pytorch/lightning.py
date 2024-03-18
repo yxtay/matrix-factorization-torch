@@ -1,11 +1,13 @@
 import lightning as L
+import lightning.pytorch.callbacks as pl_callbacks
 import torch
 import torchmetrics
-from lightning.pytorch import callbacks as pl_callbacks
-from torchmetrics import retrieval as tm_retrieval
+import torchmetrics.retrieval as tm_retrieval
 
 from . import losses as mf_losses
 from . import models as mf_models
+
+METRIC = {"name": "val/RetrievalNormalizedDCG", "mode": "max"}
 
 
 class LitMatrixFactorization(L.LightningModule):
@@ -13,22 +15,17 @@ class LitMatrixFactorization(L.LightningModule):
         self,
         num_embeddings: int = 2**16 + 1,
         embedding_dim: int = 32,
-        *,
         train_loss: str = "PairwiseLogisticLoss",
+        *,
         max_norm: float = None,
         sparse: bool = True,
         normalize: bool = True,
+        use_user_negatives: bool = True,
         learning_rate: float = 1.0,
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
-        self.model = mf_models.MatrixFactorization(
-            num_embeddings=num_embeddings,
-            embedding_dim=embedding_dim,
-            max_norm=max_norm,
-            sparse=sparse,
-            normalize=normalize,
-        )
+        self.model = None
         self.example_input_array = self.get_example_input_array()
         self.loss_fns = self.get_loss_fns()
         self.metrics = self.get_metrics(top_k=20)
@@ -85,7 +82,10 @@ class LitMatrixFactorization(L.LightningModule):
         return metrics
 
     def on_fit_start(self) -> None:
-        self.logger.log_graph(self)
+        if self.global_rank == 0:
+            metrics = {key.replace("val/", "hp/"): 0.0 for key in self.metrics["val"]}
+            self.logger.log_hyperparams(params=self.hparams, metrics=metrics)
+            self.logger.log_graph(self)
 
     def training_step(
         self, batch: dict[str, torch.Tensor], batch_idx: int
@@ -96,13 +96,13 @@ class LitMatrixFactorization(L.LightningModule):
 
     def validation_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> None:
         losses = self.compute_losses(batch, step_name="val")
-        self.log_dict(losses)
+        self.log_dict(losses, sync_dist=True)
         metrics = self.update_metrics(batch, step_name="val")
         self.log_dict(metrics)
 
     def test_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> None:
         losses = self.compute_losses(batch, step_name="test")
-        self.log_dict(losses)
+        self.log_dict(losses, sync_dist=True)
         metrics = self.update_metrics(batch, step_name="test")
         self.log_dict(metrics)
 
@@ -111,21 +111,12 @@ class LitMatrixFactorization(L.LightningModule):
     ) -> torch.Tensor:
         return self(batch)
 
-    def on_validation_end(self) -> None:
-        if self.current_epoch == 0 and self.global_step > 0:
-            metrics = {
-                key.replace("val/", "metric/"): value
-                for key, value in self.trainer.callback_metrics.items()
-                if key.startswith("val/")
-            }
-            self.logger.log_hyperparams(params=self.hparams, metrics=metrics)
-
-    # def on_fit_end(self) -> None:
-    #     if self.trainer.is_global_zero:
-    #         tb_logger = self.logger.experiment
-    #         tb_logger.add_embedding(
-    #             self.model.embedding.weight, global_step=self.global_step
-    #         )
+    def on_validation_epoch_end(self) -> None:
+        metrics = {
+            key.replace("val/", "hp/"): self.trainer.callback_metrics[key]
+            for key in self.metrics["val"]
+        }
+        self.log_dict(metrics, sync_dist=True)
 
     def configure_optimizers(self) -> torch.optim.Optimizer:
         if self.model.sparse:
@@ -135,24 +126,37 @@ class LitMatrixFactorization(L.LightningModule):
         return optimizer_class(self.parameters(), lr=self.hparams.learning_rate)
 
     def configure_callbacks(self) -> list[L.Callback]:
-        monitor = "val/RetrievalNormalizedDCG"
-        early_stop = pl_callbacks.EarlyStopping(monitor=monitor, mode="max")
+        early_stop = pl_callbacks.EarlyStopping(
+            monitor=METRIC["name"], mode=METRIC["mode"]
+        )
         checkpoint = pl_callbacks.ModelCheckpoint(
-            monitor=monitor, mode="max", auto_insert_metric_name=False
+            monitor=METRIC["name"], mode=METRIC["mode"], auto_insert_metric_name=False
         )
         return [early_stop, checkpoint]
 
+    def configure_model(self) -> None:
+        if self.model is None:
+            self.model = mf_models.MatrixFactorization(
+                num_embeddings=self.hparams.num_embeddings,
+                embedding_dim=self.hparams.embedding_dim,
+                max_norm=self.hparams.max_norm,
+                sparse=self.hparams.sparse,
+                normalize=self.hparams.normalize,
+            )
+
     def get_loss_fns(self) -> torch.nn.ModuleList:
         loss_fns = [
-            mf_losses.AlignmentLoss(),
-            mf_losses.AlignmentUniformityLoss(),
-            mf_losses.ItemUniformityLoss(),
-            mf_losses.UserUniformityLoss(),
-            mf_losses.ContrastiveLoss(),
-            mf_losses.AlignmentContrastiveLoss(),
-            mf_losses.MutualInformationNeuralEstimatorLoss(),
-            mf_losses.PairwiseHingeLoss(),
-            mf_losses.PairwiseLogisticLoss(),
+            loss_cls(use_user_negatives=self.hparams.use_user_negatives)
+            for loss_cls in [
+                mf_losses.AlignmentLoss,
+                mf_losses.ContrastiveLoss,
+                mf_losses.AlignmentContrastiveLoss,
+                mf_losses.UniformityLoss,
+                mf_losses.AlignmentUniformityLoss,
+                mf_losses.MutualInformationNeuralEstimatorLoss,
+                mf_losses.PairwiseHingeLoss,
+                mf_losses.PairwiseLogisticLoss,
+            ]
         ]
         return torch.nn.ModuleList(loss_fns)
 
@@ -183,12 +187,51 @@ class LitMatrixFactorization(L.LightningModule):
         return example_input_array
 
 
+def mlflow_start_run(experiment_name: str = ""):
+    if not experiment_name:
+        experiment_name = datetime.datetime.now().isoformat()
+
+    mlflow.pytorch.autolog(
+        checkpoint_monitor=METRIC["name"], checkpoint_mode=METRIC["mode"]
+    )
+
+    if experiment := mlflow.get_experiment_by_name(experiment_name):
+        experiment_id = experiment.experiment_id
+    else:
+        experiment_id = mlflow.create_experiment(experiment_name)
+    return mlflow.start_run(experiment_id=experiment_id)
+
+
+def get_trainer(experiment_name: str = ""):
+    if not experiment_name:
+        experiment_name = datetime.datetime.now().isoformat()
+
+    logger = pl_loggers.TensorBoardLogger(
+        save_dir="lightning_logs",
+        name=experiment_name,
+        log_graph=True,
+        default_hp_metric=False,
+    )
+    callbacks = [pl_callbacks.RichProgressBar()]
+    return L.Trainer(
+        precision="bf16-mixed",
+        logger=logger,
+        callbacks=callbacks,
+        max_epochs=1,
+        max_time=datetime.timedelta(hours=1),
+    )
+
+
 if __name__ == "__main__":
     import datetime
+    import itertools
 
-    from lightning.pytorch import loggers as pl_loggers
+    import lightning.pytorch.loggers as pl_loggers
+    import mlflow
 
     from .data import load as dm
+
+    experiment_name = datetime.datetime.now().isoformat()
 
     train_losses = [
         "PairwiseLogisticLoss",
@@ -197,20 +240,18 @@ if __name__ == "__main__":
         "AlignmentUniformityLoss",
         "MutualInformationNeuralEstimatorLoss",
     ]
+    for use_user_negatives, train_loss in itertools.product(
+        [True, False], train_losses
+    ):
+        trainer = get_trainer(experiment_name)
 
-    for train_loss in train_losses:
-        tb_logger = pl_loggers.TensorBoardLogger(
-            ".", log_graph=True, default_hp_metric=False
-        )
-        callbacks = [pl_callbacks.RichProgressBar()]
-        trainer = L.Trainer(
-            precision="bf16-mixed",
-            logger=tb_logger,
-            callbacks=callbacks,
-            max_epochs=1,
-            max_time=datetime.timedelta(hours=1),
-            # fast_dev_run=True,
-        )
-        model = LitMatrixFactorization(train_loss=train_loss)
-        datamodule = dm.Movielens1mPipeDataModule(batch_size=2**10)
-        trainer.fit(model=model, datamodule=datamodule)
+        with trainer.init_module():
+            model = LitMatrixFactorization(
+                train_loss=train_loss, use_user_negatives=use_user_negatives
+            )
+            datamodule = dm.Movielens1mPipeDataModule()
+
+        with mlflow_start_run(experiment_name):
+            mlflow.log_params(model.hparams)
+            mlflow.log_params(datamodule.hparams)
+            trainer.fit(model=model, datamodule=datamodule)

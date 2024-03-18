@@ -12,6 +12,7 @@ import ray
 import torch
 import torch.utils.data._utils.collate as torch_collate
 import torch.utils.data.datapipes as dp
+from filelock import FileLock
 
 from .prepare import (
     DATA_DIR,
@@ -176,8 +177,8 @@ class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
     item_idx: str = "movie_idx"
     label: str = "rating"
     weight: str = "rating"
-    user_features: list[str] = ["user_id", "gender", "age", "occupation", "zipcode"]  #
-    item_features: list[str] = ["movie_id", "genres"]  #
+    user_features: list[str] = ["user_id"]  # , "gender", "age", "occupation", "zipcode"
+    item_features: list[str] = ["movie_id"]  # , "genres"
     in_columns: list[str] = [
         user_idx,
         item_idx,
@@ -195,14 +196,12 @@ class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
         batch_size: int = 2**10,
     ):
         super().__init__()
-        self.data_dir = data_dir
-        self.num_hashes = num_hashes
-        self.num_buckets = num_buckets
-        self.batch_size = batch_size
+        self.save_hyperparameters()
 
     def prepare_data(self, *, overwrite: bool = False):
-        download_unpack_data(self.url, self.data_dir, overwrite=overwrite)
-        return load_dense_movielens(self.data_dir, overwrite=overwrite)
+        with FileLock(f"{self.hparams.data_dir}.lock"):
+            download_unpack_data(self.url, self.hparams.data_dir, overwrite=overwrite)
+            return load_dense_movielens(self.hparams.data_dir, overwrite=overwrite)
 
     @abc.abstractclassmethod
     def get_dataset(self, subset: str) -> torch.utils.data.Dataset: ...
@@ -245,7 +244,7 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
             "train": "sparse.parquet",
             "val": "val.parquet",
         }.get(subset, "dense.parquet")
-        parquet_path = Path(self.data_dir, "ml-1m", parquet_file)
+        parquet_path = Path(self.hparams.data_dir, "ml-1m", parquet_file)
         filter_col = f"is_{subset}"
 
         datapipe = (
@@ -253,16 +252,16 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
             .load_pyarrow_dataset_as_dict(
                 columns=list({*self.in_columns}),
                 filter_expr=ds.field(filter_col),
-                batch_size=self.batch_size,
+                batch_size=self.hparams.batch_size,
             )
-            .shuffle(buffer_size=self.batch_size * 2**4)
+            .shuffle(buffer_size=self.hparams.batch_size * 2**4)
             .sharding_filter()
             .map(
                 functools.partial(
                     hash_features,
                     feature_names=self.user_features,
-                    num_hashes=self.num_hashes,
-                    num_buckets=self.num_buckets,
+                    num_hashes=self.hparams.num_hashes,
+                    num_buckets=self.hparams.num_buckets,
                     out_prefix="user_",
                 )
             )
@@ -270,8 +269,8 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
                 functools.partial(
                     hash_features,
                     feature_names=self.item_features,
-                    num_hashes=self.num_hashes,
-                    num_buckets=self.num_buckets,
+                    num_hashes=self.hparams.num_hashes,
+                    num_buckets=self.hparams.num_buckets,
                     out_prefix="item_",
                 )
             )
@@ -292,7 +291,7 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
     ) -> torch.utils.data.DataLoader:
         return torch.utils.data.DataLoader(
             dataset,
-            batch_size=self.batch_size,
+            batch_size=self.hparams.batch_size,
             num_workers=os.cpu_count() - 1,
             persistent_workers=True,
         )
@@ -307,21 +306,21 @@ class Movielens1mRayDataModule(Movielens1mBaseDataModule):
             "train": "sparse.parquet",
             "val": "val.parquet",
         }.get(subset, "dense.parquet")
-        parquet_path = Path(self.data_dir, "ml-1m", parquet_file)
+        parquet_path = Path(self.hparams.data_dir, "ml-1m", parquet_file)
         filter_col = f"is_{subset}"
 
         dataset = (
             ray.data.read_parquet(
                 parquet_path,
-                columns=list({*self.in_columns}),
+                columns=list({*self.in_columns, filter_col}),
                 filter=ds.field(filter_col),
             )
             .map(
                 hash_features,
                 fn_kwargs={
                     "feature_names": self.user_features,
-                    "num_hashes": self.num_hashes,
-                    "num_buckets": self.num_buckets,
+                    "num_hashes": self.hparams.num_hashes,
+                    "num_buckets": self.hparams.num_buckets,
                     "out_prefix": "user_",
                 },
             )
@@ -329,8 +328,8 @@ class Movielens1mRayDataModule(Movielens1mBaseDataModule):
                 hash_features,
                 fn_kwargs={
                     "feature_names": self.item_features,
-                    "num_hashes": self.num_hashes,
-                    "num_buckets": self.num_buckets,
+                    "num_hashes": self.hparams.num_hashes,
+                    "num_buckets": self.hparams.num_buckets,
                     "out_prefix": "item_",
                 },
             )
@@ -350,9 +349,9 @@ class Movielens1mRayDataModule(Movielens1mBaseDataModule):
 
     def get_dataloader(self, dataset: ray.data.Dataset) -> ray.data.Dataset:
         return dataset.iter_torch_batches(
-            batch_size=self.batch_size,
+            batch_size=self.hparams.batch_size,
             collate_fn=ray_collate_fn,
-            local_shuffle_buffer_size=self.batch_size * 2**4,
+            local_shuffle_buffer_size=self.hparams.batch_size * 2**4,
         )
 
     def setup(self, stage: str) -> None:
