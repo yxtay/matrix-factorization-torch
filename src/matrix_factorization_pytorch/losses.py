@@ -22,6 +22,10 @@ def weighted_mean(
 
 
 class EmbeddingLoss(torch.nn.Module, abc.ABC):
+    def __init__(self, *, use_user_negatives: bool = True) -> None:
+        super().__init__()
+        self.use_user_negatives = use_user_negatives
+
     @abc.abstractmethod
     def forward(
         self,
@@ -202,7 +206,7 @@ class AlignmentLoss(EmbeddingLoss):
         )
 
 
-class ItemUniformityLoss(EmbeddingLoss):
+class UniformityLoss(EmbeddingLoss):
     def forward(
         self,
         user_embed: torch.Tensor,
@@ -213,27 +217,17 @@ class ItemUniformityLoss(EmbeddingLoss):
         user_idx: torch.Tensor | None = None,
         item_idx: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        sample_weight = self._check_sample_weight(
-            item_embed, sample_weight=sample_weight
-        )
-        return self.uniformity_loss(item_embed, sample_weight, idx=item_idx)
-
-
-class UserUniformityLoss(EmbeddingLoss):
-    def forward(
-        self,
-        user_embed: torch.Tensor,
-        item_embed: torch.Tensor,
-        *,
-        label: torch.Tensor | None = None,
-        sample_weight: torch.Tensor | None = None,
-        user_idx: torch.Tensor | None = None,
-        item_idx: torch.Tensor | None = None,
-    ) -> torch.Tensor:
+        self._check_embeds(user_embed, item_embed)
         sample_weight = self._check_sample_weight(
             user_embed, sample_weight=sample_weight
         )
-        return self.uniformity_loss(user_embed, sample_weight, idx=user_idx)
+        uniformity_loss = self.uniformity_loss(item_embed, sample_weight, idx=item_idx)
+        if self.use_user_negatives:
+            uniformity_loss = uniformity_loss + self.uniformity_loss(
+                user_embed, sample_weight, idx=user_idx
+            )
+            uniformity_loss = uniformity_loss / 2
+        return uniformity_loss
 
 
 class AlignmentUniformityLoss(EmbeddingLoss):
@@ -255,13 +249,13 @@ class AlignmentUniformityLoss(EmbeddingLoss):
         alingment_loss = self.alignment_loss(
             user_embed, item_embed, label=label, sample_weight=sample_weight
         )
-        item_uniformity_loss = self.uniformity_loss(
-            item_embed, sample_weight, idx=item_idx
-        )
-        user_uniformity_loss = self.uniformity_loss(
-            user_embed, sample_weight, idx=user_idx
-        )
-        return alingment_loss + (item_uniformity_loss + user_uniformity_loss) / 2
+        uniformity_loss = self.uniformity_loss(item_embed, sample_weight, idx=item_idx)
+        if self.use_user_negatives:
+            uniformity_loss = uniformity_loss + self.uniformity_loss(
+                user_embed, sample_weight, idx=user_idx
+            )
+            uniformity_loss = uniformity_loss / 2
+        return alingment_loss + uniformity_loss
 
 
 class ContrastiveLoss(EmbeddingLoss):
@@ -279,13 +273,24 @@ class ContrastiveLoss(EmbeddingLoss):
         sample_weight = self._check_sample_weight(
             user_embed, sample_weight=sample_weight
         )
-        return self.contrastive_loss(
+
+        loss = self.contrastive_loss(
             user_embed,
             item_embed,
             sample_weight=sample_weight,
             user_idx=user_idx,
             item_idx=item_idx,
         )
+        if self.use_user_negatives:
+            loss = loss + self.contrastive_loss(
+                item_embed,
+                user_embed,
+                sample_weight=sample_weight,
+                user_idx=item_idx,
+                item_idx=user_idx,
+            )
+            loss = loss / 2
+        return loss
 
 
 class AlignmentContrastiveLoss(EmbeddingLoss):
@@ -315,6 +320,15 @@ class AlignmentContrastiveLoss(EmbeddingLoss):
             user_idx=user_idx,
             item_idx=item_idx,
         )
+        if self.use_user_negatives:
+            contrastive_loss = contrastive_loss + self.contrastive_loss(
+                item_embed,
+                user_embed,
+                sample_weight=sample_weight,
+                user_idx=item_idx,
+                item_idx=user_idx,
+            )
+            contrastive_loss = contrastive_loss / 2
         return alignment_loss + contrastive_loss
 
 
@@ -334,7 +348,7 @@ class MutualInformationNeuralEstimatorLoss(EmbeddingLoss):
         sample_weight = self._check_sample_weight(
             user_embed, sample_weight=sample_weight
         )
-        return self.mine_loss(
+        loss = self.mine_loss(
             user_embed,
             item_embed,
             label=label,
@@ -342,11 +356,28 @@ class MutualInformationNeuralEstimatorLoss(EmbeddingLoss):
             user_idx=user_idx,
             item_idx=item_idx,
         )
+        if self.use_user_negatives:
+            loss = loss + self.mine_loss(
+                item_embed,
+                user_embed,
+                label=label,
+                sample_weight=sample_weight,
+                user_idx=item_idx,
+                item_idx=user_idx,
+            )
+            loss = loss / 2
+        return loss
 
 
 class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
-    def __init__(self, *, sigma: float = 1.0, margin: float = 1.0) -> None:
-        super().__init__()
+    def __init__(
+        self,
+        *,
+        use_user_negatives: bool = True,
+        sigma: float = 1.0,
+        margin: float = 1.0,
+    ) -> None:
+        super().__init__(use_user_negatives=use_user_negatives)
         self.sigma = sigma
         self.margin = margin
 
@@ -400,7 +431,7 @@ class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
         sample_weight = self._check_sample_weight(
             user_embed, sample_weight=sample_weight
         )
-        return self.pariwise_loss(
+        loss = self.pariwise_loss(
             user_embed,
             item_embed,
             label=label,
@@ -410,6 +441,19 @@ class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
             sigma=self.sigma,
             margin=self.margin,
         )
+        if self.use_user_negatives:
+            loss = loss + self.pariwise_loss(
+                item_embed,
+                user_embed,
+                label=label,
+                sample_weight=sample_weight,
+                user_idx=item_idx,
+                item_idx=user_idx,
+                sigma=self.sigma,
+                margin=self.margin,
+            )
+            loss = loss / 2
+        return loss
 
 
 class PairwiseLogisticLoss(PairwiseEmbeddingLoss):

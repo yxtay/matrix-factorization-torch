@@ -11,16 +11,19 @@ license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.10"
+flaml = "^2.1.2"
 lightning = "^2.2.0"
 loguru = "^0.7.2"
+mlflow = "^2.11.1"
 mmh3 = "^4.1.0"
+optuna = "^3.5.0"
 pandas = "~=2.1.4"
 polars = "^0.20.10"
-ray = { extras = ["data"], version = "^2.9.3" }
+ray = { extras = ["data", "train", "tune"], version = "^2.9.3" }
 requests = "^2.31.0"
 rich = "^13.7.0"
-tensorboard = "^2.16.2"
+tensorboard = "^2.6.2"
 torch = "^2.2.0"
 
 [tool.poetry.group.dev.dependencies]

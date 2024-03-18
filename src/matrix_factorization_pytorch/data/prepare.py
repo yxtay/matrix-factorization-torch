@@ -10,7 +10,6 @@ from loguru import logger
 
 MOVIELENS_1M_URL = "https://files.grouplens.org/datasets/movielens/ml-1m.zip"
 DATA_DIR = "data"
-ROW_GROUP_SIZE = 2**16
 
 
 ###
@@ -162,11 +161,13 @@ def ordered_split(
     data = (
         data.lazy()
         .with_columns(
-            p=(pl.col(order_col).rank("ordinal") / pl.count(order_col)).over(group_col)
+            p=((pl.col(order_col).rank("ordinal") - 1) / pl.count(order_col)).over(
+                group_col
+            )
         )
         .with_columns(
             is_rated=True,
-            is_train=pl.col("p") <= train_prop,
+            is_train=pl.col("p") < train_prop,
         )
         .drop("p")
     )
@@ -180,8 +181,8 @@ def users_split_activty(
         data.lazy()
         .group_by("user_id")
         .len()
-        .with_columns(p=(pl.col("len").rank("ordinal") / pl.count("len")))
-        .with_columns(is_val_user=pl.col("p") > 1 - val_prop)
+        .with_columns(p=((pl.col("len").rank("ordinal") - 1) / pl.count("len")))
+        .with_columns(is_val_user=pl.col("p") >= 1 - val_prop)
         .drop("len", "p")
     )
     return users.lazy().join(users_interactions_agg, on="user_id", how="left")
