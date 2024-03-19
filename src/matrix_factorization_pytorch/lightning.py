@@ -1,5 +1,6 @@
 import lightning as L
 import lightning.pytorch.callbacks as pl_callbacks
+import mlflow
 import torch
 import torchmetrics
 import torchmetrics.retrieval as tm_retrieval
@@ -187,7 +188,7 @@ class LitMatrixFactorization(L.LightningModule):
         return example_input_array
 
 
-def mlflow_start_run(experiment_name: str = ""):
+def mlflow_start_run(experiment_name: str = "") -> mlflow.ActiveRun:
     if not experiment_name:
         experiment_name = datetime.datetime.now().isoformat()
 
@@ -202,7 +203,7 @@ def mlflow_start_run(experiment_name: str = ""):
     return mlflow.start_run(experiment_id=experiment_id)
 
 
-def get_trainer(experiment_name: str = ""):
+def get_trainer(experiment_name: str = "") -> L.Trainer:
     if not experiment_name:
         experiment_name = datetime.datetime.now().isoformat()
 

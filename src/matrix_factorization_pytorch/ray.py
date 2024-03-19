@@ -18,7 +18,7 @@ from .data.load import Movielens1mPipeDataModule
 from .lightning import METRIC, LitMatrixFactorization
 
 
-def prepare_trainer(config):
+def prepare_trainer(config: dict) -> L.Trainer:
     logger = pl_loggers.TensorBoardLogger(
         save_dir=config["tensorboard_save_dir"],
         name=ray.train.get_context().get_experiment_name(),
@@ -40,7 +40,7 @@ def prepare_trainer(config):
     return ray_lightning.prepare_trainer(trainer)
 
 
-def mlflow_start_run(mlflow_tracking_uri):
+def mlflow_start_run(mlflow_tracking_uri: str) -> mlflow.ActiveRun:
     experiment_name = ray.train.get_context().get_experiment_name()
     if ray.train.get_context().get_world_rank() or experiment_name is None:
         return contextlib.nullcontext()
@@ -88,10 +88,11 @@ def train_loop_per_worker(config):
         with checkpoint.as_directory() as ckpt_dir:
             ckpt_path = Path(ckpt_dir, checkpoint_name)
 
-    with mlflow_start_run(config["mlflow_tracking_uri"]):
-        mlflow.log_params(config)
-        mlflow.log_params(datamodule.hparams)
-        mlflow.log_params(model.hparams)
+    with mlflow_start_run(config["mlflow_tracking_uri"]) as run:
+        if run:
+            mlflow.log_params(config)
+            mlflow.log_params(datamodule.hparams)
+            mlflow.log_params(model.hparams)
         trainer.fit(model, datamodule=datamodule, ckpt_path=ckpt_path)
 
 
@@ -148,10 +149,10 @@ def get_ray_trainer():
 def get_tuner():
     train_losses = [
         "PairwiseLogisticLoss",
-        # "PairwiseHingeLoss",
+        "PairwiseHingeLoss",
         "AlignmentContrastiveLoss",
-        # "AlignmentUniformityLoss",
-        # "MutualInformationNeuralEstimatorLoss",
+        "AlignmentUniformityLoss",
+        "MutualInformationNeuralEstimatorLoss",
     ]
     search_space = {
         "num_hashes": ray.tune.randint(1, 5),

@@ -113,11 +113,8 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         *,
         idx: torch.Tensor | None = None,
         sigma: float = 1.0,
-        margin: float = 0.0,
     ) -> torch.Tensor:
         sq_distances = squared_distance(embed[None, :, :], embed[:, None, :])
-        # shape: (batch_size, batch_size)
-        losses = margin - sq_distances * sigma
         # shape: (batch_size, batch_size)
         # take upper triangle
         negative_weights = EmbeddingLoss.negative_weights(
@@ -126,9 +123,11 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         # shape: (batch_size, batch_size)
         denominator = negative_weights.sum() + 1e-10
         # shape: scalar
-        return (losses + negative_weights.log() - denominator.log()).logsumexp(
-            dim=(0, 1)
-        )
+        loss = (
+            sq_distances * -sigma + negative_weights.log() - denominator.log()
+        ).logsumexp(dim=(0, 1))
+        # shape: scalar
+        return loss
 
     @staticmethod
     def contrastive_loss(
