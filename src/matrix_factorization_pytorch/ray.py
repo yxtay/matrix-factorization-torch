@@ -1,4 +1,3 @@
-import contextlib
 import datetime
 import os
 from pathlib import Path
@@ -7,6 +6,7 @@ import flaml
 import lightning as L
 import lightning.pytorch.loggers as pl_loggers
 import mlflow
+import ray.air.integrations.mlflow as ray_mlflow
 import ray.train
 import ray.train.lightning as ray_lightning
 import ray.train.torch as ray_torch
@@ -40,22 +40,18 @@ def prepare_trainer(config: dict) -> L.Trainer:
     return ray_lightning.prepare_trainer(trainer)
 
 
-def mlflow_start_run(mlflow_tracking_uri: str) -> mlflow.ActiveRun:
-    experiment_name = ray.train.get_context().get_experiment_name()
-    if ray.train.get_context().get_world_rank() or experiment_name is None:
-        return contextlib.nullcontext()
-
-    mlflow.set_tracking_uri(mlflow_tracking_uri)
+def setup_mlflow(config: dict) -> mlflow:
+    mlflow = ray_mlflow.setup_mlflow(
+        config,
+        tracking_uri=config["mlflow_tracking_uri"],
+        experiment_name=ray.train.get_context().get_experiment_name(),
+        run_name=ray.train.get_context().get_trial_name(),
+        create_experiment_if_not_exists=True,
+    )
     mlflow.pytorch.autolog(
         checkpoint_monitor=METRIC["name"], checkpoint_mode=METRIC["mode"]
     )
-
-    if experiment := mlflow.get_experiment_by_name(experiment_name):
-        experiment_id = experiment.experiment_id
-    else:
-        experiment_id = mlflow.create_experiment(experiment_name)
-    trial_name = ray.train.get_context().get_trial_name()
-    return mlflow.start_run(experiment_id=experiment_id, run_name=trial_name)
+    return mlflow
 
 
 def train_loop_per_worker(config):
@@ -88,25 +84,33 @@ def train_loop_per_worker(config):
         with checkpoint.as_directory() as ckpt_dir:
             ckpt_path = Path(ckpt_dir, checkpoint_name)
 
-    with mlflow_start_run(config["mlflow_tracking_uri"]) as run:
-        if run:
-            mlflow.log_params(config)
-            mlflow.log_params(datamodule.hparams)
-            mlflow.log_params(model.hparams)
+    mlflow = setup_mlflow(config)
+    with mlflow.active_run():
+        mlflow.log_params(datamodule.hparams)
+        mlflow.log_params(model.hparams)
         trainer.fit(model, datamodule=datamodule, ckpt_path=ckpt_path)
 
 
 def get_run_config():
+    checkpoint_config = ray.train.CheckpointConfig(
+        num_to_keep=1,
+        checkpoint_score_attribute=METRIC["name"],
+        checkpoint_score_order=METRIC["mode"],
+    )
+    stopper = ray_stopper.ExperimentPlateauStopper(
+        metric=METRIC["name"], mode=METRIC["mode"]
+    )
+    callbacks = [
+        ray_mlflow.MLflowLoggerCallback(
+            experiment_name=datetime.datetime.now().isoformat(),
+            save_artifact=True,
+        )
+    ]
     return ray.train.RunConfig(
         storage_path=Path("ray_results").absolute(),
-        checkpoint_config=ray.train.CheckpointConfig(
-            num_to_keep=1,
-            checkpoint_score_attribute=METRIC["name"],
-            checkpoint_score_order=METRIC["mode"],
-        ),
-        stop=ray_stopper.ExperimentPlateauStopper(
-            metric=METRIC["name"], mode=METRIC["mode"]
-        ),
+        checkpoint_config=checkpoint_config,
+        stop=stopper,
+        callbacks=callbacks,
     )
 
 
