@@ -1,5 +1,6 @@
 import lightning as L
 import lightning.pytorch.callbacks as pl_callbacks
+import lightning.pytorch.loggers as pl_loggers
 import mlflow
 import torch
 import torchmetrics
@@ -189,17 +190,12 @@ class LitMatrixFactorization(L.LightningModule):
 
 
 def mlflow_start_run(experiment_name: str = "") -> mlflow.ActiveRun:
-    if not experiment_name:
-        experiment_name = datetime.datetime.now().isoformat()
-
     mlflow.pytorch.autolog(
         checkpoint_monitor=METRIC["name"], checkpoint_mode=METRIC["mode"]
     )
 
-    if experiment := mlflow.get_experiment_by_name(experiment_name):
-        experiment_id = experiment.experiment_id
-    else:
-        experiment_id = mlflow.create_experiment(experiment_name)
+    experiment_name = experiment_name or datetime.datetime.now().isoformat()
+    experiment_id = mlflow.set_experiment(experiment_name).experiment_id
     return mlflow.start_run(experiment_id=experiment_id)
 
 
@@ -226,9 +222,6 @@ def get_trainer(experiment_name: str = "") -> L.Trainer:
 if __name__ == "__main__":
     import datetime
     import itertools
-
-    import lightning.pytorch.loggers as pl_loggers
-    import mlflow
 
     from .data import load as dm
 
