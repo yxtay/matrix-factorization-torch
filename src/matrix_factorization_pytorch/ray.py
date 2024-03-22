@@ -18,13 +18,41 @@ from .data.load import Movielens1mPipeDataModule
 from .lightning import METRIC, LitMatrixFactorization
 
 
-def prepare_trainer(config: dict) -> L.Trainer:
-    logger = pl_loggers.TensorBoardLogger(
-        save_dir=config["tensorboard_save_dir"],
-        name=ray.train.get_context().get_experiment_name(),
-        log_graph=True,
-        default_hp_metric=False,
+def setup_mlflow(config: dict) -> mlflow:
+    experiment_name = ray.train.get_context().get_experiment_name()
+    trial_name = ray.train.get_context().get_trial_name()
+    mlflow = ray_mlflow.setup_mlflow(
+        config,
+        tracking_uri=config["mlflow_tracking_uri"],
+        experiment_name=experiment_name,
+        run_name=trial_name,
+        create_experiment_if_not_exists=True,
     )
+    return mlflow
+
+
+def prepare_trainer(config: dict) -> L.Trainer:
+    if ray.train.get_context().get_world_rank():
+        logger = False
+    else:
+        experiment_name = ray.train.get_context().get_experiment_name()
+        trial_name = ray.train.get_context().get_trial_name()
+        logger = [
+            pl_loggers.TensorBoardLogger(
+                save_dir=config["tensorboard_save_dir"],
+                name=experiment_name or "lightning_logs",
+                version=trial_name,
+                log_graph=True,
+                default_hp_metric=False,
+            ),
+            pl_loggers.MLFlowLogger(
+                tracking_uri=str(config["mlflow_tracking_uri"]),
+                experimen_name=experiment_name,
+                run_name=trial_name,
+                run_id=mlflow.active_run().info.run_id,
+                log_model=True,
+            ),
+        ]
     trainer = L.Trainer(
         precision=config["precision"],
         max_epochs=config["max_epochs"],
@@ -33,28 +61,15 @@ def prepare_trainer(config: dict) -> L.Trainer:
         enable_progress_bar=False,
         enable_model_summary=False,
         strategy=ray_lightning.RayDDPStrategy(),
-        logger=False if ray.train.get_context().get_world_rank() else logger,
+        logger=logger,
         callbacks=[ray_lightning.RayTrainReportCallback()],
         plugins=[ray_lightning.RayLightningEnvironment()],
     )
     return ray_lightning.prepare_trainer(trainer)
 
 
-def setup_mlflow(config: dict) -> mlflow:
-    mlflow = ray_mlflow.setup_mlflow(
-        config,
-        tracking_uri=config["mlflow_tracking_uri"],
-        experiment_name=ray.train.get_context().get_experiment_name(),
-        run_name=ray.train.get_context().get_trial_name(),
-        create_experiment_if_not_exists=True,
-    )
-    mlflow.pytorch.autolog(
-        checkpoint_monitor=METRIC["name"], checkpoint_mode=METRIC["mode"]
-    )
-    return mlflow
-
-
 def train_loop_per_worker(config):
+    mlflow = setup_mlflow(config)
     trainer = prepare_trainer(config)
 
     with trainer.init_module():
@@ -84,7 +99,6 @@ def train_loop_per_worker(config):
         with checkpoint.as_directory() as ckpt_dir:
             ckpt_path = Path(ckpt_dir, checkpoint_name)
 
-    mlflow = setup_mlflow(config)
     with mlflow.active_run():
         mlflow.log_params(datamodule.hparams)
         mlflow.log_params(model.hparams)
@@ -103,7 +117,6 @@ def get_run_config():
     callbacks = [
         ray_mlflow.MLflowLoggerCallback(
             experiment_name=datetime.datetime.now().isoformat(),
-            save_artifact=True,
         )
     ]
     return ray.train.RunConfig(
@@ -135,8 +148,8 @@ def get_ray_trainer():
         "max_norm_exp": 0,
         "sparse": True,
         "normalize": True,
-        "use_user_negatives": True,
-        "learning_rate": 1.0,
+        "use_user_negatives": False,
+        "learning_rate": 0.1,
     }
     scaling_config = ray.train.ScalingConfig(
         num_workers=1,
@@ -167,7 +180,7 @@ def get_tuner():
         # "max_norm_exp": ray.tune.randint(0, 6),
         # "normalize": ray.tune.choice([True, False]),
         "use_user_negatives": ray.tune.choice([True, False]),
-        "learning_rate": ray.tune.loguniform(0.1, 10.0),
+        "learning_rate": ray.tune.qloguniform(0.01, 1.0, 0.01),
         "precision": ray.tune.choice(["bf16-true", "bf16-mixed"]),
     }
     low_cost_partial_config = {
@@ -179,7 +192,7 @@ def get_tuner():
         # "max_norm_exp": 0,
         # "normalize": True,
         "use_user_negatives": False,
-        "learning_rate": 1.0,
+        # "learning_rate": 0.1,
         "precision": "bf16-true",
     }
     point_to_evaluate = {
@@ -191,7 +204,7 @@ def get_tuner():
         # "max_norm_exp": 0,
         # "normalize": True,
         "use_user_negatives": True,
-        "learning_rate": 1.0,
+        "learning_rate": 0.1,
         "precision": "bf16-true",
     }
     search_alg = flaml.BlendSearch(
@@ -205,7 +218,7 @@ def get_tuner():
         search_alg=search_alg,
         scheduler=scheduler,
         num_samples=-1,
-        time_budget_s=25000,
+        time_budget_s=30000,
         max_concurrent_trials=1,
     )
     tuner = ray.tune.Tuner(
