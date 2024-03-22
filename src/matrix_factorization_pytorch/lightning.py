@@ -22,8 +22,8 @@ class LitMatrixFactorization(L.LightningModule):
         max_norm: float = None,
         sparse: bool = True,
         normalize: bool = True,
-        use_user_negatives: bool = True,
-        learning_rate: float = 1.0,
+        use_user_negatives: bool = False,
+        learning_rate: float = 0.1,
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
@@ -190,25 +190,27 @@ class LitMatrixFactorization(L.LightningModule):
 
 
 def mlflow_start_run(experiment_name: str = "") -> mlflow.ActiveRun:
-    mlflow.pytorch.autolog(
-        checkpoint_monitor=METRIC["name"], checkpoint_mode=METRIC["mode"]
-    )
-
     experiment_name = experiment_name or datetime.datetime.now().isoformat()
     experiment_id = mlflow.set_experiment(experiment_name).experiment_id
     return mlflow.start_run(experiment_id=experiment_id)
 
 
 def get_trainer(experiment_name: str = "") -> L.Trainer:
-    if not experiment_name:
-        experiment_name = datetime.datetime.now().isoformat()
-
-    logger = pl_loggers.TensorBoardLogger(
-        save_dir="lightning_logs",
-        name=experiment_name,
-        log_graph=True,
-        default_hp_metric=False,
-    )
+    experiment_name = experiment_name or datetime.datetime.now().isoformat()
+    logger = [
+        pl_loggers.TensorBoardLogger(
+            save_dir="lightning_logs",
+            name=experiment_name,
+            log_graph=True,
+            default_hp_metric=False,
+        ),
+        pl_loggers.MLFlowLogger(
+            tracking_uri="mlruns",
+            experiment_name=experiment_name,
+            run_id=mlflow.active_run().info.run_id,
+            log_model=True,
+        ),
+    ]
     callbacks = [pl_callbacks.RichProgressBar()]
     return L.Trainer(
         precision="bf16-mixed",
@@ -221,9 +223,8 @@ def get_trainer(experiment_name: str = "") -> L.Trainer:
 
 if __name__ == "__main__":
     import datetime
-    import itertools
 
-    from .data import load as dm
+    from .data import load as mf_data
 
     experiment_name = datetime.datetime.now().isoformat()
 
@@ -234,18 +235,15 @@ if __name__ == "__main__":
         "AlignmentUniformityLoss",
         "MutualInformationNeuralEstimatorLoss",
     ]
-    for use_user_negatives, train_loss in itertools.product(
-        [True, False], train_losses
-    ):
+    for train_loss in train_losses:
+        mlflow_start_run(experiment_name)
         trainer = get_trainer(experiment_name)
 
         with trainer.init_module():
-            model = LitMatrixFactorization(
-                train_loss=train_loss, use_user_negatives=use_user_negatives
-            )
-            datamodule = dm.Movielens1mPipeDataModule()
+            datamodule = mf_data.Movielens1mPipeDataModule()
+            model = LitMatrixFactorization(train_loss=train_loss)
 
-        with mlflow_start_run(experiment_name):
-            mlflow.log_params(model.hparams)
+        with mlflow.active_run():
             mlflow.log_params(datamodule.hparams)
+            mlflow.log_params(model.hparams)
             trainer.fit(model=model, datamodule=datamodule)

@@ -92,7 +92,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
             item_idx[None, :] == item_idx[:, None]
         )
         # shape: (batch_size, batch_size)
-        return ~accidental_hits * sample_weight[None, :]
+        return ~accidental_hits * torch.ones_like(sample_weight)[None, :]
 
     @staticmethod
     def alignment_loss(
@@ -113,11 +113,10 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         *,
         idx: torch.Tensor | None = None,
         sigma: float = 1.0,
-        margin: float = 0.0,
     ) -> torch.Tensor:
         sq_distances = squared_distance(embed[None, :, :], embed[:, None, :])
         # shape: (batch_size, batch_size)
-        losses = margin - sq_distances * sigma
+        losses = sq_distances * -sigma
         # shape: (batch_size, batch_size)
         # take upper triangle
         negative_weights = EmbeddingLoss.negative_weights(
@@ -172,7 +171,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         )
         # shape: (batch_size, batch_size)
         negative_weights = EmbeddingLoss.negative_weights(
-            sample_weight, user_idx=user_idx, item_idx=item_idx
+            torch.ones_like(sample_weight), user_idx=user_idx, item_idx=item_idx
         )
         # shape: (batch_size, batch_size)
         negative_score = (sq_distances * -sigma + negative_weights.log()).logsumexp(
@@ -220,13 +219,13 @@ class UniformityLoss(EmbeddingLoss):
         sample_weight = self._check_sample_weight(
             user_embed, sample_weight=sample_weight
         )
-        uniformity_loss = self.uniformity_loss(item_embed, sample_weight, idx=item_idx)
-        if self.use_user_negatives:
-            uniformity_loss = uniformity_loss + self.uniformity_loss(
-                user_embed, sample_weight, idx=user_idx
-            )
-            uniformity_loss = uniformity_loss / 2
-        return uniformity_loss
+        item_uniformity_loss = self.uniformity_loss(
+            item_embed, sample_weight, idx=item_idx
+        )
+        user_uniformity_loss = self.uniformity_loss(
+            user_embed, sample_weight, idx=user_idx
+        )
+        return (item_uniformity_loss + user_uniformity_loss) / 2
 
 
 class AlignmentUniformityLoss(EmbeddingLoss):
@@ -248,13 +247,13 @@ class AlignmentUniformityLoss(EmbeddingLoss):
         alingment_loss = self.alignment_loss(
             user_embed, item_embed, label=label, sample_weight=sample_weight
         )
-        uniformity_loss = self.uniformity_loss(item_embed, sample_weight, idx=item_idx)
-        if self.use_user_negatives:
-            uniformity_loss = uniformity_loss + self.uniformity_loss(
-                user_embed, sample_weight, idx=user_idx
-            )
-            uniformity_loss = uniformity_loss / 2
-        return alingment_loss + uniformity_loss
+        item_uniformity_loss = self.uniformity_loss(
+            item_embed, sample_weight, idx=item_idx
+        )
+        user_uniformity_loss = self.uniformity_loss(
+            user_embed, sample_weight, idx=user_idx
+        )
+        return alingment_loss + (item_uniformity_loss + user_uniformity_loss) / 2
 
 
 class ContrastiveLoss(EmbeddingLoss):
@@ -409,7 +408,7 @@ class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
         negative_weights = self.negative_weights(
             sample_weight, user_idx=user_idx, item_idx=item_idx
         )
-        # shape: (batch_size)
+        # shape: (batch_size, batch_size)
         loss = weighted_mean(losses, negative_weights, dim=-1)
         # shape: (batch_size)
         return weighted_mean(loss, sample_weight)
