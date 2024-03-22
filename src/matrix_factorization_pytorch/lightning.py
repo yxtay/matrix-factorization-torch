@@ -33,8 +33,8 @@ class LitMatrixFactorization(L.LightningModule):
         self.metrics = self.get_metrics(top_k=20)
 
     def forward(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
-        user_features = batch["user_features"]
-        item_features = batch["item_features"]
+        user_features = batch["user_feature_hashes"]
+        item_features = batch["item_feature_hashes"]
         user_feature_weights = batch.get("user_feature_weights")
         item_feature_weights = batch.get("item_feature_weights")
         return self.model(
@@ -49,8 +49,8 @@ class LitMatrixFactorization(L.LightningModule):
     ) -> dict[str, torch.Tensor]:
         label = batch["label"]
         sample_weight = batch["weight"]
-        user_features = batch["user_features"]
-        item_features = batch["item_features"]
+        user_features = batch["user_feature_hashes"]
+        item_features = batch["item_feature_hashes"]
         user_feature_weights = batch.get("user_feature_weights")
         item_feature_weights = batch.get("item_feature_weights")
         user_idx = batch["user_idx"]
@@ -180,8 +180,8 @@ class LitMatrixFactorization(L.LightningModule):
     def get_example_input_array(self) -> tuple[dict[str, torch.Tensor]]:
         example_input_array = (
             {
-                "user_features": torch.zeros(1, 1).int(),
-                "item_features": torch.zeros(1, 1).int(),
+                "user_feature_hashes": torch.zeros(1, 1).int(),
+                "item_feature_hashes": torch.zeros(1, 1).int(),
                 "user_feature_weights": torch.zeros(1, 1),
                 "item_feature_weights": torch.zeros(1, 1),
             },

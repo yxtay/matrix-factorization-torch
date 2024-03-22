@@ -10,6 +10,7 @@ import numpy as np
 import pyarrow.dataset as ds
 import ray
 import torch
+import torch.utils.data as torch_data
 import torch.utils.data._utils.collate as torch_collate
 import torch.utils.data.datapipes as dp
 from filelock import FileLock
@@ -74,7 +75,7 @@ def hash_features(
         num_features + num_hashes
     )
 
-    row[f"{out_prefix}features"] = feature_hashes.astype("int32")
+    row[f"{out_prefix}feature_hashes"] = feature_hashes.astype("int32")
     row[f"{out_prefix}feature_weights"] = feature_weights.astype("float32")
     return row
 
@@ -93,9 +94,9 @@ def gather_inputs(
         "item_idx": row[item_idx] or 0,
         "label": bool(label_value > 0) - bool(label_value < 0),
         "weight": row[weight] or 0,
-        "user_features": row["user_features"],
+        "user_feature_hashes": row["user_feature_hashes"],
         "user_feature_weights": row["user_feature_weights"],
-        "item_features": row["item_features"],
+        "item_feature_hashes": row["item_feature_hashes"],
         "item_feature_weights": row["item_feature_weights"],
     }
     return inputs
@@ -133,6 +134,7 @@ def ray_collate_fn(
     return torch.as_tensor(batch)
 
 
+@torch_data.functional_datapipe("load_pyarrow_dataset_as_dict")
 class PyArrowDatasetDictLoaderIterDataPipe(dp.datapipe.IterDataPipe):
     def __init__(
         self,
@@ -166,26 +168,30 @@ class PyArrowDatasetDictLoaderIterDataPipe(dp.datapipe.IterDataPipe):
                 yield from batch.to_pylist()
 
 
-dp.datapipe.IterDataPipe.register_datapipe_as_function(
-    "load_pyarrow_dataset_as_dict", PyArrowDatasetDictLoaderIterDataPipe
-)
-
-
 class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
     url: str = MOVIELENS_1M_URL
     user_idx: str = "user_idx"
     item_idx: str = "movie_idx"
     label: str = "rating"
     weight: str = "rating"
-    user_features: list[str] = ["user_id"]  # , "gender", "age", "occupation", "zipcode"
-    item_features: list[str] = ["movie_id"]  # , "genres"
+    user_feature_names: list[str] = [
+        "user_id",
+        # "gender",
+        # "age",
+        # "occupation",
+        # "zipcode",
+    ]
+    item_feature_names: list[str] = [
+        "movie_id",
+        # "genres",
+    ]
     in_columns: list[str] = [
         user_idx,
         item_idx,
         label,
         weight,
-        *user_features,
-        *item_features,
+        *user_feature_names,
+        *item_feature_names,
     ]
 
     def __init__(
@@ -259,7 +265,7 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
             .map(
                 functools.partial(
                     hash_features,
-                    feature_names=self.user_features,
+                    feature_names=self.user_feature_names,
                     num_hashes=self.hparams.num_hashes,
                     num_buckets=self.hparams.num_buckets,
                     out_prefix="user_",
@@ -268,7 +274,7 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
             .map(
                 functools.partial(
                     hash_features,
-                    feature_names=self.item_features,
+                    feature_names=self.item_feature_names,
                     num_hashes=self.hparams.num_hashes,
                     num_buckets=self.hparams.num_buckets,
                     out_prefix="item_",
@@ -318,7 +324,7 @@ class Movielens1mRayDataModule(Movielens1mBaseDataModule):
             .map(
                 hash_features,
                 fn_kwargs={
-                    "feature_names": self.user_features,
+                    "feature_names": self.user_feature_names,
                     "num_hashes": self.hparams.num_hashes,
                     "num_buckets": self.hparams.num_buckets,
                     "out_prefix": "user_",
@@ -327,7 +333,7 @@ class Movielens1mRayDataModule(Movielens1mBaseDataModule):
             .map(
                 hash_features,
                 fn_kwargs={
-                    "feature_names": self.item_features,
+                    "feature_names": self.item_feature_names,
                     "num_hashes": self.hparams.num_hashes,
                     "num_buckets": self.hparams.num_buckets,
                     "out_prefix": "item_",

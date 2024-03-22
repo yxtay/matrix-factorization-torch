@@ -62,33 +62,37 @@ class MatrixFactorization(torch.nn.Module):
         return model
 
     def embed(
-        self, features: torch.Tensor, feature_weights: torch.Tensor | None = None
+        self, feature_hashes: torch.Tensor, feature_weights: torch.Tensor | None = None
     ) -> torch.Tensor:
-        embed = self.embedding(features, per_sample_weights=feature_weights)
+        embed = self.embedding(feature_hashes, per_sample_weights=feature_weights)
         if self.normalize:
             embed = F.normalize(embed, dim=-1)
         return embed
 
     def forward(
         self,
-        user_features: torch.Tensor,
-        item_features: torch.Tensor,
+        user_feature_hashes: torch.Tensor,
+        item_feature_hashes: torch.Tensor,
         *,
         user_feature_weights: torch.Tensor | None = None,
         item_feature_weights: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        user_embed = self.embed(user_features, user_feature_weights)
-        item_embed = self.embed(item_features, item_feature_weights)
+        user_embed = self.embed(user_feature_hashes, user_feature_weights)
+        item_embed = self.embed(item_feature_hashes, item_feature_weights)
         return (user_embed * item_embed).sum(-1)
 
     def full_predict(
         self,
-        user_features: torch.Tensor,
-        item_features: torch.Tensor,
+        user_feature_hashes: torch.Tensor,
+        item_feature_hashes: torch.Tensor,
         *,
         user_feature_weights: torch.Tensor | None = None,
         item_feature_weights: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        user_embed = self.embed(user_features, per_sample_weights=user_feature_weights)
-        item_embed = self.embed(item_features, per_sample_weights=item_feature_weights)
+        user_embed = self.embed(
+            user_feature_hashes, per_sample_weights=user_feature_weights
+        )
+        item_embed = self.embed(
+            item_feature_hashes, per_sample_weights=item_feature_weights
+        )
         return torch.mm(user_embed, item_embed.T)

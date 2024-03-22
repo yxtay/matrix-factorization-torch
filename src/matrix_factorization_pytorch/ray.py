@@ -47,7 +47,7 @@ def prepare_trainer(config: dict) -> L.Trainer:
             ),
             pl_loggers.MLFlowLogger(
                 tracking_uri=str(config["mlflow_tracking_uri"]),
-                experimen_name=experiment_name,
+                experiment_name=experiment_name,
                 run_name=trial_name,
                 run_id=mlflow.active_run().info.run_id,
                 log_model=True,
@@ -218,7 +218,7 @@ def get_tuner():
         search_alg=search_alg,
         scheduler=scheduler,
         num_samples=-1,
-        time_budget_s=30000,
+        time_budget_s=40000,
         max_concurrent_trials=1,
     )
     tuner = ray.tune.Tuner(
