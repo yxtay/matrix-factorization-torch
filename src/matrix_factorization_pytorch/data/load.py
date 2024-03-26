@@ -12,7 +12,7 @@ import ray
 import torch
 import torch.utils.data as torch_data
 import torch.utils.data._utils.collate as torch_collate
-import torch.utils.data.datapipes as dp
+import torch.utils.data.datapipes as torch_datapipes
 from filelock import FileLock
 
 from .prepare import (
@@ -26,11 +26,13 @@ from .prepare import (
 def hash_features(
     row: dict[str, int | float | str | list[int, str]],
     *,
+    idx: str,
     feature_names: list[str],
     num_hashes: int = 2,
     num_buckets: int = 2**16 + 1,
     out_prefix: str = "",
-) -> np.ndarray:
+    keep_input: bool = True,
+) -> torch.Tensor:
     feature_values = []
     feature_weights = []
     num_features = 0
@@ -40,14 +42,14 @@ def hash_features(
     ]
     if len(cat_features) > 0:
         feature_values.extend(cat_features)
-        feature_weights.append(np.ones(len(cat_features)))
+        feature_weights.append(torch.ones(len(cat_features)))
         num_features += len(cat_features)
 
     # float features
     float_features = [key for key in feature_names if isinstance(row[key], float)]
     if len(float_features) > 0:
         feature_values.extend(float_features)
-        feature_weights.append(np.array([row[key] for key in float_features]))
+        feature_weights.append(torch.as_tensor([row[key] for key in float_features]))
         num_features += len(float_features)
 
     # multi categorical features
@@ -59,7 +61,7 @@ def hash_features(
             num_values = len(iter_feature_values)
             if num_values == 0:
                 continue
-            iter_feature_weights = np.ones(num_values) / num_values
+            iter_feature_weights = torch.ones(num_values) / num_values
 
             feature_values.extend(iter_feature_values)
             feature_weights.append(iter_feature_weights)
@@ -70,36 +72,47 @@ def hash_features(
         for seed in range(num_hashes)
         for values in feature_values
     ]
-    feature_hashes = np.array(feature_hashes) % (num_buckets - 1) + 1
-    feature_weights = np.tile(np.concatenate(feature_weights), num_hashes) / (
-        num_features + num_hashes
+    feature_hashes = torch.as_tensor(feature_hashes) % (num_buckets - 1) + 1
+    feature_weights = (
+        torch.cat(feature_weights).tile(num_hashes) / num_features / num_hashes
     )
 
-    row[f"{out_prefix}feature_hashes"] = feature_hashes.astype("int32")
-    row[f"{out_prefix}feature_weights"] = feature_weights.astype("float32")
+    new_row = {
+        f"{out_prefix}idx": row[idx] or 0,
+        f"{out_prefix}feature_hashes": feature_hashes.to(torch.int32),
+        f"{out_prefix}feature_weights": feature_weights.to(torch.float32),
+    }
+    if not keep_input:
+        return new_row
+    row.update(new_row)
     return row
 
 
 def gather_inputs(
     row: dict[str, int | float | list[int | float] | None],
     *,
-    user_idx: str = "user_idx",
-    item_idx: str = "item_idx",
     label: str = "label",
     weight: str = "weight",
 ) -> dict[str, int | float | list[int | float]]:
     label_value = row[label] or 0
     inputs = {
-        "user_idx": row[user_idx] or 0,
-        "item_idx": row[item_idx] or 0,
         "label": bool(label_value > 0) - bool(label_value < 0),
         "weight": row[weight] or 0,
+        "user_idx": row["user_idx"],
         "user_feature_hashes": row["user_feature_hashes"],
         "user_feature_weights": row["user_feature_weights"],
+        "item_idx": row["item_idx"],
         "item_feature_hashes": row["item_feature_hashes"],
         "item_feature_weights": row["item_feature_weights"],
     }
     return inputs
+
+
+def merge_rows(rows):
+    new_row = {**rows[0]}
+    for row in rows[1:]:
+        new_row = {**new_row, **row}
+    return new_row
 
 
 def collate_tensor_fn(
@@ -107,8 +120,18 @@ def collate_tensor_fn(
 ) -> torch.Tensor:
     it = iter(batch)
     elem_size = next(it).size()
-    if not all(elem.size() == elem_size for elem in it):
-        return torch.nn.utils.rnn.pad_sequence(batch, batch_first=True)
+    if (
+        any(elem.size() != elem_size for elem in it)
+        and (
+            # only last dimension different
+            all(elem.size()[:-1] == elem_size[:-1] for elem in it)
+            # only first dimension differen
+            or all(elem.size()[1:] == elem_size[1:] for elem in it)
+        )
+    ):
+        # pad tensor if only first or last dimensions are different
+        nested = torch.nested.as_nested_tensor(batch)
+        return torch.nested.to_padded_tensor(nested, padding=0)
     return torch_collate.collate_tensor_fn(batch, collate_fn_map=collate_fn_map)
 
 
@@ -124,28 +147,35 @@ def ray_collate_fn(
         }
 
     # batch is np.ndarray
-    if batch.dtype.type is np.object_ and isinstance(batch[0], np.ndarray):
-        # batch is ndarray of ndarray if shape is different
-        padded = torch.nn.utils.rnn.pad_sequence(
-            [torch.as_tensor(arr) for arr in batch], batch_first=True
+    if (
+        batch.dtype.type is np.object_
+        and isinstance(batch[0], np.ndarray)
+        and any(elem.shape != batch[0].shape for elem in batch)
+        and (
+            # only last dimension different
+            all(elem.shape[:-1] == batch[0].shape[:-1] for elem in batch)
+            # only first dimension differen
+            or all(elem.shape[1:] == batch[0].shape[1:] for elem in batch)
         )
-        return padded
+    ):
+        nested = torch.nested.as_nested_tensor([torch.as_tensor(arr) for arr in batch])
+        return torch.nested.to_padded_tensor(nested, padding=0)
 
     return torch.as_tensor(batch)
 
 
 @torch_data.functional_datapipe("load_pyarrow_dataset_as_dict")
-class PyArrowDatasetDictLoaderIterDataPipe(dp.datapipe.IterDataPipe):
+class PyArrowDatasetDictLoaderIterDataPipe(torch_data.IterDataPipe):
     def __init__(
         self,
-        sources: Iterable[str | Path],
+        source_datapipe: Iterable[str | Path],
         *,
         columns: Iterable[str] | None = None,
         filter_expr: ds.Expression | None = None,
         batch_size: int = 2**10,
     ) -> None:
         super().__init__()
-        self.sources = sources
+        self.source_datapipe = source_datapipe
         self.columns = columns
         self.filter_expr = filter_expr
         self.batch_size = batch_size
@@ -153,12 +183,12 @@ class PyArrowDatasetDictLoaderIterDataPipe(dp.datapipe.IterDataPipe):
     def __len__(self) -> int:
         num_rows = sum(
             ds.dataset(source).count_rows(filter=self.filter_expr)
-            for source in self.sources
+            for source in self.source_datapipe
         )
         return num_rows
 
     def __iter__(self) -> Iterable[dict]:
-        for source in self.sources:
+        for source in self.source_datapipe:
             dataset = ds.dataset(source)
             for batch in dataset.to_batches(
                 columns=self.columns,
@@ -166,6 +196,33 @@ class PyArrowDatasetDictLoaderIterDataPipe(dp.datapipe.IterDataPipe):
                 batch_size=self.batch_size,
             ):
                 yield from batch.to_pylist()
+
+
+@torch_data.functional_datapipe("cycle")
+class CyclerIterDataPipe(torch_data.IterDataPipe):
+    def __init__(
+        self,
+        source_datapipe: Iterable[str | Path],
+        count: int | None = None,
+    ) -> None:
+        super().__init__()
+        self.source_datapipe = source_datapipe
+        self.count = count
+        if count is not None and count < 0:
+            msg = f"requires count >= 0, but {count = }"
+            raise ValueError(msg)
+
+    def __len__(self) -> int:
+        if self.count is None:
+            # use arbitrary large number so that valid length is shown for zip
+            return 2**32
+        return len(self.source_datapipe) * self.count
+
+    def __iter__(self) -> Iterable[dict]:
+        i = 0
+        while self.count is None or i < self.count:
+            yield from self.source_datapipe
+            i += 1
 
 
 class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
@@ -176,14 +233,14 @@ class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
     weight: str = "rating"
     user_feature_names: list[str] = [
         "user_id",
-        # "gender",
-        # "age",
-        # "occupation",
-        # "zipcode",
+        "gender",
+        "age",
+        "occupation",
+        "zipcode",
     ]
     item_feature_names: list[str] = [
         "movie_id",
-        # "genres",
+        "genres",
     ]
     in_columns: list[str] = [
         user_idx,
@@ -200,6 +257,7 @@ class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
         num_hashes: int = 2,
         num_buckets: int = 2**16 + 1,
         batch_size: int = 2**10,
+        negative_multiple: int = 1,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -244,6 +302,32 @@ class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
 
 
 class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
+    def get_movies_dataset(self, cycle_count: int | None = 1):
+        parquet_path = Path(self.hparams.data_dir, "ml-1m", "movies.parquet")
+
+        datapipe = (
+            torch_datapipes.iter.IterableWrapper([parquet_path])
+            .load_pyarrow_dataset_as_dict(
+                columns=[self.item_idx, *self.item_feature_names],
+                batch_size=self.hparams.batch_size,
+            )
+            .cycle(cycle_count)
+            .shuffle(buffer_size=self.hparams.batch_size * 2**4)
+            .sharding_filter()
+            .map(
+                functools.partial(
+                    hash_features,
+                    idx=self.item_idx,
+                    feature_names=self.item_feature_names,
+                    num_hashes=self.hparams.num_hashes,
+                    num_buckets=self.hparams.num_buckets,
+                    out_prefix="neg_item_",
+                    keep_input=False,
+                )
+            )
+        )
+        return datapipe
+
     def get_dataset(self, subset: str) -> torch.utils.data.Dataset:
         assert subset in {"train", "val", "test", "predict"}
         parquet_file = {
@@ -254,7 +338,7 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
         filter_col = f"is_{subset}"
 
         datapipe = (
-            dp.iter.IterableWrapper([parquet_path])
+            torch_datapipes.iter.IterableWrapper([parquet_path])
             .load_pyarrow_dataset_as_dict(
                 columns=list({*self.in_columns}),
                 filter_expr=ds.field(filter_col),
@@ -265,6 +349,7 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
             .map(
                 functools.partial(
                     hash_features,
+                    idx=self.user_idx,
                     feature_names=self.user_feature_names,
                     num_hashes=self.hparams.num_hashes,
                     num_buckets=self.hparams.num_buckets,
@@ -274,6 +359,7 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
             .map(
                 functools.partial(
                     hash_features,
+                    idx=self.item_idx,
                     feature_names=self.item_feature_names,
                     num_hashes=self.hparams.num_hashes,
                     num_buckets=self.hparams.num_buckets,
@@ -283,13 +369,22 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
             .map(
                 functools.partial(
                     gather_inputs,
-                    user_idx=self.user_idx,
-                    item_idx=self.item_idx,
                     label=self.label,
                     weight=self.weight,
                 )
             )
         )
+        if subset == "train" and self.hparams.negative_multiple > 0:
+            num_movies = len(self.get_movies_dataset())
+            (len(datapipe) * self.hparams.negative_multiple // num_movies + 1)
+            datapipe = (
+                self.get_movies_dataset(cycle_count=None)
+                .batch(self.hparams.negative_multiple)
+                .collate()
+                .zip(datapipe)
+                .map(merge_rows)
+            )
+
         return datapipe
 
     def get_dataloader(
@@ -304,9 +399,7 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
 
 
 class Movielens1mRayDataModule(Movielens1mBaseDataModule):
-    def get_dataset(
-        self, subset: str, *, materialize: bool = False
-    ) -> ray.data.Dataset:
+    def get_dataset(self, subset: str) -> ray.data.Dataset:
         assert subset in {"train", "val", "test", "predict"}
         parquet_file = {
             "train": "sparse.parquet",
@@ -324,6 +417,7 @@ class Movielens1mRayDataModule(Movielens1mBaseDataModule):
             .map(
                 hash_features,
                 fn_kwargs={
+                    "idx": self.user_idx,
                     "feature_names": self.user_feature_names,
                     "num_hashes": self.hparams.num_hashes,
                     "num_buckets": self.hparams.num_buckets,
@@ -333,6 +427,7 @@ class Movielens1mRayDataModule(Movielens1mBaseDataModule):
             .map(
                 hash_features,
                 fn_kwargs={
+                    "idx": self.item_idx,
                     "feature_names": self.item_feature_names,
                     "num_hashes": self.hparams.num_hashes,
                     "num_buckets": self.hparams.num_buckets,
@@ -342,15 +437,11 @@ class Movielens1mRayDataModule(Movielens1mBaseDataModule):
             .map(
                 gather_inputs,
                 fn_kwargs={
-                    "user_idx": self.user_idx,
-                    "item_idx": self.item_idx,
                     "label": self.label,
                     "weight": self.weight,
                 },
             )
         )
-        if materialize:
-            dataset = dataset.materialize()
         return dataset
 
     def get_dataloader(self, dataset: ray.data.Dataset) -> ray.data.Dataset:
@@ -360,20 +451,15 @@ class Movielens1mRayDataModule(Movielens1mBaseDataModule):
             local_shuffle_buffer_size=self.hparams.batch_size * 2**4,
         )
 
-    def setup(self, stage: str) -> None:
-        super().setup(stage)
-        if stage == "fit":
-            self.train_data = self.get_dataset("train", materialize=True)
-
-        if stage in ("fit", "validate"):
-            self.val_data = self.get_dataset("val", materialize=True)
-
 
 if __name__ == "__main__":
     import rich
 
-    dm = Movielens1mPipeDataModule()
-    dm.prepare_data().head().collect().glimpse()
-    dm.setup("fit")
-    rich.print(next(iter(dm.train_dataloader())))
-    rich.print(next(iter(dm.val_dataloader())))
+    for dm_cls in [Movielens1mPipeDataModule, Movielens1mRayDataModule]:
+        dm = dm_cls()
+        dm.prepare_data().head().collect().glimpse()
+        dm.setup("fit")
+        for dataloader_fn in [dm.train_dataloader, dm.val_dataloader]:
+            batch = next(iter(dataloader_fn()))
+            rich.print(batch)
+            rich.print({key: value.shape for key, value in batch.items()})
