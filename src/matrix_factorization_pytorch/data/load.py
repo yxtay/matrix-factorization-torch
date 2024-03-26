@@ -321,7 +321,7 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
                     feature_names=self.item_feature_names,
                     num_hashes=self.hparams.num_hashes,
                     num_buckets=self.hparams.num_buckets,
-                    out_prefix="rand_item_",
+                    out_prefix="neg_item_",
                     keep_input=False,
                 )
             )

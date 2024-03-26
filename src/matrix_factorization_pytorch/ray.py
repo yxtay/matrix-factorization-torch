@@ -11,7 +11,6 @@ import ray.train
 import ray.train.lightning as ray_lightning
 import ray.train.torch as ray_torch
 import ray.tune
-import ray.tune.schedulers as ray_schedulers
 import ray.tune.stopper as ray_stopper
 
 from .data.load import Movielens1mPipeDataModule
@@ -211,14 +210,12 @@ def get_tuner():
         low_cost_partial_config={"train_loop_config": low_cost_partial_config},
         points_to_evaluate=[{"train_loop_config": point_to_evaluate}],
     )
-    scheduler = ray_schedulers.AsyncHyperBandScheduler()
     tune_config = ray.tune.TuneConfig(
         metric=METRIC["name"],
         mode=METRIC["mode"],
         search_alg=search_alg,
-        scheduler=scheduler,
         num_samples=-1,
-        time_budget_s=20000,
+        time_budget_s=40000,
         max_concurrent_trials=1,
     )
     tuner = ray.tune.Tuner(

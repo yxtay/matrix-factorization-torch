@@ -73,35 +73,35 @@ class LitMatrixFactorization(L.LightningModule):
         # shape: (batch_size, num_item_features)
 
         # negative item
-        rand_item_idx = batch.get("rand_item_idx")
+        neg_item_idx = batch.get("neg_item_idx")
         # shape: (batch_size, neg_multiple)
-        rand_item_feature_hashes = batch.get("rand_item_feature_hashes")
+        neg_item_feature_hashes = batch.get("neg_item_feature_hashes")
         # shape: (batch_size, neg_multiple, num_item_features)
-        rand_item_feature_weights = batch.get("rand_item_feature_weights")
+        neg_item_feature_weights = batch.get("neg_item_feature_weights")
         # shape: (batch_size, neg_multiple, num_item_features)
 
         user_embed = self.model.embed(user_feature_hashes, user_feature_weights)
         # shape: (batch_size, embed_dim)
         item_embed = self.model.embed(item_feature_hashes, item_feature_weights)
         # shape: (batch_size, embed_dim)
-        if rand_item_feature_hashes is not None:
-            num_item_features = rand_item_feature_hashes.size(-1)
+        if neg_item_feature_hashes is not None:
+            num_item_features = neg_item_feature_hashes.size(-1)
             # reshape to 2d
-            rand_item_feature_hashes = rand_item_feature_hashes.reshape(
+            neg_item_feature_hashes = neg_item_feature_hashes.reshape(
                 -1, num_item_features
             )
             # shape: (batch_size * neg_multiple, num_item_features)
-            rand_item_feature_weights = rand_item_feature_weights.reshape(
+            neg_item_feature_weights = neg_item_feature_weights.reshape(
                 -1, num_item_features
             )
             # shape: (batch_size * neg_multiple, num_item_features)
-            rand_item_embed = self.model.embed(
-                rand_item_feature_hashes, rand_item_feature_weights
+            neg_item_embed = self.model.embed(
+                neg_item_feature_hashes, neg_item_feature_weights
             )
             # shape: (batch_size * neg_multiple, embed_dim)
-            item_embed = torch.cat([item_embed, rand_item_embed])
+            item_embed = torch.cat([item_embed, neg_item_embed])
             # shape: (batch_size * (1 + neg_multiple), embed_dim)
-            item_idx = torch.cat([item_idx, rand_item_idx.reshape(-1)])
+            item_idx = torch.cat([item_idx, neg_item_idx.reshape(-1)])
             # shape: (batch_size * (1 + neg_multiple))
 
         losses = {}
