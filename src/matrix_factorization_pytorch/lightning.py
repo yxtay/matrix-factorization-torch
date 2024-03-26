@@ -17,12 +17,11 @@ class LitMatrixFactorization(L.LightningModule):
         self,
         num_embeddings: int = 2**16 + 1,
         embedding_dim: int = 32,
-        train_loss: str = "PairwiseLogisticLoss",
+        train_loss: str = "PairwiseHingeLoss",
         *,
         max_norm: float = None,
         sparse: bool = True,
         normalize: bool = True,
-        use_user_negatives: bool = False,
         learning_rate: float = 0.1,
     ) -> None:
         super().__init__()
@@ -33,13 +32,18 @@ class LitMatrixFactorization(L.LightningModule):
         self.metrics = self.get_metrics(top_k=20)
 
     def forward(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
-        user_features = batch["user_feature_hashes"]
-        item_features = batch["item_feature_hashes"]
-        user_feature_weights = batch.get("user_feature_weights")
-        item_feature_weights = batch.get("item_feature_weights")
+        user_feature_hashes = batch["user_feature_hashes"]
+        # shape: (batch_size, num_user_features)
+        item_feature_hashes = batch["item_feature_hashes"]
+        # shape: (batch_size, num_user_features)
+        user_feature_weights = batch["user_feature_weights"]
+        # shape: (batch_size, num_item_features)
+        item_feature_weights = batch["item_feature_weights"]
+        # shape: (batch_size, num_item_features)
+        # output shape: (batch_size)
         return self.model(
-            user_features,
-            item_features,
+            user_feature_hashes,
+            item_feature_hashes,
             user_feature_weights=user_feature_weights,
             item_feature_weights=item_feature_weights,
         )
@@ -48,16 +52,57 @@ class LitMatrixFactorization(L.LightningModule):
         self, batch: dict[str, torch.Tensor], step_name: str = "train"
     ) -> dict[str, torch.Tensor]:
         label = batch["label"]
+        # shape: (batch_size)
         sample_weight = batch["weight"]
-        user_features = batch["user_feature_hashes"]
-        item_features = batch["item_feature_hashes"]
-        user_feature_weights = batch.get("user_feature_weights")
-        item_feature_weights = batch.get("item_feature_weights")
-        user_idx = batch["user_idx"]
-        item_idx = batch["item_idx"]
+        # shape: (batch_size)
 
-        user_embed = self.model.embed(user_features, user_feature_weights)
-        item_embed = self.model.embed(item_features, item_feature_weights)
+        # user
+        user_idx = batch["user_idx"]
+        # shape: (batch_size)
+        user_feature_hashes = batch["user_feature_hashes"]
+        # shape: (batch_size, num_user_features)
+        user_feature_weights = batch.get("user_feature_weights")
+        # shape: (batch_size, num_user_features)
+
+        # item
+        item_idx = batch["item_idx"]
+        # shape: (batch_size)
+        item_feature_hashes = batch["item_feature_hashes"]
+        # shape: (batch_size, num_item_features)
+        item_feature_weights = batch.get("item_feature_weights")
+        # shape: (batch_size, num_item_features)
+
+        # negative item
+        neg_item_idx = batch.get("neg_item_idx")
+        # shape: (batch_size, neg_multiple)
+        neg_item_feature_hashes = batch.get("neg_item_feature_hashes")
+        # shape: (batch_size, neg_multiple, num_item_features)
+        neg_item_feature_weights = batch.get("neg_item_feature_weights")
+        # shape: (batch_size, neg_multiple, num_item_features)
+
+        user_embed = self.model.embed(user_feature_hashes, user_feature_weights)
+        # shape: (batch_size, embed_dim)
+        item_embed = self.model.embed(item_feature_hashes, item_feature_weights)
+        # shape: (batch_size, embed_dim)
+        if neg_item_feature_hashes is not None:
+            num_item_features = neg_item_feature_hashes.size(-1)
+            # reshape to 2d
+            neg_item_feature_hashes = neg_item_feature_hashes.reshape(
+                -1, num_item_features
+            )
+            # shape: (batch_size * neg_multiple, num_item_features)
+            neg_item_feature_weights = neg_item_feature_weights.reshape(
+                -1, num_item_features
+            )
+            # shape: (batch_size * neg_multiple, num_item_features)
+            neg_item_embed = self.model.embed(
+                neg_item_feature_hashes, neg_item_feature_weights
+            )
+            # shape: (batch_size * neg_multiple, embed_dim)
+            item_embed = torch.cat([item_embed, neg_item_embed])
+            # shape: (batch_size * (1 + neg_multiple), embed_dim)
+            item_idx = torch.cat([item_idx, neg_item_idx.reshape(-1)])
+            # shape: (batch_size * (1 + neg_multiple))
 
         losses = {}
         for loss_fn in self.loss_fns:
@@ -148,7 +193,7 @@ class LitMatrixFactorization(L.LightningModule):
 
     def get_loss_fns(self) -> torch.nn.ModuleList:
         loss_fns = [
-            loss_cls(use_user_negatives=self.hparams.use_user_negatives)
+            loss_cls()
             for loss_cls in [
                 mf_losses.AlignmentLoss,
                 mf_losses.ContrastiveLoss,
@@ -240,7 +285,7 @@ if __name__ == "__main__":
         trainer = get_trainer(experiment_name)
 
         with trainer.init_module():
-            datamodule = mf_data.Movielens1mPipeDataModule()
+            datamodule = mf_data.Movielens1mPipeDataModule(negative_multiple=1)
             model = LitMatrixFactorization(train_loss=train_loss)
 
         with mlflow.active_run():
