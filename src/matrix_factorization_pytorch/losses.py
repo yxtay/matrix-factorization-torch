@@ -99,15 +99,17 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
 
         # accidental hits can be samples with same user or item
         batch_size, num_items = losses.size()
+        # pad columns with zeroes if num_items > batch_size
         user_hits = (
             user_idx[:, None] == F.pad(user_idx, (0, num_items - batch_size))[None, :]
         )
         # shape: (batch_size, num_items)
+        # limit rows to batch size if num_items > batch_size
         item_hits = item_idx[:batch_size, None] == item_idx[None, :]
         # shape: (batch_size, num_items)
         accidental_hits = user_hits | item_hits
         # shape: (batch_size, num_items)
-        return accidental_hits.logical_not().float()
+        return accidental_hits.logical_not()
 
     @staticmethod
     def alignment_loss(
@@ -159,8 +161,6 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         # shape: (batch_size, num_items)
         losses = (margin - sq_distances * sigma).relu()
         # shape: (batch_size, num_items)
-
-        # weighted mean over negative samples
         negative_weights = EmbeddingLoss.negative_weights(
             losses, user_idx=user_idx, item_idx=item_idx
         )
@@ -378,8 +378,6 @@ class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
         # shape: (batch_size, num_items)
         losses = self.score_loss_fn(distances_diff * sigma - margin)
         # shape: (batch_size, num_items)
-
-        # weighted mean over negative samples
         negative_weights = self.negative_weights(
             losses, user_idx=user_idx, item_idx=item_idx
         )
