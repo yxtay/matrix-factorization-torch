@@ -74,13 +74,14 @@ def train_loop_per_worker(config):
     with trainer.init_module():
         num_embeddings = 2 ** config["num_embeddings_exp"] + 1
         max_norm = 2.0 ** config["max_norm_exp"] if config["use_max_norm"] else None
+        batch_size = 2 ** (config["batch_size_exp"] - config["negative_multiple_exp"])
 
         datamodule = Movielens1mPipeDataModule(
             data_dir=config["data_dir"],
-            batch_size=2 ** config["batch_size_exp"],
+            batch_size=batch_size,
             num_hashes=config["num_hashes"],
             num_buckets=num_embeddings,
-            negative_multiple=config["negative_multiple"],
+            negative_multiple=2 ** config["negative_multiple_exp"] - 1,
         )
         model = LitMatrixFactorization(
             num_embeddings=num_embeddings,
@@ -139,7 +140,7 @@ def get_ray_trainer():
         "data_dir": Path("data").absolute(),
         "batch_size_exp": 10,
         "num_hashes": 2,
-        "negative_multiple": 0,
+        "negative_multiple_exp": 1,
         # lightning module
         "num_embeddings_exp": 16,
         "embedding_dim_exp": 5,
@@ -166,15 +167,16 @@ def get_tuner():
     train_losses = [
         "PairwiseLogisticLoss",
         "PairwiseHingeLoss",
-        "AlignmentContrastiveLoss",
-        "AlignmentUniformityLoss",
-        "MutualInformationNeuralEstimatorLoss",
+        "InfomationNoiseContrastiveEstimationLoss",
+        "MutualInformationNeuralEstimationLoss",
+        # "AlignmentContrastiveLoss",
+        # "AlignmentUniformityLoss",
     ]
     search_space = {
-        "num_hashes": ray.tune.randint(1, 5),
-        "negative_multiple": ray.tune.randint(0, 5),
-        "num_embeddings_exp": ray.tune.randint(10, 17),
-        "embedding_dim_exp": ray.tune.randint(2, 7),
+        # "num_hashes": ray.tune.randint(1, 5),
+        "negative_multiple_exp": ray.tune.randint(0, 4),
+        # "num_embeddings_exp": ray.tune.randint(10, 17),
+        # "embedding_dim_exp": ray.tune.randint(2, 7),
         "train_loss": ray.tune.choice(train_losses),
         # "use_max_norm": ray.tune.choice([False, True]),
         # "max_norm_exp": ray.tune.randint(0, 6),
@@ -183,10 +185,10 @@ def get_tuner():
         "precision": ray.tune.choice(["bf16-true", "bf16-mixed"]),
     }
     low_cost_partial_config = {
-        "num_hashes": 1,
-        "negative_multiple": 0,
-        "num_embeddings_exp": 10,
-        "embedding_dim_exp": 2,
+        # "num_hashes": 1,
+        "negative_multiple_exp": 0,
+        # "num_embeddings_exp": 10,
+        # "embedding_dim_exp": 2,
         # "train_loss": "PairwiseHingeLoss",
         # "use_max_norm": False,
         # "max_norm_exp": 0,
@@ -195,10 +197,10 @@ def get_tuner():
         "precision": "bf16-true",
     }
     point_to_evaluate = {
-        "num_hashes": 2,
-        "negative_multiple": 1,
-        "num_embeddings_exp": 16,
-        "embedding_dim_exp": 5,
+        # "num_hashes": 2,
+        "negative_multiple_exp": 1,
+        # "num_embeddings_exp": 16,
+        # "embedding_dim_exp": 5,
         "train_loss": "PairwiseHingeLoss",
         # "use_max_norm": False,
         # "max_norm_exp": 0,
@@ -215,7 +217,7 @@ def get_tuner():
         mode=METRIC["mode"],
         search_alg=search_alg,
         num_samples=-1,
-        time_budget_s=40000,
+        time_budget_s=60000,
         max_concurrent_trials=1,
     )
     tuner = ray.tune.Tuner(
