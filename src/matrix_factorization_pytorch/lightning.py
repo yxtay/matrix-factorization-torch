@@ -27,9 +27,9 @@ class LitMatrixFactorization(L.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.model = None
-        self.example_input_array = self.get_example_input_array()
-        self.loss_fns = self.get_loss_fns()
-        self.metrics = self.get_metrics(top_k=20)
+        self.loss_fns = None
+        self.metrics = None
+        self.example_input_array = None
 
     def forward(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
         user_feature_hashes = batch["user_feature_hashes"]
@@ -86,7 +86,7 @@ class LitMatrixFactorization(L.LightningModule):
         # shape: (batch_size, embed_dim)
         if neg_item_feature_hashes is not None:
             num_item_features = neg_item_feature_hashes.size(-1)
-            # reshape to 2d
+            # shape: (batch_size * neg_multiple)
             neg_item_feature_hashes = neg_item_feature_hashes.reshape(
                 -1, num_item_features
             )
@@ -183,28 +183,36 @@ class LitMatrixFactorization(L.LightningModule):
 
     def configure_model(self) -> None:
         if self.model is None:
-            self.model = mf_models.MatrixFactorization(
-                num_embeddings=self.hparams.num_embeddings,
-                embedding_dim=self.hparams.embedding_dim,
-                max_norm=self.hparams.max_norm,
-                sparse=self.hparams.sparse,
-                normalize=self.hparams.normalize,
-            )
+            self.model = self.get_model()
+        if self.loss_fns is None:
+            self.loss_fns = self.get_loss_fns()
+        if self.metrics is None:
+            self.metrics = self.get_metrics(top_k=20)
+        if self.example_input_array is None:
+            self.example_input_array = self.get_example_input_array()
+
+    def get_model(self) -> torch.nn.Module:
+        return mf_models.MatrixFactorization(
+            num_embeddings=self.hparams.num_embeddings,
+            embedding_dim=self.hparams.embedding_dim,
+            max_norm=self.hparams.max_norm,
+            sparse=self.hparams.sparse,
+            normalize=self.hparams.normalize,
+        )
 
     def get_loss_fns(self) -> torch.nn.ModuleList:
-        loss_fns = [
-            loss_cls()
-            for loss_cls in [
-                mf_losses.AlignmentLoss,
-                mf_losses.ContrastiveLoss,
-                mf_losses.AlignmentContrastiveLoss,
-                mf_losses.UniformityLoss,
-                mf_losses.AlignmentUniformityLoss,
-                mf_losses.MutualInformationNeuralEstimatorLoss,
-                mf_losses.PairwiseHingeLoss,
-                mf_losses.PairwiseLogisticLoss,
-            ]
+        loss_classes = [
+            mf_losses.AlignmentLoss,
+            mf_losses.ContrastiveLoss,
+            mf_losses.AlignmentContrastiveLoss,
+            mf_losses.UniformityLoss,
+            mf_losses.AlignmentUniformityLoss,
+            mf_losses.InfomationNoiseContrastiveEstimationLoss,
+            mf_losses.MutualInformationNeuralEstimationLoss,
+            mf_losses.PairwiseHingeLoss,
+            mf_losses.PairwiseLogisticLoss,
         ]
+        loss_fns = [loss_class() for loss_class in loss_classes]
         return torch.nn.ModuleList(loss_fns)
 
     def get_metrics(self, top_k: int = 20) -> torch.nn.ModuleDict:
@@ -276,16 +284,17 @@ if __name__ == "__main__":
     train_losses = [
         "PairwiseLogisticLoss",
         "PairwiseHingeLoss",
-        "AlignmentContrastiveLoss",
-        "AlignmentUniformityLoss",
-        "MutualInformationNeuralEstimatorLoss",
+        "InfomationNoiseContrastiveEstimationLoss",
+        "MutualInformationNeuralEstimationLoss",
+        # "AlignmentContrastiveLoss",
+        # "AlignmentUniformityLoss",
     ]
     for train_loss in train_losses:
         mlflow_start_run(experiment_name)
         trainer = get_trainer(experiment_name)
 
         with trainer.init_module():
-            datamodule = mf_data.Movielens1mPipeDataModule(negative_multiple=1)
+            datamodule = mf_data.Movielens1mPipeDataModule(negative_multiple=0)
             model = LitMatrixFactorization(train_loss=train_loss)
 
         with mlflow.active_run():

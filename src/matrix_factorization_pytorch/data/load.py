@@ -143,25 +143,11 @@ def ray_collate_fn(
 ) -> torch.Tensor | dict[str, torch.Tensor]:
     if isinstance(batch, dict):
         return {
-            col_name: ray_collate_fn(col_batch) for col_name, col_batch in batch.items()
+            col_name: torch_data.default_collate(col_batch)
+            for col_name, col_batch in batch.items()
         }
 
-    # batch is np.ndarray
-    if (
-        batch.dtype.type is np.object_
-        and isinstance(batch[0], np.ndarray)
-        and any(elem.shape != batch[0].shape for elem in batch)
-        and (
-            # only last dimension different
-            all(elem.shape[:-1] == batch[0].shape[:-1] for elem in batch)
-            # only first dimension differen
-            or all(elem.shape[1:] == batch[0].shape[1:] for elem in batch)
-        )
-    ):
-        nested = torch.nested.as_nested_tensor([torch.as_tensor(arr) for arr in batch])
-        return torch.nested.to_padded_tensor(nested, padding=0)
-
-    return torch.as_tensor(batch)
+    return torch_data.default_collate(batch)
 
 
 @torch_data.functional_datapipe("load_pyarrow_dataset_as_dict")
@@ -375,8 +361,6 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
             )
         )
         if subset == "train" and self.hparams.negative_multiple > 0:
-            num_movies = len(self.get_movies_dataset())
-            (len(datapipe) * self.hparams.negative_multiple // num_movies + 1)
             datapipe = (
                 self.get_movies_dataset(cycle_count=None)
                 .batch(self.hparams.negative_multiple)
