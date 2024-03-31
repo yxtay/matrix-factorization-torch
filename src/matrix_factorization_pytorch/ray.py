@@ -77,6 +77,7 @@ def train_loop_per_worker(config):
         batch_size = 2 ** (
             config["batch_size_exp"] - config["negatives_multiple_exp"] + 1
         )
+        negatives_multiple = 2 ** config["negatives_multiple_exp"] - 1
         hard_negatives_factor = (
             config["hard_negatives_factor"] if config["use_hard_negatives"] else None
         )
@@ -86,7 +87,7 @@ def train_loop_per_worker(config):
             batch_size=batch_size,
             num_hashes=config["num_hashes"],
             num_buckets=num_embeddings,
-            negatives_multiple=2 ** config["negatives_multiple_exp"] - 1,
+            negatives_multiple=negatives_multiple,
         )
         model = LitMatrixFactorization(
             num_embeddings=num_embeddings,
