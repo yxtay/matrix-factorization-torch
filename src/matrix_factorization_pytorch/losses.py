@@ -70,7 +70,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
 
     @staticmethod
     def _check_idx(
-        size: torch.Size,
+        size: int,
         idx: torch.Tensor | None = None,
     ) -> torch.Tensor:
         if idx is None:
