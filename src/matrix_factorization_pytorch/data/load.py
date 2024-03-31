@@ -243,7 +243,7 @@ class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
         num_hashes: int = 2,
         num_buckets: int = 2**16 + 1,
         batch_size: int = 2**10,
-        negative_multiple: int = 1,
+        negatives_multiple: int = 1,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -360,10 +360,10 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
                 )
             )
         )
-        if subset == "train" and self.hparams.negative_multiple > 0:
+        if subset == "train" and self.hparams.negatives_multiple > 0:
             datapipe = (
                 self.get_movies_dataset(cycle_count=None)
-                .batch(self.hparams.negative_multiple)
+                .batch(self.hparams.negatives_multiple)
                 .collate()
                 .zip(datapipe)
                 .map(merge_rows)
