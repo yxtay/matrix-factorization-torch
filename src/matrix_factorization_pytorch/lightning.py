@@ -22,6 +22,7 @@ class LitMatrixFactorization(L.LightningModule):
         max_norm: float = None,
         sparse: bool = True,
         normalize: bool = True,
+        hard_negatives_factor: float | None = None,
         learning_rate: float = 0.1,
     ) -> None:
         super().__init__()
@@ -212,7 +213,10 @@ class LitMatrixFactorization(L.LightningModule):
             mf_losses.PairwiseHingeLoss,
             mf_losses.PairwiseLogisticLoss,
         ]
-        loss_fns = [loss_class() for loss_class in loss_classes]
+        loss_fns = [
+            loss_class(hard_negatives_factor=self.hparams.hard_negatives_factor)
+            for loss_class in loss_classes
+        ]
         return torch.nn.ModuleList(loss_fns)
 
     def get_metrics(self, top_k: int = 20) -> torch.nn.ModuleDict:
@@ -271,6 +275,7 @@ def get_trainer(experiment_name: str = "") -> L.Trainer:
         callbacks=callbacks,
         max_epochs=1,
         max_time=datetime.timedelta(hours=1),
+        # fast_dev_run=True,
     )
 
 
@@ -286,15 +291,15 @@ if __name__ == "__main__":
         "PairwiseHingeLoss",
         "InfomationNoiseContrastiveEstimationLoss",
         "MutualInformationNeuralEstimationLoss",
-        # "AlignmentContrastiveLoss",
-        # "AlignmentUniformityLoss",
+        "AlignmentContrastiveLoss",
+        "AlignmentUniformityLoss",
     ]
     for train_loss in train_losses:
         mlflow_start_run(experiment_name)
         trainer = get_trainer(experiment_name)
 
         with trainer.init_module():
-            datamodule = mf_data.Movielens1mPipeDataModule(negative_multiple=0)
+            datamodule = mf_data.Movielens1mPipeDataModule()
             model = LitMatrixFactorization(train_loss=train_loss)
 
         with mlflow.active_run():
