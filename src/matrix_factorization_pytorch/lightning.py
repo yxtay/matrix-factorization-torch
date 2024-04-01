@@ -22,7 +22,7 @@ class LitMatrixFactorization(L.LightningModule):
         max_norm: float = None,
         sparse: bool = True,
         normalize: bool = True,
-        hard_negatives_factor: float | None = None,
+        hard_negatives_ratio: float | None = None,
         learning_rate: float = 0.1,
     ) -> None:
         super().__init__()
@@ -214,7 +214,7 @@ class LitMatrixFactorization(L.LightningModule):
             mf_losses.PairwiseLogisticLoss,
         ]
         loss_fns = [
-            loss_class(hard_negatives_factor=self.hparams.hard_negatives_factor)
+            loss_class(hard_negatives_ratio=self.hparams.hard_negatives_ratio)
             for loss_class in loss_classes
         ]
         return torch.nn.ModuleList(loss_fns)
@@ -287,8 +287,8 @@ if __name__ == "__main__":
     experiment_name = datetime.datetime.now().isoformat()
 
     train_losses = [
-        "PairwiseLogisticLoss",
         "PairwiseHingeLoss",
+        "PairwiseLogisticLoss",
         "InfomationNoiseContrastiveEstimationLoss",
         "MutualInformationNeuralEstimationLoss",
         "AlignmentContrastiveLoss",

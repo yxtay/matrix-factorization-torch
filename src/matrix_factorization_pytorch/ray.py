@@ -74,12 +74,10 @@ def train_loop_per_worker(config):
     with trainer.init_module():
         num_embeddings = 2 ** config["num_embeddings_exp"] + 1
         max_norm = 2.0 ** config["max_norm_exp"] if config["use_max_norm"] else None
-        batch_size = 2 ** (
-            config["batch_size_exp"] - config["negatives_multiple_exp"] + 1
-        )
-        negatives_multiple = 2 ** config["negatives_multiple_exp"] - 1
-        hard_negatives_factor = (
-            config["hard_negatives_factor"] if config["use_hard_negatives"] else None
+        batch_size = 2 ** (config["batch_size_exp"] - config["negatives_ratio_exp"] + 1)
+        negatives_ratio = 2 ** config["negatives_ratio_exp"] - 1
+        hard_negatives_ratio = (
+            config["hard_negatives_ratio"] if config["use_hard_negatives"] else None
         )
 
         datamodule = Movielens1mPipeDataModule(
@@ -87,7 +85,7 @@ def train_loop_per_worker(config):
             batch_size=batch_size,
             num_hashes=config["num_hashes"],
             num_buckets=num_embeddings,
-            negatives_multiple=negatives_multiple,
+            negatives_ratio=negatives_ratio,
         )
         model = LitMatrixFactorization(
             num_embeddings=num_embeddings,
@@ -96,7 +94,7 @@ def train_loop_per_worker(config):
             max_norm=max_norm,
             sparse=config["sparse"],
             normalize=config["normalize"],
-            hard_negatives_factor=hard_negatives_factor,
+            hard_negatives_ratio=hard_negatives_ratio,
             learning_rate=config["learning_rate"],
         )
 
@@ -141,7 +139,7 @@ def get_ray_trainer():
         "data_dir": Path("data").absolute(),
         "batch_size_exp": 10,
         "num_hashes": 2,
-        "negatives_multiple_exp": 1,
+        "negatives_ratio_exp": 1,
         # lightning module
         "num_embeddings_exp": 16,
         "embedding_dim_exp": 5,
@@ -151,7 +149,7 @@ def get_ray_trainer():
         "sparse": True,
         "normalize": True,
         "use_hard_negatives": False,
-        "hard_negatives_factor": 1.0,
+        "hard_negatives_ratio": 1.0,
         "learning_rate": 0.1,
     }
     scaling_config = ray.train.ScalingConfig(
@@ -168,8 +166,8 @@ def get_ray_trainer():
 
 def get_tuner():
     train_losses = [
-        "PairwiseLogisticLoss",
         "PairwiseHingeLoss",
+        "PairwiseLogisticLoss",
         "InfomationNoiseContrastiveEstimationLoss",
         "MutualInformationNeuralEstimationLoss",
         "AlignmentContrastiveLoss",
@@ -177,7 +175,7 @@ def get_tuner():
     ]
     search_space = {
         # "num_hashes": ray.tune.randint(1, 5),
-        "negatives_multiple_exp": ray.tune.randint(1, 4),
+        "negatives_ratio_exp": ray.tune.randint(1, 4),
         # "num_embeddings_exp": ray.tune.randint(10, 17),
         # "embedding_dim_exp": ray.tune.randint(2, 7),
         "train_loss": ray.tune.choice(train_losses),
@@ -185,13 +183,13 @@ def get_tuner():
         # "max_norm_exp": ray.tune.randint(0, 6),
         # "normalize": ray.tune.choice([True, False]),
         "use_hard_negatives": ray.tune.choice([True, False]),
-        "hard_negatives_factor": ray.tune.quniform(0.5, 2.0, 0.01),
+        "hard_negatives_ratio": ray.tune.quniform(0.5, 2.0, 0.01),
         "learning_rate": ray.tune.qloguniform(0.01, 1.0, 0.01),
         "precision": ray.tune.choice(["bf16-true", "bf16-mixed"]),
     }
     low_cost_partial_config = {
         # "num_hashes": 1,
-        "negatives_multiple_exp": 0,
+        "negatives_ratio_exp": 1,
         # "num_embeddings_exp": 10,
         # "embedding_dim_exp": 2,
         # "train_loss": "PairwiseHingeLoss",
@@ -199,21 +197,21 @@ def get_tuner():
         # "max_norm_exp": 0,
         # "normalize": True,
         "use_hard_negatives": True,
-        "hard_negatives_factor": 1.0,
+        "hard_negatives_ratio": 1.0,
         # "learning_rate": 0.1,
         "precision": "bf16-true",
     }
     point_to_evaluate = {
         # "num_hashes": 2,
-        "negatives_multiple_exp": 1,
+        "negatives_ratio_exp": 1,
         # "num_embeddings_exp": 16,
         # "embedding_dim_exp": 5,
         "train_loss": "PairwiseHingeLoss",
         # "use_max_norm": False,
         # "max_norm_exp": 0,
         # "normalize": True,
-        "use_hard_negatives": False,
-        "hard_negatives_factor": 1.0,
+        "use_hard_negatives": True,
+        "hard_negatives_ratio": 1.0,
         "learning_rate": 0.1,
         "precision": "bf16-true",
     }
