@@ -201,7 +201,8 @@ class CyclerIterDataPipe(torch_data.IterDataPipe):
     def __len__(self) -> int:
         if self.count is None:
             # use arbitrary large number so that valid length is shown for zip
-            return 2**32
+            # max 32-bit signed integer
+            return 2**31 - 1
         return len(self.source_datapipe) * self.count
 
     def __iter__(self) -> Iterable[dict]:
@@ -243,7 +244,7 @@ class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
         num_hashes: int = 2,
         num_buckets: int = 2**16 + 1,
         batch_size: int = 2**10,
-        negatives_multiple: int = 1,
+        negatives_ratio: int = 1,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -360,10 +361,10 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
                 )
             )
         )
-        if subset == "train" and self.hparams.negatives_multiple > 0:
+        if subset == "train" and self.hparams.negatives_ratio > 0:
             datapipe = (
                 self.get_movies_dataset(cycle_count=None)
-                .batch(self.hparams.negatives_multiple)
+                .batch(self.hparams.negatives_ratio)
                 .collate()
                 .zip(datapipe)
                 .map(merge_rows)
