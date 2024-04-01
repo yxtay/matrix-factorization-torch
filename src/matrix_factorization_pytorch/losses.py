@@ -113,7 +113,8 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         if hard_negatives_ratio is None:
             return losses, negative_masks
 
-        # num_hard_negatives as a factor of batch_size
+        # num_hard_negatives as a ratio of batch_size
+        # important to handle different batch_size, especially last batch
         num_hard_negatives = int(losses.size(0) * hard_negatives_ratio)
         if hard_negatives_ratio > 1 and losses.size(1) <= num_hard_negatives:
             return losses, negative_masks
