@@ -201,8 +201,7 @@ class CyclerIterDataPipe(torch_data.IterDataPipe):
     def __len__(self) -> int:
         if self.count is None:
             # use arbitrary large number so that valid length is shown for zip
-            # max 32-bit signed integer
-            return 2**31 - 1
+            return 2**31 - 1  # max 32-bit signed integer
         return len(self.source_datapipe) * self.count
 
     def __iter__(self) -> Iterable[dict]:
