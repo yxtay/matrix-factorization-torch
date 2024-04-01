@@ -210,7 +210,7 @@ def get_tuner():
         # "use_max_norm": False,
         # "max_norm_exp": 0,
         # "normalize": True,
-        "use_hard_negatives": False,
+        "use_hard_negatives": True,
         "hard_negatives_ratio": 1.0,
         "learning_rate": 0.1,
         "precision": "bf16-true",
