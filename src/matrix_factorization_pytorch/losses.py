@@ -101,7 +101,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         # shape: (batch_size, num_items)
         accidental_hits = user_hits | item_hits
         # shape: (batch_size, num_items)
-        return accidental_hits.logical_not()
+        return ~accidental_hits
 
     @staticmethod
     def hard_negative_mining(
