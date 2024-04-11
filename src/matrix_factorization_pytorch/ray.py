@@ -74,7 +74,7 @@ def train_loop_per_worker(config):
     with trainer.init_module():
         num_embeddings = 2 ** config["num_embeddings_exp"] + 1
         max_norm = 2.0 ** config["max_norm_exp"] if config["use_max_norm"] else None
-        batch_size = 2 ** (config["batch_size_exp"] - config["negatives_ratio_exp"] + 1)
+        batch_size = 2 ** (config["batch_size_exp"] - config["negatives_ratio_exp"])
         negatives_ratio = 2 ** config["negatives_ratio_exp"] - 1
         hard_negatives_ratio = (
             config["hard_negatives_ratio"] if config["use_hard_negatives"] else None
@@ -137,7 +137,7 @@ def get_ray_trainer():
         "max_time": datetime.timedelta(hours=1),
         # datamodule
         "data_dir": Path("data").absolute(),
-        "batch_size_exp": 10,
+        "batch_size_exp": 11,
         "num_hashes": 2,
         "negatives_ratio_exp": 1,
         # lightning module
@@ -165,27 +165,19 @@ def get_ray_trainer():
 
 
 def get_tuner():
-    train_losses = [
-        "PairwiseHingeLoss",
-        "PairwiseLogisticLoss",
-        "InfomationNoiseContrastiveEstimationLoss",
-        "MutualInformationNeuralEstimationLoss",
-        "AlignmentContrastiveLoss",
-        "AlignmentUniformityLoss",
-    ]
     search_space = {
         # "num_hashes": ray.tune.randint(1, 5),
         "negatives_ratio_exp": ray.tune.randint(1, 4),
         # "num_embeddings_exp": ray.tune.randint(10, 17),
         # "embedding_dim_exp": ray.tune.randint(2, 7),
-        "train_loss": ray.tune.choice(train_losses),
+        # "train_loss": ray.tune.choice(train_losses),
         # "use_max_norm": ray.tune.choice([False, True]),
         # "max_norm_exp": ray.tune.randint(0, 6),
         # "normalize": ray.tune.choice([True, False]),
         "use_hard_negatives": ray.tune.choice([True, False]),
         "hard_negatives_ratio": ray.tune.quniform(0.5, 2.0, 0.01),
         "learning_rate": ray.tune.qloguniform(0.01, 1.0, 0.01),
-        "precision": ray.tune.choice(["bf16-true", "bf16-mixed"]),
+        # "precision": ray.tune.choice(["bf16-true", "bf16-mixed"]),
     }
     low_cost_partial_config = {
         # "num_hashes": 1,
@@ -199,21 +191,21 @@ def get_tuner():
         "use_hard_negatives": True,
         "hard_negatives_ratio": 1.0,
         # "learning_rate": 0.1,
-        "precision": "bf16-true",
+        # "precision": "bf16-true",
     }
     point_to_evaluate = {
         # "num_hashes": 2,
         "negatives_ratio_exp": 1,
         # "num_embeddings_exp": 16,
         # "embedding_dim_exp": 5,
-        "train_loss": "PairwiseHingeLoss",
+        # "train_loss": "PairwiseHingeLoss",
         # "use_max_norm": False,
         # "max_norm_exp": 0,
         # "normalize": True,
         "use_hard_negatives": True,
         "hard_negatives_ratio": 1.0,
         "learning_rate": 0.1,
-        "precision": "bf16-true",
+        # "precision": "bf16-true",
     }
     search_alg = flaml.BlendSearch(
         low_cost_partial_config={"train_loop_config": low_cost_partial_config},
@@ -224,7 +216,7 @@ def get_tuner():
         mode=METRIC["mode"],
         search_alg=search_alg,
         num_samples=-1,
-        time_budget_s=60 * 60 * 15,
+        time_budget_s=60 * 60 * 6,
         max_concurrent_trials=1,
     )
     tuner = ray.tune.Tuner(
