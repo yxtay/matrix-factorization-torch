@@ -1,26 +1,16 @@
-import abc
-import functools
-import os
+from __future__ import annotations
+
 from collections.abc import Iterable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import lightning as L
-import mmh3
-import numpy as np
-import pyarrow.dataset as ds
-import ray
 import torch
 import torch.utils.data as torch_data
 import torch.utils.data._utils.collate as torch_collate
-import torch.utils.data.datapipes as torch_datapipes
-from filelock import FileLock
 
-from .prepare import (
-    DATA_DIR,
-    MOVIELENS_1M_URL,
-    download_unpack_data,
-    load_dense_movielens,
-)
+if TYPE_CHECKING:
+    import numpy as np
+    import pyarrow.dataset as ds
 
 
 def hash_features(
@@ -33,6 +23,8 @@ def hash_features(
     out_prefix: str = "",
     keep_input: bool = True,
 ) -> torch.Tensor:
+    import mmh3
+
     feature_values = []
     feature_weights = []
     num_features = 0
@@ -166,22 +158,35 @@ class PyArrowDatasetDictLoaderIterDataPipe(torch_data.IterDataPipe):
         self.filter_expr = filter_expr
         self.batch_size = batch_size
 
+    def pyarrow_dataset(self, source: str | Path) -> ds.Dataset:
+        import pyarrow.dataset as ds
+
+        return ds.dataset(source)
+
     def __len__(self) -> int:
         num_rows = sum(
-            ds.dataset(source).count_rows(filter=self.filter_expr)
+            self.pyarrow_dataset(source).count_rows(filter=self.filter_expr)
             for source in self.source_datapipe
         )
         return num_rows
 
     def __iter__(self) -> Iterable[dict]:
         for source in self.source_datapipe:
-            dataset = ds.dataset(source)
+            dataset = self.pyarrow_dataset(source)
             for batch in dataset.to_batches(
                 columns=self.columns,
                 filter=self.filter_expr,
                 batch_size=self.batch_size,
             ):
                 yield from batch.to_pylist()
+
+
+@torch_data.functional_datapipe("load_delta_table_as_dict")
+class DeltaTableDictLoaderIterDataPipe(PyArrowDatasetDictLoaderIterDataPipe):
+    def pyarrow_dataset(self, source: str | Path) -> ds.Dataset:
+        import deltalake as dl
+
+        return dl.DeltaTable(source).to_pyarrow_dataset()
 
 
 @torch_data.functional_datapipe("cycle")
@@ -209,241 +214,3 @@ class CyclerIterDataPipe(torch_data.IterDataPipe):
         while self.count is None or i < self.count:
             yield from self.source_datapipe
             i += 1
-
-
-class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
-    url: str = MOVIELENS_1M_URL
-    user_idx: str = "user_idx"
-    item_idx: str = "movie_idx"
-    label: str = "rating"
-    weight: str = "rating"
-    user_feature_names: list[str] = [
-        "user_id",
-        "gender",
-        "age",
-        "occupation",
-        "zipcode",
-    ]
-    item_feature_names: list[str] = [
-        "movie_id",
-        "genres",
-    ]
-    in_columns: list[str] = [
-        user_idx,
-        item_idx,
-        label,
-        weight,
-        *user_feature_names,
-        *item_feature_names,
-    ]
-
-    def __init__(
-        self,
-        data_dir: str = DATA_DIR,
-        num_hashes: int = 2,
-        num_buckets: int = 2**16 + 1,
-        batch_size: int = 2**10,
-        negatives_ratio: int = 1,
-    ):
-        super().__init__()
-        self.save_hyperparameters()
-
-    def prepare_data(self, *, overwrite: bool = False):
-        with FileLock(f"{self.hparams.data_dir}.lock"):
-            download_unpack_data(self.url, self.hparams.data_dir, overwrite=overwrite)
-            return load_dense_movielens(self.hparams.data_dir, overwrite=overwrite)
-
-    @abc.abstractclassmethod
-    def get_dataset(self, subset: str) -> torch.utils.data.Dataset: ...
-
-    @abc.abstractmethod
-    def get_dataloader(
-        self, dataset: torch.utils.data.Dataset
-    ) -> torch.utils.data.DataLoader: ...
-
-    def setup(self, stage: str) -> None:
-        if stage == "fit":
-            self.train_data = self.get_dataset("train")
-
-        if stage in ("fit", "validate"):
-            self.val_data = self.get_dataset("val")
-
-        if stage == "test":
-            self.test_data = self.get_dataset("test")
-
-        if stage == "predict":
-            self.predict_data = self.get_dataset("predict")
-
-    def train_dataloader(self) -> torch.utils.data.DataLoader:
-        return self.get_dataloader(self.train_data)
-
-    def val_dataloader(self) -> torch.utils.data.DataLoader:
-        return self.get_dataloader(self.val_data)
-
-    def test_dataloader(self) -> torch.utils.data.DataLoader:
-        return self.get_dataloader(self.test_data)
-
-    def predict_dataloader(self) -> torch.utils.data.DataLoader:
-        return self.get_dataloader(self.predict_data)
-
-
-class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
-    def get_movies_dataset(self, cycle_count: int | None = 1):
-        parquet_path = Path(self.hparams.data_dir, "ml-1m", "movies.parquet")
-
-        datapipe = (
-            torch_datapipes.iter.IterableWrapper([parquet_path])
-            .load_pyarrow_dataset_as_dict(
-                columns=[self.item_idx, *self.item_feature_names],
-                batch_size=self.hparams.batch_size,
-            )
-            .cycle(cycle_count)
-            .shuffle(buffer_size=self.hparams.batch_size * 2**4)
-            .sharding_filter()
-            .map(
-                functools.partial(
-                    hash_features,
-                    idx=self.item_idx,
-                    feature_names=self.item_feature_names,
-                    num_hashes=self.hparams.num_hashes,
-                    num_buckets=self.hparams.num_buckets,
-                    out_prefix="neg_item_",
-                    keep_input=False,
-                )
-            )
-        )
-        return datapipe
-
-    def get_dataset(self, subset: str) -> torch.utils.data.Dataset:
-        assert subset in {"train", "val", "test", "predict"}
-        parquet_file = {
-            "train": "sparse.parquet",
-            "val": "val.parquet",
-        }.get(subset, "dense.parquet")
-        parquet_path = Path(self.hparams.data_dir, "ml-1m", parquet_file)
-        filter_col = f"is_{subset}"
-
-        datapipe = (
-            torch_datapipes.iter.IterableWrapper([parquet_path])
-            .load_pyarrow_dataset_as_dict(
-                columns=list({*self.in_columns}),
-                filter_expr=ds.field(filter_col),
-                batch_size=self.hparams.batch_size,
-            )
-            .shuffle(buffer_size=self.hparams.batch_size * 2**4)
-            .sharding_filter()
-            .map(
-                functools.partial(
-                    hash_features,
-                    idx=self.user_idx,
-                    feature_names=self.user_feature_names,
-                    num_hashes=self.hparams.num_hashes,
-                    num_buckets=self.hparams.num_buckets,
-                    out_prefix="user_",
-                )
-            )
-            .map(
-                functools.partial(
-                    hash_features,
-                    idx=self.item_idx,
-                    feature_names=self.item_feature_names,
-                    num_hashes=self.hparams.num_hashes,
-                    num_buckets=self.hparams.num_buckets,
-                    out_prefix="item_",
-                )
-            )
-            .map(
-                functools.partial(
-                    gather_inputs,
-                    label=self.label,
-                    weight=self.weight,
-                )
-            )
-        )
-        if subset == "train" and self.hparams.negatives_ratio > 0:
-            datapipe = (
-                self.get_movies_dataset(cycle_count=None)
-                .batch(self.hparams.negatives_ratio)
-                .collate()
-                .zip(datapipe)
-                .map(merge_rows)
-            )
-
-        return datapipe
-
-    def get_dataloader(
-        self, dataset: torch.utils.data.Dataset
-    ) -> torch.utils.data.DataLoader:
-        return torch.utils.data.DataLoader(
-            dataset,
-            batch_size=self.hparams.batch_size,
-            num_workers=os.cpu_count() - 1,
-            persistent_workers=True,
-        )
-
-
-class Movielens1mRayDataModule(Movielens1mBaseDataModule):
-    def get_dataset(self, subset: str) -> ray.data.Dataset:
-        assert subset in {"train", "val", "test", "predict"}
-        parquet_file = {
-            "train": "sparse.parquet",
-            "val": "val.parquet",
-        }.get(subset, "dense.parquet")
-        parquet_path = Path(self.hparams.data_dir, "ml-1m", parquet_file)
-        filter_col = f"is_{subset}"
-
-        dataset = (
-            ray.data.read_parquet(
-                parquet_path,
-                columns=list({*self.in_columns, filter_col}),
-                filter=ds.field(filter_col),
-            )
-            .map(
-                hash_features,
-                fn_kwargs={
-                    "idx": self.user_idx,
-                    "feature_names": self.user_feature_names,
-                    "num_hashes": self.hparams.num_hashes,
-                    "num_buckets": self.hparams.num_buckets,
-                    "out_prefix": "user_",
-                },
-            )
-            .map(
-                hash_features,
-                fn_kwargs={
-                    "idx": self.item_idx,
-                    "feature_names": self.item_feature_names,
-                    "num_hashes": self.hparams.num_hashes,
-                    "num_buckets": self.hparams.num_buckets,
-                    "out_prefix": "item_",
-                },
-            )
-            .map(
-                gather_inputs,
-                fn_kwargs={
-                    "label": self.label,
-                    "weight": self.weight,
-                },
-            )
-        )
-        return dataset
-
-    def get_dataloader(self, dataset: ray.data.Dataset) -> ray.data.Dataset:
-        return dataset.iter_torch_batches(
-            batch_size=self.hparams.batch_size,
-            collate_fn=ray_collate_fn,
-            local_shuffle_buffer_size=self.hparams.batch_size * 2**4,
-        )
-
-
-if __name__ == "__main__":
-    import rich
-
-    for dm_cls in [Movielens1mPipeDataModule, Movielens1mRayDataModule]:
-        dm = dm_cls()
-        dm.prepare_data().head().collect().glimpse()
-        dm.setup("fit")
-        for dataloader_fn in [dm.train_dataloader, dm.val_dataloader]:
-            batch = next(iter(dataloader_fn()))
-            rich.print(batch)
-            rich.print({key: value.shape for key, value in batch.items()})
