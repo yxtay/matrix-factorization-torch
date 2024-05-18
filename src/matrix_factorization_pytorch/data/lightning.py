@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import abc
 import functools
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -66,7 +65,8 @@ class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
             download_unpack_data(self.url, self.hparams.data_dir, overwrite=overwrite)
             return load_dense_movielens(self.hparams.data_dir, overwrite=overwrite)
 
-    @abc.abstractclassmethod
+    @abc.abstractmethod
+    @classmethod
     def get_dataset(self, subset: str) -> torch.utils.data.Dataset: ...
 
     @abc.abstractmethod
@@ -189,6 +189,8 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
     def get_dataloader(
         self, dataset: torch.utils.data.Dataset
     ) -> torch.utils.data.DataLoader:
+        import os
+
         return torch.utils.data.DataLoader(
             dataset,
             batch_size=self.hparams.batch_size,
@@ -211,9 +213,15 @@ class Movielens1mRayDataModule(Movielens1mBaseDataModule):
         delta_path = Path(self.hparams.data_dir, "ml-1m", delta_file)
         filter_col = f"is_{subset}"
 
+        parquet_paths = [
+            f"{delta_path}/{fragment.path}"
+            for fragment in dl.DeltaTable(delta_path)
+            .to_pyarrow_dataset()
+            .get_fragments(filter=ds.field(filter_col))
+        ]
         dataset = (
             ray.data.read_parquet(
-                dl.DeltaTable(delta_path).file_uris(),
+                parquet_paths,
                 columns=list({*self.in_columns, filter_col}),
                 filter=ds.field(filter_col),
             )

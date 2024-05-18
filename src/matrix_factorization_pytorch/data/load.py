@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import torch
@@ -9,6 +7,9 @@ import torch.utils.data as torch_data
 import torch.utils.data._utils.collate as torch_collate
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from pathlib import Path
+
     import numpy as np
     import pyarrow.dataset as ds
 
@@ -23,6 +24,8 @@ def hash_features(
     out_prefix: str = "",
     keep_input: bool = True,
 ) -> torch.Tensor:
+    from collections.abc import Iterable
+
     import mmh3
 
     feature_values = []
@@ -142,8 +145,8 @@ def ray_collate_fn(
     return torch_data.default_collate(batch)
 
 
-@torch_data.functional_datapipe("load_pyarrow_dataset_as_dict")
-class PyArrowDatasetDictLoaderIterDataPipe(torch_data.IterDataPipe):
+@torch_data.functional_datapipe("load_parquet_as_dict")
+class ParquetDictLoaderIterDataPipe(torch_data.IterDataPipe):
     def __init__(
         self,
         source_datapipe: Iterable[str | Path],
@@ -182,7 +185,7 @@ class PyArrowDatasetDictLoaderIterDataPipe(torch_data.IterDataPipe):
 
 
 @torch_data.functional_datapipe("load_delta_table_as_dict")
-class DeltaTableDictLoaderIterDataPipe(PyArrowDatasetDictLoaderIterDataPipe):
+class DeltaTableDictLoaderIterDataPipe(ParquetDictLoaderIterDataPipe):
     def pyarrow_dataset(self, source: str | Path) -> ds.Dataset:
         import deltalake as dl
 

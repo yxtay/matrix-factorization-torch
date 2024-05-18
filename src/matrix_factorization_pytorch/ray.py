@@ -1,17 +1,12 @@
-import datetime
-import os
+from __future__ import annotations
+
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import lightning as L
 import ray.train
-import ray.train.lightning as ray_lightning
-import ray.tune
-
-from .data.lightning import Movielens1mPipeDataModule
-from .lightning import METRIC, LitMatrixFactorization
 
 if TYPE_CHECKING:
+    import lightning as L
     import mlflow
 
 
@@ -31,6 +26,9 @@ def setup_mlflow(config: dict) -> mlflow:
 
 
 def prepare_trainer(config: dict) -> L.Trainer:
+    import lightning as L
+    import ray.train.lightning as ray_lightning
+
     if ray.train.get_context().get_world_rank():
         logger = False
     else:
@@ -71,6 +69,11 @@ def prepare_trainer(config: dict) -> L.Trainer:
 
 
 def train_loop_per_worker(config):
+    import ray.train.lightning as ray_lightning
+
+    from .data.lightning import Movielens1mPipeDataModule
+    from .lightning import LitMatrixFactorization
+
     mlflow = setup_mlflow(config)
     trainer = prepare_trainer(config)
 
@@ -116,6 +119,8 @@ def train_loop_per_worker(config):
 def get_run_config():
     import ray.tune.stopper as ray_stopper
 
+    from .lightning import METRIC
+
     checkpoint_config = ray.train.CheckpointConfig(
         num_to_keep=1,
         checkpoint_score_attribute=METRIC["name"],
@@ -132,6 +137,9 @@ def get_run_config():
 
 
 def get_ray_trainer():
+    import datetime
+    import os
+
     import ray.train.torch as ray_torch
 
     train_loop_config = {
@@ -173,6 +181,9 @@ def get_ray_trainer():
 
 def get_tuner():
     import flaml
+    import ray.tune
+
+    from .lightning import METRIC
 
     search_space = {
         # "num_hashes": ray.tune.randint(1, 5),
@@ -225,7 +236,7 @@ def get_tuner():
         mode=METRIC["mode"],
         search_alg=search_alg,
         num_samples=-1,
-        time_budget_s=60 * 60 * 6,
+        time_budget_s=60 * 60 * 1,
         max_concurrent_trials=1,
     )
     tuner = ray.tune.Tuner(
