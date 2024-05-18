@@ -5,9 +5,6 @@ from typing import TYPE_CHECKING
 import lightning as L
 import torch
 
-from . import losses as mf_losses
-from . import models as mf_models
-
 if TYPE_CHECKING:
     import mlflow
     import torchmetrics
@@ -198,6 +195,8 @@ class LitMatrixFactorization(L.LightningModule):
             self.example_input_array = self.get_example_input_array()
 
     def get_model(self) -> torch.nn.Module:
+        from . import models as mf_models
+
         return mf_models.MatrixFactorization(
             num_embeddings=self.hparams.num_embeddings,
             embedding_dim=self.hparams.embedding_dim,
@@ -207,6 +206,8 @@ class LitMatrixFactorization(L.LightningModule):
         )
 
     def get_loss_fns(self) -> torch.nn.ModuleList:
+        from . import losses as mf_losses
+
         loss_classes = [
             mf_losses.AlignmentLoss,
             mf_losses.ContrastiveLoss,
@@ -297,10 +298,13 @@ if __name__ == "__main__":
     import datetime
 
     import mlflow
+    import zoneinfo
 
     from .data import lightning as mf_data
 
-    experiment_name = datetime.datetime.now().isoformat()
+    experiment_name = datetime.datetime.now(
+        zoneinfo.ZoneInfo("Asia/Singapore")
+    ).isoformat()
 
     train_losses = [
         "PairwiseHingeLoss",

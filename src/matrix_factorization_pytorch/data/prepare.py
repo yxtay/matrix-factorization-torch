@@ -1,6 +1,3 @@
-import concurrent.futures
-import shutil
-import tempfile
 from pathlib import Path
 
 import polars as pl
@@ -18,6 +15,8 @@ DATA_DIR = "data"
 def download_data(
     url: str = MOVIELENS_1M_URL, dest_dir: str = DATA_DIR, *, overwrite: bool = False
 ) -> Path:
+    import shutil
+
     import requests
 
     # prepare destination
@@ -36,6 +35,8 @@ def download_data(
 
 
 def unpack_data(archive_file: str, *, overwrite: bool = False) -> list[str]:
+    import shutil
+
     archive_file = Path(archive_file)
     dest_dir = archive_file.parent / archive_file.stem
 
@@ -203,8 +204,6 @@ def users_split_activty(
 def get_dense_interactions(
     users: pl.LazyFrame, movies: pl.LazyFrame, data: pl.LazyFrame, delta_path: str
 ) -> pl.LazyFrame:
-    import deltalake as dl
-
     dense_interactions = (
         users.lazy()
         .join(movies.lazy(), how="cross")
@@ -221,8 +220,6 @@ def get_dense_interactions(
         .collect(streaming=True)
     )
     dense_interactions.write_delta(delta_path, mode="overwrite")
-    dl.DeltaTable(delta_path).optimize.compact()
-    dl.DeltaTable(delta_path).vacuum()
     logger.info("slice saved: {}, shape: {}", delta_path, dense_interactions.shape)
 
     dense_interactions = pl.scan_delta(str(delta_path))
@@ -242,7 +239,7 @@ def get_sparse_movielens(
 
     sparse = data.filter(pl.col("is_rated")).collect(streaming=True)
     sparse.write_delta(sparse_delta, mode="overwrite")
-    dl.DeltaTable(sparse_delta).optimize.compact()
+    dl.DeltaTable(sparse_delta).optimize.z_order(["is_train", "is_val", "is_test"])
     dl.DeltaTable(sparse_delta).vacuum()
     logger.info("sparse saved: {}, shape: {}", sparse_delta, sparse.shape)
 
@@ -263,7 +260,7 @@ def get_val_movielens(
 
     val = data.filter(pl.col("is_val_user")).collect(streaming=True)
     val.write_delta(val_delta, mode="overwrite")
-    dl.DeltaTable(val_delta).optimize.compact()
+    dl.DeltaTable(val_delta).optimize.z_order(["is_train", "is_val", "is_test"])
     dl.DeltaTable(val_delta).vacuum()
     logger.info("val saved: {}, shape: {}", val_delta, val.shape)
 
@@ -279,6 +276,9 @@ def load_dense_movielens(
         dense = pl.scan_delta(str(dense_delta))
         logger.info("dense loaded: {}", dense_delta)
         return dense
+
+    import concurrent.futures
+    import tempfile
 
     import deltalake as dl
 
@@ -310,7 +310,7 @@ def load_dense_movielens(
             .sample(fraction=1.0, shuffle=True, seed=0)
         )
         dense.write_delta(dense_delta, mode="overwrite")
-        dl.DeltaTable(dense_delta).optimize.compact()
+        dl.DeltaTable(dense_delta).optimize.z_order(["is_train", "is_val", "is_test"])
         dl.DeltaTable(dense_delta).vacuum()
         logger.info("dense saved: {}, shape: {}", dense_delta, dense.shape)
 
