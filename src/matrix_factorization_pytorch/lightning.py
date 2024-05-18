@@ -1,13 +1,16 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import lightning as L
-import lightning.pytorch.callbacks as pl_callbacks
-import lightning.pytorch.loggers as pl_loggers
-import mlflow
 import torch
-import torchmetrics
-import torchmetrics.retrieval as tm_retrieval
 
 from . import losses as mf_losses
 from . import models as mf_models
+
+if TYPE_CHECKING:
+    import mlflow
+    import torchmetrics
 
 METRIC = {"name": "val/RetrievalNormalizedDCG", "mode": "max"}
 
@@ -174,6 +177,8 @@ class LitMatrixFactorization(L.LightningModule):
         return optimizer_class(self.parameters(), lr=self.hparams.learning_rate)
 
     def configure_callbacks(self) -> list[L.Callback]:
+        import lightning.pytorch.callbacks as pl_callbacks
+
         early_stop = pl_callbacks.EarlyStopping(
             monitor=METRIC["name"], mode=METRIC["mode"]
         )
@@ -220,6 +225,9 @@ class LitMatrixFactorization(L.LightningModule):
         return torch.nn.ModuleList(loss_fns)
 
     def get_metrics(self, top_k: int = 20) -> torch.nn.ModuleDict:
+        import torchmetrics
+        import torchmetrics.retrieval as tm_retrieval
+
         metrics = {
             step_name: torchmetrics.MetricCollection(
                 tm_retrieval.RetrievalNormalizedDCG(top_k=top_k),
@@ -247,12 +255,18 @@ class LitMatrixFactorization(L.LightningModule):
 
 
 def mlflow_start_run(experiment_name: str = "") -> mlflow.ActiveRun:
+    import mlflow
+
     experiment_name = experiment_name or datetime.datetime.now().isoformat()
     experiment_id = mlflow.set_experiment(experiment_name).experiment_id
     return mlflow.start_run(experiment_id=experiment_id)
 
 
 def get_trainer(experiment_name: str = "") -> L.Trainer:
+    import lightning.pytorch.callbacks as pl_callbacks
+    import lightning.pytorch.loggers as pl_loggers
+    import mlflow
+
     experiment_name = experiment_name or datetime.datetime.now().isoformat()
     logger = [
         pl_loggers.TensorBoardLogger(
@@ -282,7 +296,9 @@ def get_trainer(experiment_name: str = "") -> L.Trainer:
 if __name__ == "__main__":
     import datetime
 
-    from .data import load as mf_data
+    import mlflow
+
+    from .data import lightning as mf_data
 
     experiment_name = datetime.datetime.now().isoformat()
 

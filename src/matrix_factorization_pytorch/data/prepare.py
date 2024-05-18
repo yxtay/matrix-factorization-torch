@@ -3,9 +3,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-import pandas as pd
 import polars as pl
-import requests
 from loguru import logger
 
 MOVIELENS_1M_URL = "https://files.grouplens.org/datasets/movielens/ml-1m.zip"
@@ -20,6 +18,8 @@ DATA_DIR = "data"
 def download_data(
     url: str = MOVIELENS_1M_URL, dest_dir: str = DATA_DIR, *, overwrite: bool = False
 ) -> Path:
+    import requests
+
     # prepare destination
     dest = Path(dest_dir) / Path(url).name
 
@@ -60,11 +60,14 @@ def download_unpack_data(
 
 
 def load_users(src_dir: str = DATA_DIR, *, overwrite: bool = False) -> pl.LazyFrame:
-    users_parquet = Path(src_dir, "ml-1m", "users.parquet")
-    if users_parquet.exists() and not overwrite:
-        users = pl.scan_parquet(users_parquet)
-        logger.info("users loaded: {}", users_parquet)
+    users_delta = Path(src_dir, "ml-1m", "users.delta")
+    if users_delta.exists() and not overwrite:
+        users = pl.scan_delta(str(users_delta))
+        logger.info("users loaded: {}", users_delta)
         return users
+
+    import deltalake as dl
+    import pandas as pd
 
     users_dat = Path(src_dir, "ml-1m", "users.dat")
     dtype = {
@@ -85,22 +88,27 @@ def load_users(src_dir: str = DATA_DIR, *, overwrite: bool = False) -> pl.LazyFr
     ).pipe(pl.from_pandas)
     logger.info("users loaded: {}, shape: {}", users_dat, users.shape)
 
-    users = users.sort("user_id").with_columns(
+    users = users.with_columns(
         pl.col("user_id").rank().cast(pl.Int32).alias("user_idx")
     )
-    users.write_parquet(users_parquet)
-    logger.info("users saved: {}", users_parquet)
+    users.write_delta(users_delta, mode="overwrite")
+    dl.DeltaTable(users_delta).optimize.z_order(["user_id"])
+    dl.DeltaTable(users_delta).vacuum()
+    logger.info("users saved: {}", users_delta)
 
-    users = pl.scan_parquet(users_parquet)
+    users = pl.scan_delta(str(users_delta))
     return users
 
 
 def load_movies(src_dir: str = DATA_DIR, *, overwrite: bool = False) -> pl.LazyFrame:
-    movies_parquet = Path(src_dir, "ml-1m", "movies.parquet")
-    if movies_parquet.exists() and not overwrite:
-        movies = pl.scan_parquet(movies_parquet)
-        logger.info("movies loaded: {}", movies_parquet)
+    movies_delta = Path(src_dir, "ml-1m", "movies.delta")
+    if movies_delta.exists() and not overwrite:
+        movies = pl.scan_delta(str(movies_delta))
+        logger.info("movies loaded: {}", movies_delta)
         return movies
+
+    import deltalake as dl
+    import pandas as pd
 
     movies_dat = Path(src_dir, "ml-1m", "movies.dat")
     dtype = {"movie_id": "int32", "title": "category", "genres": "str"}
@@ -115,18 +123,22 @@ def load_movies(src_dir: str = DATA_DIR, *, overwrite: bool = False) -> pl.LazyF
     ).pipe(pl.from_pandas)
     logger.info("movies loaded: {}, shape: {}", movies_dat, movies.shape)
 
-    movies = movies.sort("movie_id").with_columns(
+    movies = movies.with_columns(
         pl.col("genres").str.split("|").cast(pl.List(pl.Categorical)).alias("genres"),
         pl.col("movie_id").rank().cast(pl.Int32).alias("movie_idx"),
     )
-    movies.write_parquet(movies_parquet)
-    logger.info("movies saved: {}", movies_parquet)
+    movies.write_delta(movies_delta, mode="overwrite")
+    dl.DeltaTable(movies_delta).optimize.z_order(["movie_id"])
+    dl.DeltaTable(movies_delta).vacuum()
+    logger.info("movies saved: {}", movies_delta)
 
-    movies = pl.scan_parquet(movies_parquet)
+    movies = pl.scan_delta(str(movies_delta))
     return movies
 
 
 def load_ratings(src_dir: str = DATA_DIR) -> pl.LazyFrame:
+    import pandas as pd
+
     ratings_dat = Path(src_dir, "ml-1m", "ratings.dat")
     dtype = {
         "user_id": "int32",
@@ -189,8 +201,10 @@ def users_split_activty(
 
 
 def get_dense_interactions(
-    users: pl.LazyFrame, movies: pl.LazyFrame, data: pl.LazyFrame, parquet_path: str
+    users: pl.LazyFrame, movies: pl.LazyFrame, data: pl.LazyFrame, delta_path: str
 ) -> pl.LazyFrame:
+    import deltalake as dl
+
     dense_interactions = (
         users.lazy()
         .join(movies.lazy(), how="cross")
@@ -206,55 +220,67 @@ def get_dense_interactions(
         )
         .collect(streaming=True)
     )
-    dense_interactions.write_parquet(parquet_path)
-    logger.info("slice saved: {}, shape: {}", parquet_path, dense_interactions.shape)
+    dense_interactions.write_delta(delta_path, mode="overwrite")
+    dl.DeltaTable(delta_path).optimize.compact()
+    dl.DeltaTable(delta_path).vacuum()
+    logger.info("slice saved: {}, shape: {}", delta_path, dense_interactions.shape)
 
-    dense_interactions = pl.scan_parquet(parquet_path)
+    dense_interactions = pl.scan_delta(str(delta_path))
     return dense_interactions
 
 
 def get_sparse_movielens(
     data: pl.LazyFrame, src_dir: str = DATA_DIR, *, overwrite: bool = False
 ) -> pl.LazyFrame:
-    sparse_parquet = Path(src_dir, "ml-1m", "sparse.parquet")
-    if sparse_parquet.exists() and not overwrite:
-        sparse = pl.scan_parquet(sparse_parquet)
-        logger.info("sparse loaded: {}", sparse_parquet)
+    sparse_delta = Path(src_dir, "ml-1m", "sparse.delta")
+    if sparse_delta.exists() and not overwrite:
+        sparse = pl.scan_delta(str(sparse_delta))
+        logger.info("sparse loaded: {}", sparse_delta)
         return sparse
 
-    sparse = data.filter(pl.col("is_rated")).collect(streaming=True)
-    sparse.write_parquet(sparse_parquet)
-    logger.info("sparse saved: {}, shape: {}", sparse_parquet, sparse.shape)
+    import deltalake as dl
 
-    sparse = pl.scan_parquet(sparse_parquet)
+    sparse = data.filter(pl.col("is_rated")).collect(streaming=True)
+    sparse.write_delta(sparse_delta, mode="overwrite")
+    dl.DeltaTable(sparse_delta).optimize.compact()
+    dl.DeltaTable(sparse_delta).vacuum()
+    logger.info("sparse saved: {}, shape: {}", sparse_delta, sparse.shape)
+
+    sparse = pl.scan_delta(str(sparse_delta))
     return sparse
 
 
 def get_val_movielens(
     data: pl.LazyFrame, src_dir: str = DATA_DIR, *, overwrite: bool = False
 ) -> pl.LazyFrame:
-    val_parquet = Path(src_dir, "ml-1m", "val.parquet")
-    if val_parquet.exists() and not overwrite:
-        val = pl.scan_parquet(val_parquet)
-        logger.info("val loaded: {}", val_parquet)
+    val_delta = Path(src_dir, "ml-1m", "val.delta")
+    if val_delta.exists() and not overwrite:
+        val = pl.scan_delta(str(val_delta))
+        logger.info("val loaded: {}", val_delta)
         return val
 
-    val = data.filter(pl.col("is_val_user")).collect(streaming=True)
-    val.write_parquet(val_parquet)
-    logger.info("val saved: {}, shape: {}", val_parquet, val.shape)
+    import deltalake as dl
 
-    val = pl.scan_parquet(val_parquet)
+    val = data.filter(pl.col("is_val_user")).collect(streaming=True)
+    val.write_delta(val_delta, mode="overwrite")
+    dl.DeltaTable(val_delta).optimize.compact()
+    dl.DeltaTable(val_delta).vacuum()
+    logger.info("val saved: {}, shape: {}", val_delta, val.shape)
+
+    val = pl.scan_delta(str(val_delta))
     return val
 
 
 def load_dense_movielens(
     src_dir: str = DATA_DIR, *, overwrite: bool = False
 ) -> pl.LazyFrame:
-    dense_parquet = Path(src_dir, "ml-1m", "dense.parquet")
-    if dense_parquet.exists() and not overwrite:
-        dense = pl.scan_parquet(dense_parquet)
-        logger.info("dense loaded: {}", dense_parquet)
+    dense_delta = Path(src_dir, "ml-1m", "dense.delta")
+    if dense_delta.exists() and not overwrite:
+        dense = pl.scan_delta(str(dense_delta))
+        logger.info("dense loaded: {}", dense_delta)
         return dense
+
+    import deltalake as dl
 
     users = load_users(src_dir, overwrite=overwrite)
     movies = load_movies(src_dir, overwrite=overwrite)
@@ -268,7 +294,7 @@ def load_dense_movielens(
                 users_slice,
                 movies,
                 ratings,
-                Path(temp_dir, f"part-{idx}.parquet"),
+                Path(temp_dir, f"part-{idx}.delta"),
             )
             for idx, users_slice in enumerate(users.iter_slices(users.height // 10))
         ]
@@ -283,16 +309,17 @@ def load_dense_movielens(
             .collect()
             .sample(fraction=1.0, shuffle=True, seed=0)
         )
+        dense.write_delta(dense_delta, mode="overwrite")
+        dl.DeltaTable(dense_delta).optimize.compact()
+        dl.DeltaTable(dense_delta).vacuum()
+        logger.info("dense saved: {}, shape: {}", dense_delta, dense.shape)
 
-    dense.write_parquet(dense_parquet)
-    logger.info("dense saved: {}, shape: {}", dense_parquet, dense.shape)
-
-    dense = pl.scan_parquet(dense_parquet)
+    dense = pl.scan_delta(str(dense_delta))
     get_sparse_movielens(dense, src_dir=src_dir, overwrite=overwrite)
     get_val_movielens(dense, src_dir=src_dir, overwrite=overwrite)
     return dense
 
 
 if __name__ == "__main__":
-    download_unpack_data()
-    load_dense_movielens().head().collect().glimpse()
+    download_unpack_data(overwrite=True)
+    load_dense_movielens(overwrite=True).head().collect().glimpse()

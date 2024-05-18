@@ -1,23 +1,23 @@
 import datetime
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import flaml
 import lightning as L
-import lightning.pytorch.loggers as pl_loggers
-import mlflow
-import ray.air.integrations.mlflow as ray_mlflow
 import ray.train
 import ray.train.lightning as ray_lightning
-import ray.train.torch as ray_torch
 import ray.tune
-import ray.tune.stopper as ray_stopper
 
-from .data.load import Movielens1mPipeDataModule
+from .data.lightning import Movielens1mPipeDataModule
 from .lightning import METRIC, LitMatrixFactorization
+
+if TYPE_CHECKING:
+    import mlflow
 
 
 def setup_mlflow(config: dict) -> mlflow:
+    import ray.air.integrations.mlflow as ray_mlflow
+
     experiment_name = ray.train.get_context().get_experiment_name()
     trial_name = ray.train.get_context().get_trial_name()
     mlflow = ray_mlflow.setup_mlflow(
@@ -34,6 +34,9 @@ def prepare_trainer(config: dict) -> L.Trainer:
     if ray.train.get_context().get_world_rank():
         logger = False
     else:
+        import lightning.pytorch.loggers as pl_loggers
+        import mlflow
+
         experiment_name = ray.train.get_context().get_experiment_name()
         trial_name = ray.train.get_context().get_trial_name()
         logger = [
@@ -111,6 +114,8 @@ def train_loop_per_worker(config):
 
 
 def get_run_config():
+    import ray.tune.stopper as ray_stopper
+
     checkpoint_config = ray.train.CheckpointConfig(
         num_to_keep=1,
         checkpoint_score_attribute=METRIC["name"],
@@ -127,6 +132,8 @@ def get_run_config():
 
 
 def get_ray_trainer():
+    import ray.train.torch as ray_torch
+
     train_loop_config = {
         # tracking
         "tensorboard_save_dir": Path("lightning_logs").absolute(),
@@ -165,6 +172,8 @@ def get_ray_trainer():
 
 
 def get_tuner():
+    import flaml
+
     search_space = {
         # "num_hashes": ray.tune.randint(1, 5),
         "negatives_ratio_exp": ray.tune.randint(1, 4),
