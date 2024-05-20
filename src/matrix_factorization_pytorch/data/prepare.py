@@ -1,7 +1,13 @@
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import polars as pl
 from loguru import logger
+
+if TYPE_CHECKING:
+    import deltalake
 
 MOVIELENS_1M_URL = "https://files.grouplens.org/datasets/movielens/ml-1m.zip"
 DATA_DIR = "data"
@@ -60,6 +66,24 @@ def download_unpack_data(
 ###
 
 
+def optimize_delta_table(
+    delta_path: str,
+    columns: list[str] | None = None,
+    *,
+    retention_hours: int = 0,
+    **kwargs,
+) -> deltalake.DeltaTable:
+    import deltalake
+
+    table = deltalake.DeltaTable(delta_path)
+    if columns:
+        table.optimize.z_order(columns, **kwargs)
+    else:
+        table.optimize.compact(**kwargs)
+    table.vacuum(retention_hours, dry_run=False, enforce_retention_duration=False)
+    return table
+
+
 def load_users(src_dir: str = DATA_DIR, *, overwrite: bool = False) -> pl.LazyFrame:
     users_delta = Path(src_dir, "ml-1m", "users.delta")
     if users_delta.exists() and not overwrite:
@@ -67,7 +91,6 @@ def load_users(src_dir: str = DATA_DIR, *, overwrite: bool = False) -> pl.LazyFr
         logger.info("users loaded: {}", users_delta)
         return users
 
-    import deltalake as dl
     import pandas as pd
 
     users_dat = Path(src_dir, "ml-1m", "users.dat")
@@ -92,9 +115,10 @@ def load_users(src_dir: str = DATA_DIR, *, overwrite: bool = False) -> pl.LazyFr
     users = users.with_columns(
         pl.col("user_id").rank().cast(pl.Int32).alias("user_idx")
     )
-    users.write_delta(users_delta, mode="overwrite")
-    dl.DeltaTable(users_delta).optimize.z_order(["user_id"])
-    dl.DeltaTable(users_delta).vacuum()
+    users.write_delta(
+        users_delta, mode="overwrite", delta_write_options={"overwrite_schema": True}
+    )
+    optimize_delta_table(users_delta, ["user_id"])
     logger.info("users saved: {}", users_delta)
 
     users = pl.scan_delta(str(users_delta))
@@ -108,7 +132,6 @@ def load_movies(src_dir: str = DATA_DIR, *, overwrite: bool = False) -> pl.LazyF
         logger.info("movies loaded: {}", movies_delta)
         return movies
 
-    import deltalake as dl
     import pandas as pd
 
     movies_dat = Path(src_dir, "ml-1m", "movies.dat")
@@ -128,9 +151,10 @@ def load_movies(src_dir: str = DATA_DIR, *, overwrite: bool = False) -> pl.LazyF
         pl.col("genres").str.split("|").cast(pl.List(pl.Categorical)).alias("genres"),
         pl.col("movie_id").rank().cast(pl.Int32).alias("movie_idx"),
     )
-    movies.write_delta(movies_delta, mode="overwrite")
-    dl.DeltaTable(movies_delta).optimize.z_order(["movie_id"])
-    dl.DeltaTable(movies_delta).vacuum()
+    movies.write_delta(
+        movies_delta, mode="overwrite", delta_write_options={"overwrite_schema": True}
+    )
+    optimize_delta_table(movies_delta, ["movie_id"])
     logger.info("movies saved: {}", movies_delta)
 
     movies = pl.scan_delta(str(movies_delta))
@@ -219,7 +243,7 @@ def get_dense_interactions(
         )
         .collect(streaming=True)
     )
-    dense_interactions.write_delta(delta_path, mode="overwrite")
+    dense_interactions.write_delta(delta_path)
     logger.info("slice saved: {}, shape: {}", delta_path, dense_interactions.shape)
 
     dense_interactions = pl.scan_delta(str(delta_path))
@@ -235,12 +259,11 @@ def get_sparse_movielens(
         logger.info("sparse loaded: {}", sparse_delta)
         return sparse
 
-    import deltalake as dl
-
     sparse = data.filter(pl.col("is_rated")).collect(streaming=True)
-    sparse.write_delta(sparse_delta, mode="overwrite")
-    dl.DeltaTable(sparse_delta).optimize.z_order(["is_train", "is_val", "is_test"])
-    dl.DeltaTable(sparse_delta).vacuum()
+    sparse.write_delta(
+        sparse_delta, mode="overwrite", delta_write_options={"overwrite_schema": True}
+    )
+    optimize_delta_table(sparse_delta, ["is_train", "is_val", "is_test"])
     logger.info("sparse saved: {}, shape: {}", sparse_delta, sparse.shape)
 
     sparse = pl.scan_delta(str(sparse_delta))
@@ -256,12 +279,11 @@ def get_val_movielens(
         logger.info("val loaded: {}", val_delta)
         return val
 
-    import deltalake as dl
-
     val = data.filter(pl.col("is_val_user")).collect(streaming=True)
-    val.write_delta(val_delta, mode="overwrite")
-    dl.DeltaTable(val_delta).optimize.z_order(["is_train", "is_val", "is_test"])
-    dl.DeltaTable(val_delta).vacuum()
+    val.write_delta(
+        val_delta, mode="overwrite", delta_write_options={"overwrite_schema": True}
+    )
+    optimize_delta_table(val_delta, ["is_train", "is_val", "is_test"])
     logger.info("val saved: {}, shape: {}", val_delta, val.shape)
 
     val = pl.scan_delta(str(val_delta))
@@ -279,8 +301,6 @@ def load_dense_movielens(
 
     import concurrent.futures
     import tempfile
-
-    import deltalake as dl
 
     users = load_users(src_dir, overwrite=overwrite)
     movies = load_movies(src_dir, overwrite=overwrite)
@@ -309,9 +329,12 @@ def load_dense_movielens(
             .collect()
             .sample(fraction=1.0, shuffle=True, seed=0)
         )
-        dense.write_delta(dense_delta, mode="overwrite")
-        dl.DeltaTable(dense_delta).optimize.z_order(["is_train", "is_val", "is_test"])
-        dl.DeltaTable(dense_delta).vacuum()
+        dense.write_delta(
+            dense_delta,
+            mode="overwrite",
+            delta_write_options={"overwrite_schema": True},
+        )
+        optimize_delta_table(dense_delta, ["is_train", "is_val", "is_test"])
         logger.info("dense saved: {}, shape: {}", dense_delta, dense.shape)
 
     dense = pl.scan_delta(str(dense_delta))
