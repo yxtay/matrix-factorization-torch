@@ -121,8 +121,7 @@ def load_users(src_dir: str = DATA_DIR, *, overwrite: bool = False) -> pl.LazyFr
     optimize_delta_table(users_delta, ["user_id"])
     logger.info("users saved: {}", users_delta)
 
-    users = pl.scan_delta(str(users_delta))
-    return users
+    return pl.scan_delta(str(users_delta))
 
 
 def load_movies(src_dir: str = DATA_DIR, *, overwrite: bool = False) -> pl.LazyFrame:
@@ -157,8 +156,7 @@ def load_movies(src_dir: str = DATA_DIR, *, overwrite: bool = False) -> pl.LazyF
     optimize_delta_table(movies_delta, ["movie_id"])
     logger.info("movies saved: {}", movies_delta)
 
-    movies = pl.scan_delta(str(movies_delta))
-    return movies
+    return pl.scan_delta(str(movies_delta))
 
 
 def load_ratings(src_dir: str = DATA_DIR) -> pl.LazyFrame:
@@ -195,7 +193,7 @@ def ordered_split(
     order_col: str = "timestamp",
     train_prop: float = 0.8,
 ) -> pl.LazyFrame:
-    data = (
+    return (
         data.lazy()
         .with_columns(
             p=((pl.col(order_col).rank("ordinal") - 1) / pl.count(order_col)).over(
@@ -208,7 +206,6 @@ def ordered_split(
         )
         .drop("p")
     )
-    return data
 
 
 def users_split_activty(
@@ -246,8 +243,7 @@ def get_dense_interactions(
     dense_interactions.write_delta(delta_path)
     logger.info("slice saved: {}, shape: {}", delta_path, dense_interactions.shape)
 
-    dense_interactions = pl.scan_delta(str(delta_path))
-    return dense_interactions
+    return pl.scan_delta(str(delta_path))
 
 
 def get_sparse_movielens(
@@ -266,8 +262,7 @@ def get_sparse_movielens(
     optimize_delta_table(sparse_delta, ["is_train", "is_val", "is_test"])
     logger.info("sparse saved: {}, shape: {}", sparse_delta, sparse.shape)
 
-    sparse = pl.scan_delta(str(sparse_delta))
-    return sparse
+    return pl.scan_delta(str(sparse_delta))
 
 
 def get_val_movielens(
@@ -286,8 +281,7 @@ def get_val_movielens(
     optimize_delta_table(val_delta, ["is_train", "is_val", "is_test"])
     logger.info("val saved: {}, shape: {}", val_delta, val.shape)
 
-    val = pl.scan_delta(str(val_delta))
-    return val
+    return pl.scan_delta(str(val_delta))
 
 
 def load_dense_movielens(

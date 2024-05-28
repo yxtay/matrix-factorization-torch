@@ -19,7 +19,7 @@ class LitMatrixFactorization(L.LightningModule):
         embedding_dim: int = 32,
         train_loss: str = "PairwiseHingeLoss",
         *,
-        max_norm: float = None,
+        max_norm: float | None = None,
         sparse: bool = True,
         normalize: bool = True,
         hard_negatives_ratio: float | None = None,
@@ -244,7 +244,7 @@ class LitMatrixFactorization(L.LightningModule):
         return torch.nn.ModuleDict(metrics)
 
     def get_example_input_array(self) -> tuple[dict[str, torch.Tensor]]:
-        example_input_array = (
+        return (
             {
                 "user_feature_hashes": torch.zeros(1, 1).int(),
                 "item_feature_hashes": torch.zeros(1, 1).int(),
@@ -252,7 +252,6 @@ class LitMatrixFactorization(L.LightningModule):
                 "item_feature_weights": torch.zeros(1, 1),
             },
         )
-        return example_input_array
 
 
 def mlflow_start_run(experiment_name: str = "") -> mlflow.ActiveRun:

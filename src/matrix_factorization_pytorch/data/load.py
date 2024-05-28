@@ -90,7 +90,7 @@ def gather_inputs(
     weight: str = "weight",
 ) -> dict[str, int | float | list[int | float]]:
     label_value = row[label] or 0
-    inputs = {
+    return {
         "label": bool(label_value > 0) - bool(label_value < 0),
         "weight": row[weight] or 0,
         "user_idx": row["user_idx"],
@@ -100,7 +100,6 @@ def gather_inputs(
         "item_feature_hashes": row["item_feature_hashes"],
         "item_feature_weights": row["item_feature_weights"],
     }
-    return inputs
 
 
 def merge_rows(rows):
@@ -167,11 +166,10 @@ class ParquetDictLoaderIterDataPipe(torch_data.IterDataPipe):
         return ds.dataset(source)
 
     def __len__(self) -> int:
-        num_rows = sum(
+        return sum(
             self.pyarrow_dataset(source).count_rows(filter=self.filter_expr)
             for source in self.source_datapipe
         )
-        return num_rows
 
     def __iter__(self) -> Iterable[dict]:
         for source in self.source_datapipe:

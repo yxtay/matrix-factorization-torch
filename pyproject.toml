@@ -12,19 +12,41 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-deltalake = ">=0.17.4"
-flaml = "^2.1.2"
-lightning = "^2.2.5"
-loguru = ">=0.7.2"
-mlflow = "^2.13.0"
-mmh3 = "^4.1.0"
-optuna = "^3.6.1"
-polars = { extras = ["pandas"], version = ">=0.20.26" }
-ray = { extras = ["data", "train", "tune"], version = "^2.23.0" }
-rich = "^13.7.0"
-tensorboard = "^2.16.2"
-torch = "^2.3.0"
+deltalake = ">=0.17"
+flaml = "^2.1"
+lightning = "^2.2"
+loguru = ">=0.7"
+mlflow = "^2.13"
+mmh3 = "^4.1"
+optuna = "^3.6"
+polars = { extras = ["pandas"], version = ">=0.20" }
+ray = { extras = ["data", "train", "tune"], version = "^2.23" }
+rich = "^13.7"
+tensorboard = "^2.16"
+torch = "^2.2,<2.3"
 
 [tool.poetry.group.dev.dependencies]
-pre-commit = "^3.7.1"
-ruff = ">=0.4.4"
+pre-commit = "^3.7"
+ruff = ">=0.4"
+
+[tool.ruff]
+fix = true
+src = [".", "src", "tests"]
+extend-include = ["*.ipynb"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "D",      # pydocstyle
+    "E501",   # line-too-long
+    "COM812", # missing-trailing-comma # conflicts with ruff formatter
+    "ISC001", # single-line-implicit-string-concatenation # conflicts with ruff formatter
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = [
+    "S101", # assert
+]

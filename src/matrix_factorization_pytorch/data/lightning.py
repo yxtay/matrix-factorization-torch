@@ -54,7 +54,7 @@ class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
         num_buckets: int = 2**16 + 1,
         batch_size: int = 2**10,
         negatives_ratio: int = 1,
-    ):
+    ) -> None:
         super().__init__()
         self.save_hyperparameters()
 
@@ -67,7 +67,7 @@ class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
 
     @abc.abstractmethod
     @classmethod
-    def get_dataset(self, subset: str) -> torch.utils.data.Dataset: ...
+    def get_dataset(cls, subset: str) -> torch.utils.data.Dataset: ...
 
     @abc.abstractmethod
     def get_dataloader(
@@ -104,7 +104,7 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
     def get_movies_dataset(self, cycle_count: int | None = 1):
         delta_path = Path(self.hparams.data_dir, "ml-1m", "movies.delta")
 
-        datapipe = (
+        return (
             torch_datapipes.iter.IterableWrapper([delta_path])
             .load_delta_table_as_dict(
                 columns=[self.item_idx, *self.item_feature_names],
@@ -125,7 +125,6 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
                 )
             )
         )
-        return datapipe
 
     def get_dataset(self, subset: str) -> torch.utils.data.Dataset:
         import pyarrow.dataset as ds
@@ -219,7 +218,7 @@ class Movielens1mRayDataModule(Movielens1mBaseDataModule):
             .to_pyarrow_dataset()
             .get_fragments(filter=ds.field(filter_col))
         ]
-        dataset = (
+        return (
             ray.data.read_parquet(
                 parquet_paths,
                 columns=list({*self.in_columns, filter_col}),
@@ -253,7 +252,6 @@ class Movielens1mRayDataModule(Movielens1mBaseDataModule):
                 },
             )
         )
-        return dataset
 
     def get_dataloader(self, dataset: ray.data.Dataset) -> ray.data.Dataset:
         return dataset.iter_torch_batches(
