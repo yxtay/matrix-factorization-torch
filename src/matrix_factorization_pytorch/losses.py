@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import abc
 
 import torch
@@ -350,7 +352,7 @@ class ContrastiveLoss(EmbeddingLoss):
             user_embed, sample_weight=sample_weight
         )
 
-        loss = self.contrastive_loss(
+        return self.contrastive_loss(
             user_embed,
             item_embed,
             sample_weight=sample_weight,
@@ -358,7 +360,6 @@ class ContrastiveLoss(EmbeddingLoss):
             item_idx=item_idx,
             hard_negatives_ratio=self.hard_negatives_ratio,
         )
-        return loss
 
 
 class AlignmentContrastiveLoss(EmbeddingLoss):
@@ -408,7 +409,7 @@ class InfomationNoiseContrastiveEstimationLoss(EmbeddingLoss):
         sample_weight = self._check_sample_weight(
             user_embed, sample_weight=sample_weight
         )
-        loss = self.infonce_loss(
+        return self.infonce_loss(
             user_embed,
             item_embed,
             label=label,
@@ -417,7 +418,6 @@ class InfomationNoiseContrastiveEstimationLoss(EmbeddingLoss):
             item_idx=item_idx,
             hard_negatives_ratio=self.hard_negatives_ratio,
         )
-        return loss
 
 
 class MutualInformationNeuralEstimationLoss(EmbeddingLoss):
@@ -436,7 +436,7 @@ class MutualInformationNeuralEstimationLoss(EmbeddingLoss):
         sample_weight = self._check_sample_weight(
             user_embed, sample_weight=sample_weight
         )
-        loss = self.mine_loss(
+        return self.mine_loss(
             user_embed,
             item_embed,
             label=label,
@@ -445,7 +445,6 @@ class MutualInformationNeuralEstimationLoss(EmbeddingLoss):
             item_idx=item_idx,
             hard_negatives_ratio=self.hard_negatives_ratio,
         )
-        return loss
 
 
 class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
@@ -512,7 +511,7 @@ class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
         sample_weight = self._check_sample_weight(
             user_embed, sample_weight=sample_weight
         )
-        loss = self.pariwise_loss(
+        return self.pariwise_loss(
             user_embed,
             item_embed,
             label=label,
@@ -523,7 +522,6 @@ class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
             sigma=self.sigma,
             margin=self.margin,
         )
-        return loss
 
 
 class PairwiseLogisticLoss(PairwiseEmbeddingLoss):

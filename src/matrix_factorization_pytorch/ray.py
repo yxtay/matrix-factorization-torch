@@ -15,14 +15,13 @@ def setup_mlflow(config: dict) -> mlflow:
 
     experiment_name = ray.train.get_context().get_experiment_name()
     trial_name = ray.train.get_context().get_trial_name()
-    mlflow = ray_mlflow.setup_mlflow(
+    return ray_mlflow.setup_mlflow(
         {f"config/{key}": value for key, value in config.items()},
         tracking_uri=config["mlflow_tracking_uri"],
         experiment_name=experiment_name,
         run_name=trial_name,
         create_experiment_if_not_exists=True,
     )
-    return mlflow
 
 
 def prepare_trainer(config: dict) -> L.Trainer:
@@ -68,7 +67,7 @@ def prepare_trainer(config: dict) -> L.Trainer:
     return ray_lightning.prepare_trainer(trainer)
 
 
-def train_loop_per_worker(config):
+def train_loop_per_worker(config) -> None:
     import ray.train.lightning as ray_lightning
 
     from .data.lightning import Movielens1mPipeDataModule
@@ -239,13 +238,12 @@ def get_tuner():
         time_budget_s=60 * 60 * 1,
         max_concurrent_trials=1,
     )
-    tuner = ray.tune.Tuner(
+    return ray.tune.Tuner(
         get_ray_trainer(),
         param_space={"train_loop_config": search_space},
         tune_config=tune_config,
         run_config=get_run_config(),
     )
-    return tuner
 
 
 if __name__ == "__main__":

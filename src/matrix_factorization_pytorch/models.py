@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import torch
 import torch.nn.functional as F
 
@@ -9,7 +11,7 @@ class MatrixFactorization(torch.nn.Module):
         embedding_dim: int,
         *,
         _weight: torch.Tensor | None = None,
-        max_norm: float = None,
+        max_norm: float | None = None,
         norm_type: float = 2.0,
         mode: str = "sum",
         sparse: bool = False,
@@ -38,13 +40,13 @@ class MatrixFactorization(torch.nn.Module):
         cls,
         embeddings: torch.Tensor,
         freeze: bool = True,
-        max_norm: float = None,
+        max_norm: float | None = None,
         norm_type: float = 2.0,
         mode: str = "sum",
         sparse: bool = False,
         padding_idx: int = 0,
         normalize: bool = True,
-    ) -> "MatrixFactorization":
+    ) -> MatrixFactorization:
         assert embeddings.dim() == 2
         rows, cols = embeddings.shape
         model = cls(
