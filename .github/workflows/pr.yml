@@ -1,0 +1,48 @@
+name: pr
+
+on:
+    pull_request:
+        # pull_request_target:  # for forked PR
+        types:
+            - opened
+            - edited
+            - reopened
+            - synchronize
+
+jobs:
+    title-linter:
+        name: lint title
+        permissions:
+            pull-requests: read
+        runs-on: ubuntu-latest
+        steps:
+            - name: semantic-pull-request
+              uses: amannn/action-semantic-pull-request@v5
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    labeler:
+        name: label
+        permissions:
+            contents: read
+            pull-requests: write
+        runs-on: ubuntu-latest
+        steps:
+            - name: labeler
+              uses: actions/labeler@v5
+
+    size-labeler:
+        name: label size
+        permissions:
+            contents: read
+            pull-requests: write
+        runs-on: ubuntu-latest
+        steps:
+            - name: size-label
+              uses: pascalgn/size-label-action@v0.5.0
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  IGNORED: |
+                      package-lock.json
+                      *.lock
+                      docs/**
