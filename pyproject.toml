@@ -14,16 +14,16 @@ readme = "README.md"
 python = "^3.11"
 deltalake = ">=0.17.4"
 flaml = "^2.1.2"
-lightning = "^2.2.4"
+lightning = "^2.2.5"
 loguru = ">=0.7.2"
-mlflow = "^2.12.1"
+mlflow = "^2.13.0"
 mmh3 = "^4.1.0"
 optuna = "^3.6.1"
 polars = { extras = ["pandas"], version = ">=0.20.26" }
-ray = { extras = ["data", "train", "tune"], version = "^2.22.0" }
+ray = { extras = ["data", "train", "tune"], version = "^2.23.0" }
 rich = "^13.7.0"
 tensorboard = "^2.16.2"
-torch = "^2.2.0,<2.3.0"
+torch = "^2.3.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.7.1"
