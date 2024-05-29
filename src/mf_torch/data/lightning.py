@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import lightning as L
-import torch
+import torch.utils.data as torch_data
 import torch.utils.data.datapipes as torch_datapipes
 
 from .load import gather_inputs, hash_features, merge_rows, ray_collate_fn
@@ -18,7 +18,8 @@ from .prepare import (
 )
 
 if TYPE_CHECKING:
-    import ray
+    import polars as pl
+    import ray.data
 
 
 class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
@@ -48,7 +49,7 @@ class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
     ]
 
     def __init__(
-        self,
+        self: Movielens1mBaseDataModule,
         data_dir: str = DATA_DIR,
         num_hashes: int = 2,
         num_buckets: int = 2**16 + 1,
@@ -58,23 +59,27 @@ class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
         super().__init__()
         self.save_hyperparameters()
 
-    def prepare_data(self, *, overwrite: bool = False):
+    def prepare_data(
+        self: Movielens1mBaseDataModule, *, overwrite: bool = False
+    ) -> pl.LazyFrame:
         from filelock import FileLock
 
         with FileLock(f"{self.hparams.data_dir}.lock"):
             download_unpack_data(self.url, self.hparams.data_dir, overwrite=overwrite)
             return load_dense_movielens(self.hparams.data_dir, overwrite=overwrite)
 
-    @abc.abstractmethod
     @classmethod
-    def get_dataset(cls, subset: str) -> torch.utils.data.Dataset: ...
+    @abc.abstractmethod
+    def get_dataset(
+        cls: type[Movielens1mBaseDataModule], subset: str
+    ) -> torch_data.Dataset: ...
 
     @abc.abstractmethod
     def get_dataloader(
-        self, dataset: torch.utils.data.Dataset
-    ) -> torch.utils.data.DataLoader: ...
+        self: Movielens1mBaseDataModule, dataset: torch_data.Dataset
+    ) -> torch_data.DataLoader: ...
 
-    def setup(self, stage: str) -> None:
+    def setup(self: Movielens1mBaseDataModule, stage: str) -> None:
         if stage == "fit":
             self.train_data = self.get_dataset("train")
 
@@ -87,21 +92,27 @@ class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
         if stage == "predict":
             self.predict_data = self.get_dataset("predict")
 
-    def train_dataloader(self) -> torch.utils.data.DataLoader:
+    def train_dataloader(
+        self: Movielens1mBaseDataModule,
+    ) -> torch_data.DataLoader:
         return self.get_dataloader(self.train_data)
 
-    def val_dataloader(self) -> torch.utils.data.DataLoader:
+    def val_dataloader(self: Movielens1mBaseDataModule) -> torch_data.DataLoader:
         return self.get_dataloader(self.val_data)
 
-    def test_dataloader(self) -> torch.utils.data.DataLoader:
+    def test_dataloader(self: Movielens1mBaseDataModule) -> torch_data.DataLoader:
         return self.get_dataloader(self.test_data)
 
-    def predict_dataloader(self) -> torch.utils.data.DataLoader:
+    def predict_dataloader(
+        self: Movielens1mBaseDataModule,
+    ) -> torch_data.DataLoader:
         return self.get_dataloader(self.predict_data)
 
 
 class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
-    def get_movies_dataset(self, cycle_count: int | None = 1):
+    def get_movies_dataset(
+        self: Movielens1mPipeDataModule, cycle_count: int | None = 1
+    ) -> torch_data.Dataset:
         delta_path = Path(self.hparams.data_dir, "ml-1m", "movies.delta")
 
         return (
@@ -126,7 +137,7 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
             )
         )
 
-    def get_dataset(self, subset: str) -> torch.utils.data.Dataset:
+    def get_dataset(self: Movielens1mPipeDataModule, subset: str) -> torch_data.Dataset:
         import pyarrow.dataset as ds
 
         assert subset in {"train", "val", "test", "predict"}
@@ -186,11 +197,11 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
         return datapipe
 
     def get_dataloader(
-        self, dataset: torch.utils.data.Dataset
-    ) -> torch.utils.data.DataLoader:
+        self: Movielens1mPipeDataModule, dataset: torch_data.Dataset
+    ) -> torch_data.DataLoader:
         import os
 
-        return torch.utils.data.DataLoader(
+        return torch_data.DataLoader(
             dataset,
             batch_size=self.hparams.batch_size,
             num_workers=os.cpu_count() - 1,
@@ -199,7 +210,7 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
 
 
 class Movielens1mRayDataModule(Movielens1mBaseDataModule):
-    def get_dataset(self, subset: str) -> ray.data.Dataset:
+    def get_dataset(self: Movielens1mRayDataModule, subset: str) -> ray.data.Dataset:
         import deltalake as dl
         import pyarrow.dataset as ds
         import ray.data
@@ -253,7 +264,9 @@ class Movielens1mRayDataModule(Movielens1mBaseDataModule):
             )
         )
 
-    def get_dataloader(self, dataset: ray.data.Dataset) -> ray.data.Dataset:
+    def get_dataloader(
+        self: Movielens1mRayDataModule, dataset: ray.data.Dataset
+    ) -> ray.data.Dataset:
         return dataset.iter_torch_batches(
             batch_size=self.hparams.batch_size,
             collate_fn=ray_collate_fn,

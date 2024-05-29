@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import ray.train
+import ray.tune
 
 if TYPE_CHECKING:
     import lightning as L
     import mlflow
+    import ray.train.torch as ray_torch
 
 
-def setup_mlflow(config: dict) -> mlflow:
+def setup_mlflow(config: dict[str, bool | float | int | str]) -> mlflow:
     import ray.air.integrations.mlflow as ray_mlflow
 
     experiment_name = ray.train.get_context().get_experiment_name()
@@ -24,7 +27,7 @@ def setup_mlflow(config: dict) -> mlflow:
     )
 
 
-def prepare_trainer(config: dict) -> L.Trainer:
+def prepare_trainer(config: dict[str, bool | float | int | str]) -> L.Trainer:
     import lightning as L
     import ray.train.lightning as ray_lightning
 
@@ -32,7 +35,6 @@ def prepare_trainer(config: dict) -> L.Trainer:
         logger = False
     else:
         import lightning.pytorch.loggers as pl_loggers
-        import mlflow
 
         experiment_name = ray.train.get_context().get_experiment_name()
         trial_name = ray.train.get_context().get_trial_name()
@@ -48,7 +50,6 @@ def prepare_trainer(config: dict) -> L.Trainer:
                 tracking_uri=str(config["mlflow_tracking_uri"]),
                 experiment_name=experiment_name,
                 run_name=trial_name,
-                run_id=mlflow.active_run().info.run_id,
                 log_model=True,
             ),
         ]
@@ -67,7 +68,7 @@ def prepare_trainer(config: dict) -> L.Trainer:
     return ray_lightning.prepare_trainer(trainer)
 
 
-def train_loop_per_worker(config) -> None:
+def train_loop_per_worker(config: dict[str, bool | float | int | str]) -> None:
     import ray.train.lightning as ray_lightning
 
     from .data.lightning import Movielens1mPipeDataModule
@@ -115,7 +116,7 @@ def train_loop_per_worker(config) -> None:
         trainer.fit(model, datamodule=datamodule, ckpt_path=ckpt_path)
 
 
-def get_run_config():
+def get_run_config() -> ray.train.RunConfig:
     import ray.tune.stopper as ray_stopper
 
     from .lightning import METRIC
@@ -135,8 +136,7 @@ def get_run_config():
     )
 
 
-def get_ray_trainer():
-    import datetime
+def get_ray_trainer() -> ray_torch.TorchTrainer:
     import os
 
     import ray.train.torch as ray_torch
@@ -178,9 +178,8 @@ def get_ray_trainer():
     )
 
 
-def get_tuner():
+def get_tuner() -> ray.tune.Tuner:
     import flaml
-    import ray.tune
 
     from .lightning import METRIC
 

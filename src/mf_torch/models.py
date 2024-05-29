@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 class MatrixFactorization(torch.nn.Module):
     def __init__(
-        self,
+        self: MatrixFactorization,
         num_embeddings: int,
         embedding_dim: int,
         *,
@@ -32,13 +32,14 @@ class MatrixFactorization(torch.nn.Module):
         self.normalize = normalize
 
     @property
-    def sparse(self) -> bool:
+    def sparse(self: MatrixFactorization) -> bool:
         return self.embedding.sparse
 
     @classmethod
     def from_pretrained(
-        cls,
+        cls: MatrixFactorization,
         embeddings: torch.Tensor,
+        *,
         freeze: bool = True,
         max_norm: float | None = None,
         norm_type: float = 2.0,
@@ -64,7 +65,9 @@ class MatrixFactorization(torch.nn.Module):
         return model
 
     def embed(
-        self, feature_hashes: torch.Tensor, feature_weights: torch.Tensor | None = None
+        self: MatrixFactorization,
+        feature_hashes: torch.Tensor,
+        feature_weights: torch.Tensor | None = None,
     ) -> torch.Tensor:
         # input shape: (batch_size, num_features)
         embed = self.embedding(feature_hashes, per_sample_weights=feature_weights)
@@ -75,7 +78,7 @@ class MatrixFactorization(torch.nn.Module):
         return embed
 
     def forward(
-        self,
+        self: MatrixFactorization,
         user_feature_hashes: torch.Tensor,
         item_feature_hashes: torch.Tensor,
         *,
@@ -90,7 +93,7 @@ class MatrixFactorization(torch.nn.Module):
         return (user_embed * item_embed).sum(-1)
 
     def full_predict(
-        self,
+        self: MatrixFactorization,
         user_feature_hashes: torch.Tensor,
         item_feature_hashes: torch.Tensor,
         *,

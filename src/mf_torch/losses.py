@@ -24,13 +24,15 @@ def weighted_mean(
 
 
 class EmbeddingLoss(torch.nn.Module, abc.ABC):
-    def __init__(self, *, hard_negatives_ratio: int | None = None) -> None:
+    def __init__(
+        self: EmbeddingLoss, *, hard_negatives_ratio: int | None = None
+    ) -> None:
         super().__init__()
         self.hard_negatives_ratio = hard_negatives_ratio
 
     @abc.abstractmethod
     def forward(
-        self,
+        self: EmbeddingLoss,
         user_embed: torch.Tensor,
         item_embed: torch.Tensor,
         *,
@@ -268,7 +270,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
 
 class AlignmentLoss(EmbeddingLoss):
     def forward(
-        self,
+        self: AlignmentLoss,
         user_embed: torch.Tensor,
         item_embed: torch.Tensor,
         *,
@@ -289,7 +291,7 @@ class AlignmentLoss(EmbeddingLoss):
 
 class UniformityLoss(EmbeddingLoss):
     def forward(
-        self,
+        self: UniformityLoss,
         user_embed: torch.Tensor,
         item_embed: torch.Tensor,
         *,
@@ -310,7 +312,7 @@ class UniformityLoss(EmbeddingLoss):
 
 class AlignmentUniformityLoss(EmbeddingLoss):
     def forward(
-        self,
+        self: AlignmentUniformityLoss,
         user_embed: torch.Tensor,
         item_embed: torch.Tensor,
         *,
@@ -338,7 +340,7 @@ class AlignmentUniformityLoss(EmbeddingLoss):
 
 class ContrastiveLoss(EmbeddingLoss):
     def forward(
-        self,
+        self: ContrastiveLoss,
         user_embed: torch.Tensor,
         item_embed: torch.Tensor,
         *,
@@ -364,7 +366,7 @@ class ContrastiveLoss(EmbeddingLoss):
 
 class AlignmentContrastiveLoss(EmbeddingLoss):
     def forward(
-        self,
+        self: AlignmentContrastiveLoss,
         user_embed: torch.Tensor,
         item_embed: torch.Tensor,
         *,
@@ -395,7 +397,7 @@ class AlignmentContrastiveLoss(EmbeddingLoss):
 
 class InfomationNoiseContrastiveEstimationLoss(EmbeddingLoss):
     def forward(
-        self,
+        self: InfomationNoiseContrastiveEstimationLoss,
         user_embed: torch.Tensor,
         item_embed: torch.Tensor,
         *,
@@ -422,7 +424,7 @@ class InfomationNoiseContrastiveEstimationLoss(EmbeddingLoss):
 
 class MutualInformationNeuralEstimationLoss(EmbeddingLoss):
     def forward(
-        self,
+        self: MutualInformationNeuralEstimationLoss,
         user_embed: torch.Tensor,
         item_embed: torch.Tensor,
         *,
@@ -449,7 +451,7 @@ class MutualInformationNeuralEstimationLoss(EmbeddingLoss):
 
 class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
     def __init__(
-        self,
+        self: PairwiseEmbeddingLoss,
         *,
         hard_negatives_ratio: float | None = None,
         sigma: float = 1.0,
@@ -460,10 +462,12 @@ class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
         self.margin = margin
 
     @abc.abstractmethod
-    def score_loss_fn(self, score) -> torch.Tensor: ...
+    def score_loss_fn(
+        self: PairwiseEmbeddingLoss, score: torch.Tensor
+    ) -> torch.Tensor: ...
 
     def pariwise_loss(
-        self,
+        self: PairwiseEmbeddingLoss,
         user_embed: torch.Tensor,
         item_embed: torch.Tensor,
         *,
@@ -497,7 +501,7 @@ class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
         return weighted_mean(loss, sample_weight)
 
     def forward(
-        self,
+        self: PairwiseEmbeddingLoss,
         user_embed: torch.Tensor,
         item_embed: torch.Tensor,
         *,
@@ -525,10 +529,10 @@ class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
 
 
 class PairwiseLogisticLoss(PairwiseEmbeddingLoss):
-    def score_loss_fn(self, score: torch.Tensor) -> torch.Tensor:
+    def score_loss_fn(self: PairwiseLogisticLoss, score: torch.Tensor) -> torch.Tensor:
         return -F.logsigmoid(score)
 
 
 class PairwiseHingeLoss(PairwiseEmbeddingLoss):
-    def score_loss_fn(self, score: torch.Tensor) -> torch.Tensor:
+    def score_loss_fn(self: PairwiseHingeLoss, score: torch.Tensor) -> torch.Tensor:
         return (-score).relu()
