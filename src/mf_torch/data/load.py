@@ -8,7 +8,7 @@ import torch.utils.data._utils.collate as torch_collate
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-    from pathlib import Path
+    from typing import Iterator
 
     import numpy as np
     import pyarrow.dataset as ds
@@ -102,7 +102,7 @@ def gather_inputs(
     }
 
 
-def merge_rows(rows):
+def merge_rows(rows: list[dict]) -> dict:
     new_row = {**rows[0]}
     for row in rows[1:]:
         new_row = {**new_row, **row}
@@ -147,8 +147,8 @@ def ray_collate_fn(
 @torch_data.functional_datapipe("load_parquet_as_dict")
 class ParquetDictLoaderIterDataPipe(torch_data.IterDataPipe):
     def __init__(
-        self,
-        source_datapipe: Iterable[str | Path],
+        self: ParquetDictLoaderIterDataPipe,
+        source_datapipe: Iterable[str],
         *,
         columns: Iterable[str] | None = None,
         filter_expr: ds.Expression | None = None,
@@ -160,18 +160,18 @@ class ParquetDictLoaderIterDataPipe(torch_data.IterDataPipe):
         self.filter_expr = filter_expr
         self.batch_size = batch_size
 
-    def pyarrow_dataset(self, source: str | Path) -> ds.Dataset:
+    def pyarrow_dataset(self: ParquetDictLoaderIterDataPipe, source: str) -> ds.Dataset:
         import pyarrow.dataset as ds
 
         return ds.dataset(source)
 
-    def __len__(self) -> int:
+    def __len__(self: ParquetDictLoaderIterDataPipe) -> int:
         return sum(
             self.pyarrow_dataset(source).count_rows(filter=self.filter_expr)
             for source in self.source_datapipe
         )
 
-    def __iter__(self) -> Iterable[dict]:
+    def __iter__(self: ParquetDictLoaderIterDataPipe) -> Iterator[dict]:
         for source in self.source_datapipe:
             dataset = self.pyarrow_dataset(source)
             for batch in dataset.to_batches(
@@ -184,7 +184,9 @@ class ParquetDictLoaderIterDataPipe(torch_data.IterDataPipe):
 
 @torch_data.functional_datapipe("load_delta_table_as_dict")
 class DeltaTableDictLoaderIterDataPipe(ParquetDictLoaderIterDataPipe):
-    def pyarrow_dataset(self, source: str | Path) -> ds.Dataset:
+    def pyarrow_dataset(
+        self: DeltaTableDictLoaderIterDataPipe, source: str
+    ) -> ds.Dataset:
         import deltalake as dl
 
         return dl.DeltaTable(source).to_pyarrow_dataset()
@@ -193,8 +195,8 @@ class DeltaTableDictLoaderIterDataPipe(ParquetDictLoaderIterDataPipe):
 @torch_data.functional_datapipe("cycle")
 class CyclerIterDataPipe(torch_data.IterDataPipe):
     def __init__(
-        self,
-        source_datapipe: Iterable[str | Path],
+        self: CyclerIterDataPipe,
+        source_datapipe: Iterable[dict],
         count: int | None = None,
     ) -> None:
         super().__init__()
@@ -204,13 +206,13 @@ class CyclerIterDataPipe(torch_data.IterDataPipe):
             msg = f"requires count >= 0, but {count = }"
             raise ValueError(msg)
 
-    def __len__(self) -> int:
+    def __len__(self: CyclerIterDataPipe) -> int:
         if self.count is None:
             # use arbitrary large number so that valid length is shown for zip
             return 2**31 - 1  # max 32-bit signed integer
         return len(self.source_datapipe) * self.count
 
-    def __iter__(self) -> Iterable[dict]:
+    def __iter__(self: CyclerIterDataPipe) -> Iterator[dict]:
         i = 0
         while self.count is None or i < self.count:
             yield from self.source_datapipe

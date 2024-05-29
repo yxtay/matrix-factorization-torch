@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -21,8 +22,6 @@ DATA_DIR = "data"
 def download_data(
     url: str = MOVIELENS_1M_URL, dest_dir: str = DATA_DIR, *, overwrite: bool = False
 ) -> Path:
-    import shutil
-
     import requests
 
     # prepare destination
@@ -41,8 +40,6 @@ def download_data(
 
 
 def unpack_data(archive_file: str, *, overwrite: bool = False) -> list[str]:
-    import shutil
-
     archive_file = Path(archive_file)
     dest_dir = archive_file.parent / archive_file.stem
 
@@ -230,8 +227,8 @@ def get_dense_interactions(
         .join(movies.lazy(), how="cross")
         .join(data.lazy(), on=["user_id", "movie_id"], how="left")
         .with_columns(
-            is_rated=pl.col("is_rated").fill_null(False),
-            is_train=pl.col("is_train").fill_null(False),
+            is_rated=pl.col("is_rated").fill_null(value=False),
+            is_train=pl.col("is_train").fill_null(value=False),
         )
         .with_columns(
             is_val=~pl.col("is_train") & pl.col("is_val_user"),
