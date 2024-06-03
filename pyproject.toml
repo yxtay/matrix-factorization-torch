@@ -23,7 +23,7 @@ polars = { extras = ["pandas"], version = ">=0.20" }
 ray = { extras = ["data", "train", "tune"], version = "^2.23" }
 rich = "^13.7"
 tensorboard = "^2.16"
-torch = "^2.2,<2.3"
+torch = "^2.3"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.7"
