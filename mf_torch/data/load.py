@@ -23,13 +23,13 @@ def hash_features(
     num_buckets: int = 2**16 + 1,
     out_prefix: str = "",
     keep_input: bool = True,
-) -> torch.Tensor:
+) -> dict[str, int | float | str | list[int, str] | torch.Tensor]:
     from collections.abc import Iterable
 
     import mmh3
 
-    feature_values = []
-    feature_weights = []
+    feature_values: list[str] = []
+    feature_weights: list[torch.Tensor] = []
     num_features = 0
     # categorical features
     cat_features = [
@@ -124,8 +124,7 @@ def collate_tensor_fn(
         )
     ):
         # pad tensor if only first or last dimensions are different
-        nested = torch.nested.as_nested_tensor(batch)
-        return torch.nested.to_padded_tensor(nested, padding=0)
+        return torch.nested.as_nested_tensor(batch).to_padded_tensor(padding=0)
     return torch_collate.collate_tensor_fn(batch, collate_fn_map=collate_fn_map)
 
 

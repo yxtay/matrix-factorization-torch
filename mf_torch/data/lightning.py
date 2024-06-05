@@ -9,8 +9,8 @@ import lightning as L
 import torch.utils.data as torch_data
 import torch.utils.data.datapipes as torch_datapipes
 
-from .load import gather_inputs, hash_features, merge_rows, ray_collate_fn
-from .prepare import (
+from mf_torch.data.load import gather_inputs, hash_features, merge_rows, ray_collate_fn
+from mf_torch.data.prepare import (
     DATA_DIR,
     MOVIELENS_1M_URL,
     download_unpack_data,
@@ -111,7 +111,11 @@ class Movielens1mBaseDataModule(L.LightningDataModule, abc.ABC):
 
 class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
     def get_movies_dataset(
-        self: Movielens1mPipeDataModule, cycle_count: int | None = 1
+        self: Movielens1mPipeDataModule,
+        cycle_count: int | None = 1,
+        *,
+        out_prefix: str = "",
+        keep_input: bool = True,
     ) -> torch_data.Dataset:
         delta_path = Path(self.hparams.data_dir, "ml-1m", "movies.delta")
 
@@ -131,8 +135,8 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
                     feature_names=self.item_feature_names,
                     num_hashes=self.hparams.num_hashes,
                     num_buckets=self.hparams.num_buckets,
-                    out_prefix="neg_item_",
-                    keep_input=False,
+                    out_prefix=out_prefix,
+                    keep_input=keep_input,
                 )
             )
         )
@@ -187,7 +191,9 @@ class Movielens1mPipeDataModule(Movielens1mBaseDataModule):
         )
         if subset == "train" and self.hparams.negatives_ratio > 0:
             datapipe = (
-                self.get_movies_dataset(cycle_count=None)
+                self.get_movies_dataset(
+                    cycle_count=None, out_prefix="neg_item_", keep_input=False
+                )
                 .batch(self.hparams.negatives_ratio)
                 .collate()
                 .zip(datapipe)
