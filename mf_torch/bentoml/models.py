@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from docarray import BaseDoc
 from docarray.typing import NdArray  # noqa: TCH002
-
 from lancedb.pydantic import LanceModel, Vector
+
 from mf_torch.data.lightning import Movielens1mPipeDataModule
 from mf_torch.data.load import hash_features
 
