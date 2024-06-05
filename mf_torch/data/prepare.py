@@ -216,7 +216,9 @@ def users_split_activty(
         .with_columns(is_val_user=pl.col("p") >= 1 - val_prop)
         .drop("len", "p")
     )
-    return users.lazy().join(users_interactions_agg, on="user_id", how="left")
+    return users.lazy().join(
+        users_interactions_agg, on="user_id", how="left", coalesce=True
+    )
 
 
 def get_dense_interactions(
@@ -225,7 +227,7 @@ def get_dense_interactions(
     dense_interactions = (
         users.lazy()
         .join(movies.lazy(), how="cross")
-        .join(data.lazy(), on=["user_id", "movie_id"], how="left")
+        .join(data.lazy(), on=["user_id", "movie_id"], how="left", coalesce=True)
         .with_columns(
             is_rated=pl.col("is_rated").fill_null(value=False),
             is_train=pl.col("is_train").fill_null(value=False),

@@ -79,15 +79,22 @@ class MatrixFactorization(torch.nn.Module):
 
     def forward(
         self: MatrixFactorization,
+        feature_hashes: torch.Tensor,
+        feature_weights: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        return self.embed(feature_hashes, feature_weights)
+
+    def score(
+        self: MatrixFactorization,
         user_feature_hashes: torch.Tensor,
         item_feature_hashes: torch.Tensor,
         *,
         user_feature_weights: torch.Tensor | None = None,
         item_feature_weights: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        user_embed = self.embed(user_feature_hashes, user_feature_weights)
+        user_embed = self(user_feature_hashes, user_feature_weights)
         # shape: (batch_size, embed_dim)
-        item_embed = self.embed(item_feature_hashes, item_feature_weights)
+        item_embed = self(item_feature_hashes, item_feature_weights)
         # shape: (batch_size, embed_dim)
         # output shape: (batch_size)
         return (user_embed * item_embed).sum(-1)
@@ -100,13 +107,9 @@ class MatrixFactorization(torch.nn.Module):
         user_feature_weights: torch.Tensor | None = None,
         item_feature_weights: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        user_embed = self.embed(
-            user_feature_hashes, per_sample_weights=user_feature_weights
-        )
+        user_embed = self(user_feature_hashes, per_sample_weights=user_feature_weights)
         # shape: (batch_size, embed_dim)
-        item_embed = self.embed(
-            item_feature_hashes, per_sample_weights=item_feature_weights
-        )
+        item_embed = self(item_feature_hashes, per_sample_weights=item_feature_weights)
         # shape: (batch_size, embed_dim)
         # output shape: (batch_size, batch_size)
         return torch.mm(user_embed, item_embed.T)

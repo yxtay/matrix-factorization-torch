@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+from functools import cached_property
 from typing import TYPE_CHECKING
 
 import lightning as L
@@ -10,12 +11,13 @@ if TYPE_CHECKING:
     import mlflow
     import torchmetrics
 
+
 METRIC = {"name": "val/RetrievalNormalizedDCG", "mode": "max"}
 
 
 class LitMatrixFactorization(L.LightningModule):
     def __init__(
-        self,
+        self: LitMatrixFactorization,
         num_embeddings: int = 2**16 + 1,
         embedding_dim: int = 32,
         train_loss: str = "PairwiseHingeLoss",
@@ -29,11 +31,20 @@ class LitMatrixFactorization(L.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.model = None
-        self.loss_fns = None
         self.metrics = None
-        self.example_input_array = None
 
-    def forward(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
+    def forward(
+        self: LitMatrixFactorization,
+        feature_hashes: torch.Tensor,
+        feature_weights: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        return self.model(
+            feature_hashes=feature_hashes, feature_weights=feature_weights
+        )
+
+    def score(
+        self: LitMatrixFactorization, batch: dict[str, torch.Tensor]
+    ) -> torch.Tensor:
         user_feature_hashes = batch["user_feature_hashes"]
         # shape: (batch_size, num_user_features)
         item_feature_hashes = batch["item_feature_hashes"]
@@ -43,7 +54,7 @@ class LitMatrixFactorization(L.LightningModule):
         item_feature_weights = batch["item_feature_weights"]
         # shape: (batch_size, num_item_features)
         # output shape: (batch_size)
-        return self.model(
+        return self.model.score(
             user_feature_hashes,
             item_feature_hashes,
             user_feature_weights=user_feature_weights,
@@ -84,9 +95,9 @@ class LitMatrixFactorization(L.LightningModule):
         neg_item_feature_weights = batch.get("neg_item_feature_weights")
         # shape: (batch_size, neg_multiple, num_item_features)
 
-        user_embed = self.model.embed(user_feature_hashes, user_feature_weights)
+        user_embed = self(user_feature_hashes, user_feature_weights)
         # shape: (batch_size, embed_dim)
-        item_embed = self.model.embed(item_feature_hashes, item_feature_weights)
+        item_embed = self(item_feature_hashes, item_feature_weights)
         # shape: (batch_size, embed_dim)
         if neg_item_feature_hashes is not None:
             num_item_features = neg_item_feature_hashes.size(-1)
@@ -99,9 +110,7 @@ class LitMatrixFactorization(L.LightningModule):
                 -1, num_item_features
             )
             # shape: (batch_size * neg_multiple, num_item_features)
-            neg_item_embed = self.model.embed(
-                neg_item_feature_hashes, neg_item_feature_weights
-            )
+            neg_item_embed = self(neg_item_feature_hashes, neg_item_feature_weights)
             # shape: (batch_size * neg_multiple, embed_dim)
             item_embed = torch.cat([item_embed, neg_item_embed])
             # shape: (batch_size * (1 + neg_multiple), embed_dim)
@@ -129,7 +138,7 @@ class LitMatrixFactorization(L.LightningModule):
     ) -> torchmetrics.MetricCollection:
         user_idx = batch["user_idx"].long()
         label = batch["label"]
-        score = self(batch)
+        score = self.score(batch)
         metrics = self.metrics[step_name]
         metrics.update(preds=score, target=label, indexes=user_idx)
         return metrics
@@ -166,7 +175,7 @@ class LitMatrixFactorization(L.LightningModule):
     def predict_step(
         self: LitMatrixFactorization, batch: dict[str, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
-        return self(batch)
+        return self.score(batch)
 
     def on_validation_epoch_end(self: LitMatrixFactorization) -> None:
         metrics = {
@@ -196,15 +205,11 @@ class LitMatrixFactorization(L.LightningModule):
     def configure_model(self: LitMatrixFactorization) -> None:
         if self.model is None:
             self.model = self.get_model()
-        if self.loss_fns is None:
-            self.loss_fns = self.get_loss_fns()
         if self.metrics is None:
             self.metrics = self.get_metrics(top_k=20)
-        if self.example_input_array is None:
-            self.example_input_array = self.get_example_input_array()
 
     def get_model(self: LitMatrixFactorization) -> torch.nn.Module:
-        from . import models as mf_models
+        import mf_torch.models as mf_models
 
         return mf_models.MatrixFactorization(
             num_embeddings=self.hparams.num_embeddings,
@@ -214,7 +219,8 @@ class LitMatrixFactorization(L.LightningModule):
             normalize=self.hparams.normalize,
         )
 
-    def get_loss_fns(self: LitMatrixFactorization) -> torch.nn.ModuleList:
+    @cached_property
+    def loss_fns(self: LitMatrixFactorization) -> torch.nn.ModuleList:
         from . import losses as mf_losses
 
         loss_classes = [
@@ -254,34 +260,34 @@ class LitMatrixFactorization(L.LightningModule):
         }
         return torch.nn.ModuleDict(metrics)
 
-    def get_example_input_array(
+    @cached_property
+    def example_input_array(
         self: LitMatrixFactorization,
-    ) -> tuple[dict[str, torch.Tensor]]:
-        return (
-            {
-                "user_feature_hashes": torch.zeros(1, 1).int(),
-                "item_feature_hashes": torch.zeros(1, 1).int(),
-                "user_feature_weights": torch.zeros(1, 1),
-                "item_feature_weights": torch.zeros(1, 1),
-            },
-        )
+    ) -> dict[str, torch.Tensor]:
+        return {
+            "feature_hashes": torch.zeros(1, 1).int(),
+            "feature_weights": torch.zeros(1, 1),
+        }
+
+    def save_torchscript(self: LitMatrixFactorization, path: str) -> None:
+        torch.jit.save(torch.jit.script(self.model), path)
 
 
 def mlflow_start_run(experiment_name: str | None = None) -> mlflow.ActiveRun:
     import mlflow
 
-    experiment_name = experiment_name or get_sgt_now().isoformat()
+    experiment_name = experiment_name or get_local_time_now().isoformat()
     experiment_id = mlflow.set_experiment(experiment_name).experiment_id
     return mlflow.start_run(experiment_id=experiment_id)
 
 
 def get_trainer(
-    experiment_name: str | None = None, run_name: str | None = None
+    experiment_name: str | None = None, run_name: str | None = None, **kwargs
 ) -> L.Trainer:
     import lightning.pytorch.callbacks as pl_callbacks
     import lightning.pytorch.loggers as pl_loggers
 
-    experiment_name = experiment_name or get_sgt_now().isoformat()
+    experiment_name = experiment_name or get_local_time_now().isoformat()
     logger = [
         pl_loggers.TensorBoardLogger(
             save_dir="lightning_logs",
@@ -304,14 +310,43 @@ def get_trainer(
         callbacks=callbacks,
         max_epochs=1,
         max_time=datetime.timedelta(hours=1),
-        # fast_dev_run=True,
+        fast_dev_run=True,
+        **kwargs,
     )
 
 
-def get_sgt_now() -> datetime.datetime:
-    import zoneinfo
+def get_local_time_now() -> datetime.datetime:
+    return datetime.datetime.now(datetime.UTC).astimezone()
 
-    return datetime.datetime.now(zoneinfo.ZoneInfo("Asia/Singapore"))
+
+def main(
+    experiment_name: str = "",
+    *,
+    trainer_kwargs: dict | None = None,
+    data_kwargs: dict | None = None,
+    **kwargs,
+) -> L.Trainer:
+    import mlflow
+
+    from .data import lightning as mf_data
+
+    if data_kwargs is None:
+        data_kwargs = {}
+    if trainer_kwargs is None:
+        trainer_kwargs = {}
+    experiment_name = experiment_name or get_local_time_now().isoformat()
+
+    with mlflow_start_run(experiment_name) as run:
+        trainer = get_trainer(experiment_name, run.info.run_name, **trainer_kwargs)
+
+        with trainer.init_module():
+            datamodule = mf_data.Movielens1mPipeDataModule(**data_kwargs)
+            model = LitMatrixFactorization(**kwargs)
+
+        mlflow.log_params(datamodule.hparams)
+        mlflow.log_params(model.hparams)
+        trainer.fit(model=model, datamodule=datamodule)
+    return trainer
 
 
 if __name__ == "__main__":
@@ -319,7 +354,7 @@ if __name__ == "__main__":
 
     from .data import lightning as mf_data
 
-    experiment_name = get_sgt_now().isoformat()
+    experiment_name = get_local_time_now().isoformat()
     train_losses = [
         "PairwiseHingeLoss",
         # "PairwiseLogisticLoss",
