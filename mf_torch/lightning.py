@@ -310,7 +310,7 @@ def get_trainer(
         callbacks=callbacks,
         max_epochs=1,
         max_time=datetime.timedelta(hours=1),
-        fast_dev_run=True,
+        # fast_dev_run=True,
         **kwargs,
     )
 
