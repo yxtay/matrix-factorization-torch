@@ -20,6 +20,7 @@ from mf_torch.bentoml.models import (
 
 if TYPE_CHECKING:
     import lancedb.table
+
     import mf_torch.lightning as mf_lightning
 
 
