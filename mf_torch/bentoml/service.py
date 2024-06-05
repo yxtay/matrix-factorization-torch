@@ -86,10 +86,19 @@ class Recommender:
     movie_index = bentoml.depends(MovieIndex)
 
     @bentoml.api()
-    def recommend(self: Recommender, query: Query) -> list[MovieCandidate]:
+    async def embed_queries(self: Recommender, queries: list[Query]) -> list[Query]:
         try:
-            query = self.embedder.embed([query])[0]
-            results = self.movie_index.search(query)
+            queries = await self.embedder.to_async.embed(queries)
+        except Exception as e:
+            logger.exception(e)
+            raise
+        else:
+            return queries
+
+    @bentoml.api()
+    async def search_movies(self: Recommender, query: Query) -> list[MovieCandidate]:
+        try:
+            results = await self.movie_index.to_async.search(query)
         except Exception as e:
             logger.exception(e)
             raise
@@ -97,11 +106,24 @@ class Recommender:
             return results
 
     @bentoml.api()
-    def recommend_with_movie(
+    async def recommend_with_query(
+        self: Recommender, query: Query
+    ) -> list[MovieCandidate]:
+        try:
+            queries = await self.embed_queries([query])
+            results = await self.search_movies(queries[0])
+        except Exception as e:
+            logger.exception(e)
+            raise
+        else:
+            return results
+
+    @bentoml.api()
+    async def recommend_with_movie(
         self: Recommender, movie: MovieQuery
     ) -> list[MovieCandidate]:
         try:
-            results = self.recommend(movie.to_query())
+            results = await self.recommend_with_query(movie.to_query())
         except Exception as e:
             logger.exception(e)
             raise
@@ -109,9 +131,11 @@ class Recommender:
             return results
 
     @bentoml.api()
-    def recommend_with_user(self: Recommender, user: UserQuery) -> list[MovieCandidate]:
+    async def recommend_with_user(
+        self: Recommender, user: UserQuery
+    ) -> list[MovieCandidate]:
         try:
-            results = self.recommend(user.to_query())
+            results = await self.recommend_with_query(user.to_query())
         except Exception as e:
             logger.exception(e)
             raise
