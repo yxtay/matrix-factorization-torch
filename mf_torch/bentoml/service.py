@@ -9,6 +9,8 @@ from loguru import logger
 
 from mf_torch.bentoml.models import (
     EMBEDDER_PATH,
+    LANCE_DB_PATH,
+    LANCE_TABLE_NAME,
     MODEL_TAG,
     MOVIES_DOC_PATH,
     MovieCandidate,
@@ -69,10 +71,8 @@ class DocIndex:
             matches, scores = self.doc_index.find_batched(
                 torch.as_tensor(queries.embedding), search_field="embedding"
             )
-            logger.debug(matches[0][0])
             for i, score in enumerate(scores):
                 matches[i].score = score
-            logger.debug(matches[0][0])
         except Exception as e:
             logger.exception(e)
             raise
@@ -81,17 +81,46 @@ class DocIndex:
 
 
 @bentoml.service()
+class MovieIndex:
+    model_ref = bentoml.models.get(MODEL_TAG)
+
+    def __init__(self: DocIndex) -> None:
+        import lancedb
+
+        src_path = self.model_ref.path_of(LANCE_DB_PATH)
+        self.tbl = lancedb.connect(src_path).open_table(LANCE_TABLE_NAME)
+        logger.info("movies index loaded: {}", src_path)
+
+    @bentoml.api()
+    def search(self: DocIndex, query: Query) -> list[MovieCandidate]:
+        import polars as pl
+
+        try:
+            results_df = (
+                self.tbl.search(query.embedding)
+                .to_polars()
+                .with_columns((1 - pl.col("_distance")).alias("score"))
+                .drop("_distance")
+                .to_pandas()
+            )
+            results = DocList[MovieCandidate].from_dataframe(results_df)
+        except Exception as e:
+            logger.exception(e)
+            raise
+        else:
+            return results
+
+
+@bentoml.service()
 class Recommender:
     embedder = bentoml.depends(Embedder)
-    doc_index = bentoml.depends(DocIndex)
+    movie_index = bentoml.depends(MovieIndex)
 
-    @bentoml.api(batchable=True)
-    def recommend(
-        self: Recommender, queries: list[Query]
-    ) -> list[list[MovieCandidate]]:
+    @bentoml.api()
+    def recommend(self: Recommender, query: Query) -> list[MovieCandidate]:
         try:
-            queries = self.embedder.embed(queries)
-            results = self.doc_index.find(queries)
+            query = self.embedder.embed([query])[0]
+            results = self.movie_index.search(query)
         except Exception as e:
             logger.exception(e)
             raise
@@ -103,7 +132,7 @@ class Recommender:
         self: Recommender, movie: MovieQuery
     ) -> list[MovieCandidate]:
         try:
-            results = self.recommend([movie.to_query()])[0]
+            results = self.recommend(movie.to_query())
         except Exception as e:
             logger.exception(e)
             raise
@@ -113,7 +142,7 @@ class Recommender:
     @bentoml.api()
     def recommend_with_user(self: Recommender, user: UserQuery) -> list[MovieCandidate]:
         try:
-            results = self.recommend([user.to_query()])[0]
+            results = self.recommend(user.to_query())
         except Exception as e:
             logger.exception(e)
             raise

@@ -1,19 +1,18 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from docarray import BaseDoc
+from docarray.typing import NdArray  # noqa: TCH002
 
+from lancedb.pydantic import LanceModel, Vector
 from mf_torch.data.lightning import Movielens1mPipeDataModule
 from mf_torch.data.load import hash_features
-
-if TYPE_CHECKING:
-    from docarray.typing import NdArray
 
 MODEL_NAME = "mf-torch"
 MODEL_TAG = f"{MODEL_NAME}:latest"
 EMBEDDER_PATH = "scripted_module.pt"
 MOVIES_DOC_PATH = "movies"
+LANCE_DB_PATH = "lancedb"
+LANCE_TABLE_NAME = "movies"
 
 
 class Query(BaseDoc):
@@ -48,6 +47,16 @@ class MovieCandidate(MovieQuery):
     feature_weights: NdArray = None
     embedding: NdArray[32] = None
     score: float | None = None
+
+
+class MovieSchema(LanceModel):
+    movie_idx: int
+    movie_id: int
+    title: str
+    genres: list[str]
+    feature_hashes: list[float]
+    feature_weights: list[float]
+    embedding: Vector(32)
 
 
 class UserQuery(BaseDoc):
