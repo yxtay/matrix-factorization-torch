@@ -1,19 +1,15 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from docarray import BaseDoc
+from docarray.typing import NdArray  # noqa: TCH002
+from lancedb.pydantic import LanceModel, Vector
 
-from mf_torch.data.lightning import Movielens1mPipeDataModule
-from mf_torch.data.load import hash_features
-
-if TYPE_CHECKING:
-    from docarray.typing import NdArray
-
+EMBEDDER_PATH = "scripted_module.pt"
+LANCE_DB_PATH = "lancedb"
 MODEL_NAME = "mf-torch"
 MODEL_TAG = f"{MODEL_NAME}:latest"
-EMBEDDER_PATH = "scripted_module.pt"
 MOVIES_DOC_PATH = "movies"
+MOVIES_TABLE_NAME = "movies"
 
 
 class Query(BaseDoc):
@@ -29,6 +25,9 @@ class MovieQuery(BaseDoc):
     genres: list[str] | None = None
 
     def to_query(self: MovieQuery) -> Query:
+        from mf_torch.data.lightning import Movielens1mPipeDataModule
+        from mf_torch.data.load import hash_features
+
         return Query.model_validate(
             hash_features(
                 self.model_dump(),
@@ -50,6 +49,16 @@ class MovieCandidate(MovieQuery):
     score: float | None = None
 
 
+class MovieSchema(LanceModel):
+    movie_idx: int
+    movie_id: int
+    title: str
+    genres: list[str]
+    feature_hashes: list[float]
+    feature_weights: list[float]
+    embedding: Vector(32)
+
+
 class UserQuery(BaseDoc):
     user_idx: int | None = None
     user_id: int | None = None
@@ -59,6 +68,9 @@ class UserQuery(BaseDoc):
     zipcode: str | None = None
 
     def to_query(self: UserQuery) -> Query:
+        from mf_torch.data.lightning import Movielens1mPipeDataModule
+        from mf_torch.data.load import hash_features
+
         return Query.model_validate(
             hash_features(
                 self.model_dump(),
