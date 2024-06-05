@@ -221,7 +221,7 @@ class LitMatrixFactorization(L.LightningModule):
 
     @cached_property
     def loss_fns(self: LitMatrixFactorization) -> torch.nn.ModuleList:
-        from . import losses as mf_losses
+        import mf_torch.losses as mf_losses
 
         loss_classes = [
             mf_losses.AlignmentLoss,
@@ -328,7 +328,7 @@ def main(
 ) -> L.Trainer:
     import mlflow
 
-    from .data import lightning as mf_data
+    import mf_torch.data.lightning as mf_data
 
     if data_kwargs is None:
         data_kwargs = {}
@@ -352,7 +352,7 @@ def main(
 if __name__ == "__main__":
     import mlflow
 
-    from .data import lightning as mf_data
+    import mf_torch.data.lightning as mf_data
 
     experiment_name = get_local_time_now().isoformat()
     train_losses = [

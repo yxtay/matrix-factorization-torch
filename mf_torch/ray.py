@@ -71,8 +71,8 @@ def prepare_trainer(config: dict[str, bool | float | int | str]) -> L.Trainer:
 def train_loop_per_worker(config: dict[str, bool | float | int | str]) -> None:
     import ray.train.lightning as ray_lightning
 
-    from .data.lightning import Movielens1mPipeDataModule
-    from .lightning import LitMatrixFactorization
+    from mf_torch.data.lightning import Movielens1mPipeDataModule
+    from mf_torch.lightning import LitMatrixFactorization
 
     mlflow = setup_mlflow(config)
     trainer = prepare_trainer(config)
@@ -119,7 +119,7 @@ def train_loop_per_worker(config: dict[str, bool | float | int | str]) -> None:
 def get_run_config() -> ray.train.RunConfig:
     import ray.tune.stopper as ray_stopper
 
-    from .lightning import METRIC
+    from mf_torch.lightning import METRIC
 
     checkpoint_config = ray.train.CheckpointConfig(
         num_to_keep=1,
@@ -181,7 +181,7 @@ def get_ray_trainer() -> ray_torch.TorchTrainer:
 def get_tuner() -> ray.tune.Tuner:
     import flaml
 
-    from .lightning import METRIC
+    from mf_torch.lightning import METRIC
 
     search_space = {
         # "num_hashes": ray.tune.randint(1, 5),

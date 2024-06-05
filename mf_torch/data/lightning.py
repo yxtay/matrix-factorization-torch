@@ -9,8 +9,8 @@ import lightning as L
 import torch.utils.data as torch_data
 import torch.utils.data.datapipes as torch_datapipes
 
-from .load import gather_inputs, hash_features, merge_rows, ray_collate_fn
-from .prepare import (
+from mf_torch.data.load import gather_inputs, hash_features, merge_rows, ray_collate_fn
+from mf_torch.data.prepare import (
     DATA_DIR,
     MOVIELENS_1M_URL,
     download_unpack_data,
