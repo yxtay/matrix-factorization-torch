@@ -1,18 +1,15 @@
 from __future__ import annotations
 
 import bentoml
-import bentoml.models
 import torch
 from docarray import DocList
-from docarray.index import InMemoryExactNNIndex
 from loguru import logger
 
 from mf_torch.bentoml.models import (
     EMBEDDER_PATH,
     LANCE_DB_PATH,
-    LANCE_TABLE_NAME,
     MODEL_TAG,
-    MOVIES_DOC_PATH,
+    MOVIES_TABLE_NAME,
     MovieCandidate,
     MovieQuery,
     Query,
@@ -53,46 +50,18 @@ class Embedder:
 
 
 @bentoml.service()
-class DocIndex:
-    model_ref = bentoml.models.get(MODEL_TAG)
-
-    def __init__(self: DocIndex) -> None:
-        from pathlib import Path
-
-        path = Path(self.model_ref.path_of(MOVIES_DOC_PATH)).as_uri()
-        doc_list = DocList[MovieCandidate].pull(path)
-        logger.info("documents loaded: {}", path)
-        self.doc_index = InMemoryExactNNIndex[MovieCandidate](doc_list)
-
-    @bentoml.api(batchable=True)
-    def find(self: DocIndex, queries: list[Query]) -> list[list[MovieCandidate]]:
-        try:
-            queries = DocList[Query](queries)
-            matches, scores = self.doc_index.find_batched(
-                torch.as_tensor(queries.embedding), search_field="embedding"
-            )
-            for i, score in enumerate(scores):
-                matches[i].score = score
-        except Exception as e:
-            logger.exception(e)
-            raise
-        else:
-            return matches
-
-
-@bentoml.service()
 class MovieIndex:
     model_ref = bentoml.models.get(MODEL_TAG)
 
-    def __init__(self: DocIndex) -> None:
+    def __init__(self: MovieIndex) -> None:
         import lancedb
 
         src_path = self.model_ref.path_of(LANCE_DB_PATH)
-        self.tbl = lancedb.connect(src_path).open_table(LANCE_TABLE_NAME)
+        self.tbl = lancedb.connect(src_path).open_table(MOVIES_TABLE_NAME)
         logger.info("movies index loaded: {}", src_path)
 
     @bentoml.api()
-    def search(self: DocIndex, query: Query) -> list[MovieCandidate]:
+    def search(self: MovieIndex, query: Query) -> list[MovieCandidate]:
         import polars as pl
 
         try:

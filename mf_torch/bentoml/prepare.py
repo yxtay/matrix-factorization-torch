@@ -6,14 +6,13 @@ from typing import TYPE_CHECKING
 import torch
 from docarray import DocList
 
-import mf_torch.lightning as mf_lightning
 from mf_torch.bentoml.models import (
     EMBEDDER_PATH,
     LANCE_DB_PATH,
-    LANCE_TABLE_NAME,
     MODEL_NAME,
     MODEL_TAG,
     MOVIES_DOC_PATH,
+    MOVIES_TABLE_NAME,
     MovieCandidate,
     MovieSchema,
     Query,
@@ -21,9 +20,12 @@ from mf_torch.bentoml.models import (
 
 if TYPE_CHECKING:
     import lancedb.table
+    import mf_torch.lightning as mf_lightning
 
 
 def prepare_model() -> mf_lightning.LitMatrixFactorization:
+    import mf_torch.lightning as mf_lightning
+
     trainer = mf_lightning.main()
     return trainer.model
 
@@ -73,7 +75,10 @@ def prepare_index(movies: DocList[MovieCandidate]) -> lancedb.table.LanceTable:
 
     db = lancedb.connect(LANCE_DB_PATH)
     table = db.create_table(
-        LANCE_TABLE_NAME, movies.to_dataframe(), mode="overwrite", schema=MovieSchema
+        MOVIES_TABLE_NAME,
+        movies.to_dataframe(),
+        mode="overwrite",
+        schema=MovieSchema,
     )
     table.create_index(
         metric="cosine",
