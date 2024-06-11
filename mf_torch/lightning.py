@@ -8,8 +8,8 @@ import lightning as L
 import torch
 
 if TYPE_CHECKING:
-    import mlflow
     import torchmetrics
+    from lightning.pytorch.cli import ArgsType, LightningCLI
 
 
 METRIC = {"name": "val/RetrievalNormalizedDCG", "mode": "max"}
@@ -144,10 +144,17 @@ class LitMatrixFactorization(L.LightningModule):
         return metrics
 
     def on_fit_start(self: LitMatrixFactorization) -> None:
+        import lightning.pytorch.loggers as lp_loggers
+
         if self.global_rank == 0:
+            params = {**self.hparams, **self.trainer.datamodule.hparams}
             metrics = {key.replace("val/", "hp/"): 0.0 for key in self.metrics["val"]}
-            self.logger.log_hyperparams(params=self.hparams, metrics=metrics)
-            self.logger.log_graph(self)
+            for logger in self.loggers:
+                if isinstance(logger, lp_loggers.TensorBoardLogger):
+                    logger.log_hyperparams(params=params, metrics=metrics)
+                    logger.log_graph(self)
+                else:
+                    logger.log_hyperparams(params=params)
 
     def training_step(
         self: LitMatrixFactorization, batch: dict[str, torch.Tensor], batch_idx: int
@@ -192,12 +199,12 @@ class LitMatrixFactorization(L.LightningModule):
         return optimizer_class(self.parameters(), lr=self.hparams.learning_rate)
 
     def configure_callbacks(self: LitMatrixFactorization) -> list[L.Callback]:
-        import lightning.pytorch.callbacks as pl_callbacks
+        import lightning.pytorch.callbacks as lp_callbacks
 
-        early_stop = pl_callbacks.EarlyStopping(
+        early_stop = lp_callbacks.EarlyStopping(
             monitor=METRIC["name"], mode=METRIC["mode"]
         )
-        checkpoint = pl_callbacks.ModelCheckpoint(
+        checkpoint = lp_callbacks.ModelCheckpoint(
             monitor=METRIC["name"], mode=METRIC["mode"], auto_insert_metric_name=False
         )
         return [early_stop, checkpoint]
@@ -270,107 +277,54 @@ class LitMatrixFactorization(L.LightningModule):
         }
 
     def save_torchscript(self: LitMatrixFactorization, path: str) -> None:
-        torch.jit.save(torch.jit.script(self.model), path)
-
-
-def mlflow_start_run(experiment_name: str | None = None) -> mlflow.ActiveRun:
-    import mlflow
-
-    experiment_name = experiment_name or get_local_time_now().isoformat()
-    experiment_id = mlflow.set_experiment(experiment_name).experiment_id
-    return mlflow.start_run(experiment_id=experiment_id)
-
-
-def get_trainer(
-    experiment_name: str | None = None, run_name: str | None = None, **kwargs
-) -> L.Trainer:
-    import lightning.pytorch.callbacks as pl_callbacks
-    import lightning.pytorch.loggers as pl_loggers
-
-    experiment_name = experiment_name or get_local_time_now().isoformat()
-    logger = [
-        pl_loggers.TensorBoardLogger(
-            save_dir="lightning_logs",
-            name=experiment_name,
-            version=run_name,
-            log_graph=True,
-            default_hp_metric=False,
-        ),
-        pl_loggers.MLFlowLogger(
-            tracking_uri="mlruns",
-            experiment_name=experiment_name,
-            run_name=run_name,
-            log_model=True,
-        ),
-    ]
-    callbacks = [pl_callbacks.RichProgressBar()]
-    return L.Trainer(
-        precision="bf16-mixed",
-        logger=logger,
-        callbacks=callbacks,
-        max_epochs=1,
-        max_time=datetime.timedelta(hours=1),
-        # fast_dev_run=True,
-        **kwargs,
-    )
+        torch.jit.save(torch.jit.script(self.model.eval()), path)
 
 
 def get_local_time_now() -> datetime.datetime:
     return datetime.datetime.now(datetime.UTC).astimezone()
 
 
-def main(
-    experiment_name: str = "",
-    *,
-    trainer_kwargs: dict | None = None,
-    data_kwargs: dict | None = None,
-    **kwargs,
-) -> L.Trainer:
-    import mlflow
+def cli_main(args: ArgsType = None, *, experiment_name: str = "") -> LightningCLI:
+    import lightning.pytorch.callbacks as lp_callbacks
+    from jsonargparse import lazy_instance
+    from lightning.pytorch.cli import LightningCLI
 
     import mf_torch.data.lightning as mf_data
 
-    if data_kwargs is None:
-        data_kwargs = {}
-    if trainer_kwargs is None:
-        trainer_kwargs = {}
     experiment_name = experiment_name or get_local_time_now().isoformat()
-
-    with mlflow_start_run(experiment_name) as run:
-        trainer = get_trainer(experiment_name, run.info.run_name, **trainer_kwargs)
-
-        with trainer.init_module():
-            datamodule = mf_data.Movielens1mPipeDataModule(**data_kwargs)
-            model = LitMatrixFactorization(**kwargs)
-
-        mlflow.log_params(datamodule.hparams)
-        mlflow.log_params(model.hparams)
-        trainer.fit(model=model, datamodule=datamodule)
-    return trainer
+    tensorboard_logger_default = {
+        "class_path": "TensorBoardLogger",
+        "init_args": {
+            "save_dir": "lightning_logs",
+            "name": experiment_name,
+            "log_graph": True,
+            "default_hp_metric": False,
+        },
+    }
+    mlflow_logger_default = {
+        "class_path": "MLFlowLogger",
+        "init_args": {
+            "tracking_uri": "mlruns",
+            "experiment_name": experiment_name,
+            "log_model": True,
+        },
+    }
+    callbacks_default = [lazy_instance(lp_callbacks.RichProgressBar)]
+    trainer_defaults = {
+        "precision": "bf16-mixed",
+        "logger": [tensorboard_logger_default, mlflow_logger_default],
+        "callbacks": callbacks_default,
+        "max_epochs": 1,
+        "max_time": "00:01:00:00",
+        # "fast_dev_run": True,
+    }
+    return LightningCLI(
+        LitMatrixFactorization,
+        mf_data.Movielens1mPipeDataModule,
+        trainer_defaults=trainer_defaults,
+        args=args,
+    )
 
 
 if __name__ == "__main__":
-    import mlflow
-
-    import mf_torch.data.lightning as mf_data
-
-    experiment_name = get_local_time_now().isoformat()
-    train_losses = [
-        "PairwiseHingeLoss",
-        # "PairwiseLogisticLoss",
-        # "InfomationNoiseContrastiveEstimationLoss",
-        # "MutualInformationNeuralEstimationLoss",
-        # "AlignmentContrastiveLoss",
-        # "AlignmentUniformityLoss",
-    ]
-    for train_loss in train_losses:
-        with mlflow_start_run(experiment_name) as run:
-            trainer = get_trainer(experiment_name, run.info.run_name)
-
-            with trainer.init_module():
-                datamodule = mf_data.Movielens1mPipeDataModule()
-                model = LitMatrixFactorization(train_loss=train_loss)
-
-            mlflow.log_params(datamodule.hparams)
-            mlflow.log_params(model.hparams)
-            trainer.fit(model=model, datamodule=datamodule)
+    cli_main()

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -29,30 +28,26 @@ def setup_mlflow(config: dict[str, bool | float | int | str]) -> mlflow:
 
 def prepare_trainer(config: dict[str, bool | float | int | str]) -> L.Trainer:
     import lightning as L
+    import lightning.pytorch.loggers as lp_loggers
     import ray.train.lightning as ray_lightning
 
-    if ray.train.get_context().get_world_rank():
-        logger = False
-    else:
-        import lightning.pytorch.loggers as pl_loggers
-
-        experiment_name = ray.train.get_context().get_experiment_name()
-        trial_name = ray.train.get_context().get_trial_name()
-        logger = [
-            pl_loggers.TensorBoardLogger(
-                save_dir=config["tensorboard_save_dir"],
-                name=experiment_name or "lightning_logs",
-                version=trial_name,
-                log_graph=True,
-                default_hp_metric=False,
-            ),
-            pl_loggers.MLFlowLogger(
-                tracking_uri=str(config["mlflow_tracking_uri"]),
-                experiment_name=experiment_name,
-                run_name=trial_name,
-                log_model=True,
-            ),
-        ]
+    experiment_name = ray.train.get_context().get_experiment_name()
+    trial_name = ray.train.get_context().get_trial_name()
+    logger = [
+        lp_loggers.TensorBoardLogger(
+            save_dir=config["tensorboard_save_dir"],
+            name=experiment_name or "lightning_logs",
+            version=trial_name,
+            log_graph=True,
+            default_hp_metric=False,
+        ),
+        lp_loggers.MLFlowLogger(
+            tracking_uri=str(config["mlflow_tracking_uri"]),
+            experiment_name=experiment_name,
+            run_name=trial_name,
+            log_model=True,
+        ),
+    ]
     trainer = L.Trainer(
         precision=config["precision"],
         max_epochs=config["max_epochs"],
@@ -74,18 +69,17 @@ def train_loop_per_worker(config: dict[str, bool | float | int | str]) -> None:
     from mf_torch.data.lightning import Movielens1mPipeDataModule
     from mf_torch.lightning import LitMatrixFactorization
 
-    mlflow = setup_mlflow(config)
+    num_embeddings = 2 ** config["num_embeddings_exp"] + 1
+    max_norm = 2.0 ** config["max_norm_exp"] if config["use_max_norm"] else None
+    batch_size = 2 ** (config["batch_size_exp"] - config["negatives_ratio_exp"])
+    negatives_ratio = 2 ** config["negatives_ratio_exp"] - 1
+    hard_negatives_ratio = (
+        config["hard_negatives_ratio"] if config["use_hard_negatives"] else None
+    )
+
+    setup_mlflow(config)
     trainer = prepare_trainer(config)
-
     with trainer.init_module():
-        num_embeddings = 2 ** config["num_embeddings_exp"] + 1
-        max_norm = 2.0 ** config["max_norm_exp"] if config["use_max_norm"] else None
-        batch_size = 2 ** (config["batch_size_exp"] - config["negatives_ratio_exp"])
-        negatives_ratio = 2 ** config["negatives_ratio_exp"] - 1
-        hard_negatives_ratio = (
-            config["hard_negatives_ratio"] if config["use_hard_negatives"] else None
-        )
-
         datamodule = Movielens1mPipeDataModule(
             data_dir=config["data_dir"],
             batch_size=batch_size,
@@ -110,10 +104,7 @@ def train_loop_per_worker(config: dict[str, bool | float | int | str]) -> None:
         with checkpoint.as_directory() as ckpt_dir:
             ckpt_path = Path(ckpt_dir, checkpoint_name)
 
-    with mlflow.active_run():
-        mlflow.log_params(datamodule.hparams)
-        mlflow.log_params(model.hparams)
-        trainer.fit(model, datamodule=datamodule, ckpt_path=ckpt_path)
+    trainer.fit(model, datamodule=datamodule, ckpt_path=ckpt_path)
 
 
 def get_run_config() -> ray.train.RunConfig:
@@ -148,7 +139,7 @@ def get_ray_trainer() -> ray_torch.TorchTrainer:
         # trainer
         "precision": "bf16-true",
         "max_epochs": 1,
-        "max_time": datetime.timedelta(hours=1),
+        "max_time": "00:01:00:00",
         # datamodule
         "data_dir": Path("data").absolute(),
         "batch_size_exp": 11,
@@ -234,7 +225,7 @@ def get_tuner() -> ray.tune.Tuner:
         mode=METRIC["mode"],
         search_alg=search_alg,
         num_samples=-1,
-        time_budget_s=60 * 60 * 1,
+        time_budget_s=60 * 60 * 0.25,
         max_concurrent_trials=1,
     )
     return ray.tune.Tuner(
@@ -245,7 +236,7 @@ def get_tuner() -> ray.tune.Tuner:
     )
 
 
-if __name__ == "__main__":
+def main() -> None:
     import rich
 
     tuner = get_tuner()
@@ -254,3 +245,7 @@ if __name__ == "__main__":
     best_results = results.get_best_result()
     rich.print(best_results.path)
     rich.print(best_results.metrics)
+
+
+if __name__ == "__main__":
+    main()
