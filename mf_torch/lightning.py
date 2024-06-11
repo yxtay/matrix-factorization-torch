@@ -276,8 +276,12 @@ class LitMatrixFactorization(L.LightningModule):
             "feature_weights": torch.zeros(1, 1),
         }
 
-    def save_torchscript(self: LitMatrixFactorization, path: str) -> None:
-        torch.jit.save(torch.jit.script(self.model.eval()), path)
+    def save_torchscript(
+        self: LitMatrixFactorization, path: str
+    ) -> torch.jit.ScriptModule:
+        script_module = torch.jit.script(self.model.eval())
+        torch.jit.save(script_module, path)
+        return script_module
 
 
 def get_local_time_now() -> datetime.datetime:
@@ -289,7 +293,7 @@ def cli_main(args: ArgsType = None, *, experiment_name: str = "") -> LightningCL
     from jsonargparse import lazy_instance
     from lightning.pytorch.cli import LightningCLI
 
-    import mf_torch.data.lightning as mf_data
+    from mf_torch.data.lightning import Movielens1mPipeDataModule
 
     experiment_name = experiment_name or get_local_time_now().isoformat()
     tensorboard_logger_default = {
@@ -320,7 +324,7 @@ def cli_main(args: ArgsType = None, *, experiment_name: str = "") -> LightningCL
     }
     return LightningCLI(
         LitMatrixFactorization,
-        mf_data.Movielens1mPipeDataModule,
+        Movielens1mPipeDataModule,
         trainer_defaults=trainer_defaults,
         args=args,
     )
