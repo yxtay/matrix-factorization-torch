@@ -33,7 +33,7 @@ class Embedder:
     @bentoml.api(batchable=True)
     def embed(self: Embedder, queries: list[Query]) -> list[Query]:
         try:
-            with torch.no_grad():
+            with torch.inference_mode():
                 queries = DocList[Query](queries)
                 feature_hashes = torch.nested.nested_tensor(
                     queries.feature_hashes

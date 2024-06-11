@@ -11,7 +11,8 @@ license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+# python pinned to 3.11 due to ray
+python = "^3.11,<3.12"
 bentoml = "^1.2"
 deltalake = ">=0.17,<0.18"
 docarray = ">=0.40.0"
