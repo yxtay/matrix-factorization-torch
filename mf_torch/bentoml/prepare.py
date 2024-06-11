@@ -19,6 +19,7 @@ from mf_torch.bentoml.models import (
 
 if TYPE_CHECKING:
     import lancedb.table
+
     from mf_torch.lightning import LitMatrixFactorization
 
 

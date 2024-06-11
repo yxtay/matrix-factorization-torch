@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from docarray import BaseDoc
 from docarray.typing import NdArray  # noqa: TCH002
-
 from lancedb.pydantic import LanceModel, Vector
 
 EMBEDDER_PATH = "scripted_module.pt"
