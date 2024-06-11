@@ -57,7 +57,7 @@ def prepare_movies() -> DocList[MovieCandidate]:
 def embed_movies(
     movies: DocList[MovieCandidate], model: LitMatrixFactorization
 ) -> DocList[MovieCandidate]:
-    with torch.no_grad():
+    with torch.inference_mode():
         feature_hashes = torch.nested.nested_tensor(
             movies.feature_hashes
         ).to_padded_tensor(padding=0)

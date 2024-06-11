@@ -48,6 +48,7 @@ class MovieCandidate(MovieQuery):
 
 
 class MovieSchema(LanceModel):
+    id: str
     movie_idx: int
     movie_id: int
     title: str

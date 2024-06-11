@@ -8,22 +8,7 @@ import ray.tune
 
 if TYPE_CHECKING:
     import lightning as L
-    import mlflow
     import ray.train.torch as ray_torch
-
-
-def setup_mlflow(config: dict[str, bool | float | int | str]) -> mlflow:
-    import ray.air.integrations.mlflow as ray_mlflow
-
-    experiment_name = ray.train.get_context().get_experiment_name()
-    trial_name = ray.train.get_context().get_trial_name()
-    return ray_mlflow.setup_mlflow(
-        {f"config/{key}": value for key, value in config.items()},
-        tracking_uri=config["mlflow_tracking_uri"],
-        experiment_name=experiment_name,
-        run_name=trial_name,
-        create_experiment_if_not_exists=True,
-    )
 
 
 def prepare_trainer(config: dict[str, bool | float | int | str]) -> L.Trainer:
@@ -77,7 +62,6 @@ def train_loop_per_worker(config: dict[str, bool | float | int | str]) -> None:
         config["hard_negatives_ratio"] if config["use_hard_negatives"] else None
     )
 
-    setup_mlflow(config)
     trainer = prepare_trainer(config)
     with trainer.init_module():
         datamodule = Movielens1mPipeDataModule(
@@ -176,7 +160,7 @@ def get_tuner() -> ray.tune.Tuner:
 
     search_space = {
         # "num_hashes": ray.tune.randint(1, 5),
-        "negatives_ratio_exp": ray.tune.randint(1, 4),
+        # "negatives_ratio_exp": ray.tune.randint(1, 4),
         # "num_embeddings_exp": ray.tune.randint(10, 17),
         # "embedding_dim_exp": ray.tune.randint(2, 7),
         # "train_loss": ray.tune.choice(train_losses),
@@ -190,7 +174,7 @@ def get_tuner() -> ray.tune.Tuner:
     }
     low_cost_partial_config = {
         # "num_hashes": 1,
-        "negatives_ratio_exp": 1,
+        # "negatives_ratio_exp": 1,
         # "num_embeddings_exp": 10,
         # "embedding_dim_exp": 2,
         # "train_loss": "PairwiseHingeLoss",
@@ -204,7 +188,7 @@ def get_tuner() -> ray.tune.Tuner:
     }
     point_to_evaluate = {
         # "num_hashes": 2,
-        "negatives_ratio_exp": 1,
+        # "negatives_ratio_exp": 1,
         # "num_embeddings_exp": 16,
         # "embedding_dim_exp": 5,
         # "train_loss": "PairwiseHingeLoss",
