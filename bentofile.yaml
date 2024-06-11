@@ -1,0 +1,22 @@
+service: mf_torch.bentoml.service:Service
+name: mf-torch
+include:
+  - "**/*.py"
+models:
+  - mf-torch
+python:
+  packages:
+    - bentoml
+    - docarray
+    - lancedb
+    - loguru
+    - mmh3
+    - pandas
+    - torch
+envs:
+  - name: PIP_EXTRA_INDEX_URL
+    value: https://download.pytorch.org/whl/cpu
+  - name: PIP_NO_CACHE_DIR
+    value: "0"
+  - name: PIP_NO_COMPILE
+    value: "0"

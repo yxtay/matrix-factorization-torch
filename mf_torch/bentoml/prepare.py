@@ -10,7 +10,6 @@ from mf_torch.bentoml.models import (
     EMBEDDER_PATH,
     LANCE_DB_PATH,
     MODEL_NAME,
-    MODEL_TAG,
     MOVIES_DOC_PATH,
     MOVIES_TABLE_NAME,
     MovieCandidate,
@@ -21,14 +20,14 @@ from mf_torch.bentoml.models import (
 if TYPE_CHECKING:
     import lancedb.table
 
-    import mf_torch.lightning as mf_lightning
+    from mf_torch.lightning import LitMatrixFactorization
 
 
-def prepare_model() -> mf_lightning.LitMatrixFactorization:
-    import mf_torch.lightning as mf_lightning
+def prepare_model() -> LitMatrixFactorization:
+    from mf_torch.lightning import cli_main
 
-    trainer = mf_lightning.main()
-    return trainer.model
+    cli = cli_main(["fit"])
+    return cli.trainer.lightning_module.eval()
 
 
 def prepare_movies() -> DocList[MovieCandidate]:
@@ -56,16 +55,17 @@ def prepare_movies() -> DocList[MovieCandidate]:
 
 
 def embed_movies(
-    movies: DocList[MovieCandidate], model: mf_lightning.LitMatrixFactorization
+    movies: DocList[MovieCandidate], model: LitMatrixFactorization
 ) -> DocList[MovieCandidate]:
-    feature_hashes = torch.nested.nested_tensor(movies.feature_hashes).to_padded_tensor(
-        padding=0
-    )
-    feature_weights = torch.nested.nested_tensor(
-        movies.feature_weights
-    ).to_padded_tensor(padding=0)
-    embeddings = model(feature_hashes, feature_weights)
-    movies.embedding = list(embeddings)
+    with torch.no_grad():
+        feature_hashes = torch.nested.nested_tensor(
+            movies.feature_hashes
+        ).to_padded_tensor(padding=0)
+        feature_weights = torch.nested.nested_tensor(
+            movies.feature_weights
+        ).to_padded_tensor(padding=0)
+        embeddings = model(feature_hashes, feature_weights)
+        movies.embedding = list(embeddings)
     return movies
 
 
@@ -73,6 +73,9 @@ def prepare_index(movies: DocList[MovieCandidate]) -> lancedb.table.LanceTable:
     import datetime
 
     import lancedb
+
+    num_partitions = int(len(movies) ** 0.5)
+    num_sub_vectors = int(movies[0].embedding.size / 8)
 
     db = lancedb.connect(LANCE_DB_PATH)
     table = db.create_table(
@@ -83,8 +86,8 @@ def prepare_index(movies: DocList[MovieCandidate]) -> lancedb.table.LanceTable:
     )
     table.create_index(
         metric="cosine",
-        num_partitions=4,
-        num_sub_vectors=4,
+        num_partitions=num_partitions,
+        num_sub_vectors=num_sub_vectors,
         vector_column_name="embedding",
     )
     table.compact_files()
@@ -92,9 +95,7 @@ def prepare_index(movies: DocList[MovieCandidate]) -> lancedb.table.LanceTable:
     return table
 
 
-def save_model(
-    movies: DocList[MovieCandidate], model: mf_lightning.LitMatrixFactorization
-) -> None:
+def save_model(movies: DocList[MovieCandidate], model: LitMatrixFactorization) -> None:
     import shutil
 
     import bentoml
@@ -108,7 +109,7 @@ def save_model(
 def load_embedded_movies() -> DocList[MovieCandidate]:
     import bentoml
 
-    model_ref = bentoml.models.get(MODEL_TAG)
+    model_ref = bentoml.models.get(MODEL_NAME)
     path = Path(model_ref.path_of(MOVIES_DOC_PATH)).as_uri()
     return DocList[MovieCandidate].pull(path)
 
