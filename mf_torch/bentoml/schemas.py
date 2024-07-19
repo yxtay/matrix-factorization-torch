@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+from typing import Self
+
 from docarray import BaseDoc
 from docarray.typing import NdArray  # noqa: TCH002
-from lancedb.pydantic import LanceModel, Vector
 
-EMBEDDER_PATH = "scripted_module.pt"
-LANCE_DB_PATH = "lancedb"
-MODEL_NAME = "mf-torch"
-MOVIES_DOC_PATH = "movies"
-MOVIES_TABLE_NAME = "movies"
+from lancedb.pydantic import LanceModel, Vector
+from mf_torch.params import (
+    ITEM_FEATURE_NAMES,
+    ITEM_IDX,
+    USER_FEATURE_NAMES,
+    USER_IDX,
+)
 
 
 class Query(BaseDoc):
@@ -23,17 +26,13 @@ class MovieQuery(BaseDoc):
     title: str | None = None
     genres: list[str] | None = None
 
-    def to_query(self: MovieQuery) -> Query:
-        from mf_torch.data.load import hash_features
+    def to_query(self: Self) -> Query:
+        from mf_torch.data.load import process_features
 
-        return Query.model_validate(
-            hash_features(
-                self.model_dump(),
-                idx="movie_idx",
-                feature_names=["movie_id", "genres"],
-                keep_input=False,
-            )
+        query_dict = process_features(
+            self.model_dump(), idx=ITEM_IDX, feature_names=ITEM_FEATURE_NAMES
         )
+        return Query.model_validate(query_dict)
 
 
 class MovieCandidate(MovieQuery):
@@ -66,17 +65,13 @@ class UserQuery(BaseDoc):
     occupation: int | None = None
     zipcode: str | None = None
 
-    def to_query(self: UserQuery) -> Query:
-        from mf_torch.data.load import hash_features
+    def to_query(self: Self) -> Query:
+        from mf_torch.data.load import process_features
 
-        return Query.model_validate(
-            hash_features(
-                self.model_dump(),
-                idx="user_idx",
-                feature_names=["user_id", "gendeer", "age", "occupation", "zipcode"],
-                keep_input=False,
-            )
+        query_dict = process_features(
+            self.model_dump(), idx=USER_IDX, feature_names=USER_FEATURE_NAMES
         )
+        return Query.model_validate(query_dict)
 
 
 sample_movie_query = MovieQuery(

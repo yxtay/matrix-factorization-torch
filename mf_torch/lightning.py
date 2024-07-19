@@ -8,6 +8,8 @@ import lightning as L
 import torch
 
 if TYPE_CHECKING:
+    from typing import Self
+
     import torchmetrics
     from lightning.pytorch.cli import ArgsType, LightningCLI
 
@@ -17,13 +19,16 @@ METRIC = {"name": "val/RetrievalNormalizedDCG", "mode": "max"}
 
 class LitMatrixFactorization(L.LightningModule):
     def __init__(
-        self: LitMatrixFactorization,
+        self: Self,
         num_embeddings: int = 2**16 + 1,
         embedding_dim: int = 32,
         train_loss: str = "PairwiseHingeLoss",
         *,
         max_norm: float | None = None,
-        sparse: bool = True,
+        sparse: bool = False,
+        embedder_type: str | None = None,
+        num_heads: int = 1,
+        dropout: float = 0.0,
         normalize: bool = True,
         hard_negatives_ratio: float | None = None,
         learning_rate: float = 0.1,
@@ -34,7 +39,7 @@ class LitMatrixFactorization(L.LightningModule):
         self.metrics = None
 
     def forward(
-        self: LitMatrixFactorization,
+        self: Self,
         feature_hashes: torch.Tensor,
         feature_weights: torch.Tensor | None = None,
     ) -> torch.Tensor:
@@ -42,9 +47,7 @@ class LitMatrixFactorization(L.LightningModule):
             feature_hashes=feature_hashes, feature_weights=feature_weights
         )
 
-    def score(
-        self: LitMatrixFactorization, batch: dict[str, torch.Tensor]
-    ) -> torch.Tensor:
+    def score(self: Self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
         user_feature_hashes = batch["user_feature_hashes"]
         # shape: (batch_size, num_user_features)
         item_feature_hashes = batch["item_feature_hashes"]
@@ -62,7 +65,7 @@ class LitMatrixFactorization(L.LightningModule):
         )
 
     def compute_losses(
-        self: LitMatrixFactorization,
+        self: Self,
         batch: dict[str, torch.Tensor],
         step_name: str = "train",
     ) -> dict[str, torch.Tensor]:
@@ -132,7 +135,7 @@ class LitMatrixFactorization(L.LightningModule):
         return losses
 
     def update_metrics(
-        self: LitMatrixFactorization,
+        self: Self,
         batch: dict[str, torch.Tensor],
         step_name: str = "train",
     ) -> torchmetrics.MetricCollection:
@@ -143,7 +146,7 @@ class LitMatrixFactorization(L.LightningModule):
         metrics.update(preds=score, target=label, indexes=user_idx)
         return metrics
 
-    def on_fit_start(self: LitMatrixFactorization) -> None:
+    def on_fit_start(self: Self) -> None:
         import lightning.pytorch.loggers as lp_loggers
 
         if self.global_rank == 0:
@@ -157,48 +160,42 @@ class LitMatrixFactorization(L.LightningModule):
                     logger.log_hyperparams(params=params)
 
     def training_step(
-        self: LitMatrixFactorization, batch: dict[str, torch.Tensor], batch_idx: int
+        self: Self, batch: dict[str, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
         losses = self.compute_losses(batch, step_name="train")
         self.log_dict(losses)
         return losses[f"train/{self.hparams.train_loss}"]
 
     def validation_step(
-        self: LitMatrixFactorization, batch: dict[str, torch.Tensor], batch_idx: int
+        self: Self, batch: dict[str, torch.Tensor], batch_idx: int
     ) -> None:
         losses = self.compute_losses(batch, step_name="val")
         self.log_dict(losses, sync_dist=True)
         metrics = self.update_metrics(batch, step_name="val")
         self.log_dict(metrics)
 
-    def test_step(
-        self: LitMatrixFactorization, batch: dict[str, torch.Tensor], batch_idx: int
-    ) -> None:
+    def test_step(self: Self, batch: dict[str, torch.Tensor], batch_idx: int) -> None:
         losses = self.compute_losses(batch, step_name="test")
         self.log_dict(losses, sync_dist=True)
         metrics = self.update_metrics(batch, step_name="test")
         self.log_dict(metrics)
 
     def predict_step(
-        self: LitMatrixFactorization, batch: dict[str, torch.Tensor], batch_idx: int
+        self: Self, batch: dict[str, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
         return self.score(batch)
 
-    def on_validation_epoch_end(self: LitMatrixFactorization) -> None:
+    def on_validation_epoch_end(self: Self) -> None:
         metrics = {
             key.replace("val/", "hp/"): self.trainer.callback_metrics[key]
             for key in self.metrics["val"]
         }
         self.log_dict(metrics, sync_dist=True)
 
-    def configure_optimizers(self: LitMatrixFactorization) -> torch.optim.Optimizer:
-        if self.model.sparse:
-            optimizer_class = torch.optim.SparseAdam
-        else:
-            optimizer_class = torch.optim.AdamW
-        return optimizer_class(self.parameters(), lr=self.hparams.learning_rate)
+    def configure_optimizers(self: Self) -> torch.optim.Optimizer:
+        return torch.optim.AdamW(self.parameters(), lr=self.hparams.learning_rate)
 
-    def configure_callbacks(self: LitMatrixFactorization) -> list[L.Callback]:
+    def configure_callbacks(self: Self) -> list[L.Callback]:
         import lightning.pytorch.callbacks as lp_callbacks
 
         early_stop = lp_callbacks.EarlyStopping(
@@ -209,25 +206,47 @@ class LitMatrixFactorization(L.LightningModule):
         )
         return [early_stop, checkpoint]
 
-    def configure_model(self: LitMatrixFactorization) -> None:
+    def configure_model(self: Self) -> None:
         if self.model is None:
             self.model = self.get_model()
         if self.metrics is None:
             self.metrics = self.get_metrics(top_k=20)
 
-    def get_model(self: LitMatrixFactorization) -> torch.nn.Module:
+    def get_model(self: Self) -> torch.nn.Module:
+        from functools import partial
+
         import mf_torch.models as mf_models
 
-        return mf_models.MatrixFactorization(
+        if self.hparams.embedder_type == "attention":
+            embedder_class = partial(
+                mf_models.AttentionEmbeddingBag,
+                num_heads=self.hparams.num_heads,
+                dropout=self.hparams.dropout,
+            )
+        elif self.hparams.embedder_type == "transformer":
+            embedder_class = partial(
+                mf_models.TransformerEmbeddingBag,
+                num_heads=self.hparams.num_heads,
+                dropout=self.hparams.dropout,
+            )
+        elif isinstance(self.hparams.embedder_type, str):
+            msg = f"{self.hparams.embedder_type = } not supported"
+            raise ValueError(msg)
+        else:
+            embedder_class = partial(torch.nn.EmbeddingBag, padding_idx=0, mode="sum")
+
+        embedder = embedder_class(
             num_embeddings=self.hparams.num_embeddings,
             embedding_dim=self.hparams.embedding_dim,
             max_norm=self.hparams.max_norm,
             sparse=self.hparams.sparse,
-            normalize=self.hparams.normalize,
+        )
+        return mf_models.MatrixFactorization(
+            embedder=embedder, normalize=self.hparams.normalize
         )
 
     @cached_property
-    def loss_fns(self: LitMatrixFactorization) -> torch.nn.ModuleList:
+    def loss_fns(self: Self) -> torch.nn.ModuleList:
         import mf_torch.losses as mf_losses
 
         loss_classes = [
@@ -247,9 +266,7 @@ class LitMatrixFactorization(L.LightningModule):
         ]
         return torch.nn.ModuleList(loss_fns)
 
-    def get_metrics(
-        self: LitMatrixFactorization, top_k: int = 20
-    ) -> torch.nn.ModuleDict:
+    def get_metrics(self: Self, top_k: int = 20) -> torch.nn.ModuleDict:
         import torchmetrics
         import torchmetrics.retrieval as tm_retrieval
 
@@ -268,17 +285,10 @@ class LitMatrixFactorization(L.LightningModule):
         return torch.nn.ModuleDict(metrics)
 
     @cached_property
-    def example_input_array(
-        self: LitMatrixFactorization,
-    ) -> dict[str, torch.Tensor]:
-        return {
-            "feature_hashes": torch.zeros(1, 1).int(),
-            "feature_weights": torch.zeros(1, 1),
-        }
+    def example_input_array(self: Self) -> tuple[torch.Tensor, torch.Tensor]:
+        return (torch.zeros(1, 1).int(), torch.zeros(1, 1))
 
-    def save_torchscript(
-        self: LitMatrixFactorization, path: str
-    ) -> torch.jit.ScriptModule:
+    def save_torchscript(self: Self, path: str) -> torch.jit.ScriptModule:
         script_module = torch.jit.script(self.model.eval())
         torch.jit.save(script_module, path)
         return script_module
@@ -332,3 +342,13 @@ def cli_main(args: ArgsType = None, *, experiment_name: str = "") -> LightningCL
 
 if __name__ == "__main__":
     cli_main()
+    # experiment_name = get_local_time_now().isoformat()
+    # cli_main(args=["fit"], experiment_name=experiment_name)
+    # cli_main(
+    #     args=["fit", "--model.embedder_type=attention", "--model.learning_rate=0.01"],
+    #     experiment_name=experiment_name,
+    # )
+    # cli_main(
+    #     args=["fit", "--model.embedder_type=transformer", "--model.learning_rate=0.01"],
+    #     experiment_name=experiment_name,
+    # )
