@@ -39,7 +39,10 @@ class LitMatrixFactorization(L.LightningModule):
         self.metrics = None
 
         supported_embedder = {None, "attention", "transformer"}
-        if self.hparams.embedder_type not in supported_embedder:
+        if (
+            self.hparams.get("embedder_type")
+            and self.hparams.embedder_type not in supported_embedder
+        ):
             msg = (
                 f"only {supported_embedder} supported: {self.hparams.embedder_type = }"
             )
@@ -224,13 +227,13 @@ class LitMatrixFactorization(L.LightningModule):
 
         import mf_torch.models as mf_models
 
-        if self.hparams.embedder_type == "attention":
+        if self.hparams.get("embedder_type") == "attention":
             embedder_class = partial(
                 mf_models.AttentionEmbeddingBag,
                 num_heads=self.hparams.num_heads,
                 dropout=self.hparams.dropout,
             )
-        elif self.hparams.embedder_type == "transformer":
+        elif self.hparams.get("embedder_type") == "transformer":
             embedder_class = partial(
                 mf_models.TransformerEmbeddingBag,
                 num_heads=self.hparams.num_heads,
@@ -242,7 +245,7 @@ class LitMatrixFactorization(L.LightningModule):
         embedder = embedder_class(
             num_embeddings=self.hparams.num_embeddings,
             embedding_dim=self.hparams.embedding_dim,
-            max_norm=self.hparams.max_norm,
+            max_norm=self.hparams.get("max_norm"),
             sparse=self.hparams.sparse,
         )
         return mf_models.MatrixFactorization(
@@ -265,7 +268,7 @@ class LitMatrixFactorization(L.LightningModule):
             mf_losses.PairwiseLogisticLoss,
         ]
         loss_fns = [
-            loss_class(hard_negatives_ratio=self.hparams.hard_negatives_ratio)
+            loss_class(hard_negatives_ratio=self.hparams.get("hard_negatives_ratio"))
             for loss_class in loss_classes
         ]
         return torch.nn.ModuleList(loss_fns)
@@ -308,30 +311,31 @@ def cli_main(args: ArgsType = None, *, experiment_name: str = "") -> LightningCL
     from lightning.pytorch.cli import LightningCLI
 
     from mf_torch.data.lightning import Movielens1mPipeDataModule
+    from mf_torch.params import MLFLOW_DIR, TENSORBOARD_DIR
 
     experiment_name = experiment_name or get_local_time_now().isoformat()
-    tensorboard_logger_default = {
+    tensorboard_logger = {
         "class_path": "TensorBoardLogger",
         "init_args": {
-            "save_dir": "lightning_logs",
+            "save_dir": TENSORBOARD_DIR,
             "name": experiment_name,
             "log_graph": True,
             "default_hp_metric": False,
         },
     }
-    mlflow_logger_default = {
+    mlflow_logger = {
         "class_path": "MLFlowLogger",
         "init_args": {
-            "tracking_uri": "mlruns",
+            "tracking_uri": MLFLOW_DIR,
             "experiment_name": experiment_name,
             "log_model": True,
         },
     }
-    callbacks_default = [lazy_instance(lp_callbacks.RichProgressBar)]
+    callbacks = [lazy_instance(lp_callbacks.RichProgressBar)]
     trainer_defaults = {
         "precision": "bf16-mixed",
-        "logger": [tensorboard_logger_default, mlflow_logger_default],
-        "callbacks": callbacks_default,
+        "logger": [tensorboard_logger, mlflow_logger],
+        "callbacks": callbacks,
         "max_epochs": 1,
         "max_time": "00:01:00:00",
         # "fast_dev_run": True,

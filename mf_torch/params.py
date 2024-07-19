@@ -1,6 +1,10 @@
-# data
+# paths
 MOVIELENS_1M_URL = "https://files.grouplens.org/datasets/movielens/ml-1m.zip"
 DATA_DIR = "data"
+TENSORBOARD_DIR = "lightning_logs"
+MLFLOW_DIR = "mlruns"
+
+# data
 USER_IDX = "user_idx"
 USER_FEATURE_NAMES = ["user_id", "gender", "age", "occupation", "zipcode"]
 ITEM_IDX = "movie_idx"

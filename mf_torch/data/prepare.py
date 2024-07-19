@@ -112,7 +112,7 @@ def load_users(src_dir: str = DATA_DIR, *, overwrite: bool = False) -> pl.LazyFr
         pl.col("user_id").rank().cast(pl.Int32).alias("user_idx")
     )
     users.write_delta(
-        users_delta, mode="overwrite", delta_write_options={"overwrite_schema": True}
+        users_delta, mode="overwrite", delta_write_options={"schema_mode": "overwrite"}
     )
     optimize_delta_table(users_delta, ["user_id"])
     logger.info("users saved: {}", users_delta)
@@ -147,7 +147,7 @@ def load_movies(src_dir: str = DATA_DIR, *, overwrite: bool = False) -> pl.LazyF
         pl.col("movie_id").rank().cast(pl.Int32).alias("movie_idx"),
     )
     movies.write_delta(
-        movies_delta, mode="overwrite", delta_write_options={"overwrite_schema": True}
+        movies_delta, mode="overwrite", delta_write_options={"schema_mode": "overwrite"}
     )
     optimize_delta_table(movies_delta, ["movie_id"])
     logger.info("movies saved: {}", movies_delta)
@@ -255,7 +255,7 @@ def get_sparse_movielens(
 
     sparse = data.filter(pl.col("is_rated")).collect(streaming=True)
     sparse.write_delta(
-        sparse_delta, mode="overwrite", delta_write_options={"overwrite_schema": True}
+        sparse_delta, mode="overwrite", delta_write_options={"schema_mode": "overwrite"}
     )
     optimize_delta_table(sparse_delta, ["is_train", "is_val", "is_test"])
     logger.info("sparse saved: {}, shape: {}", sparse_delta, sparse.shape)
@@ -274,7 +274,7 @@ def get_val_movielens(
 
     val = data.filter(pl.col("is_val_user")).collect(streaming=True)
     val.write_delta(
-        val_delta, mode="overwrite", delta_write_options={"overwrite_schema": True}
+        val_delta, mode="overwrite", delta_write_options={"schema_mode": "overwrite"}
     )
     optimize_delta_table(val_delta, ["is_train", "is_val", "is_test"])
     logger.info("val saved: {}, shape: {}", val_delta, val.shape)
@@ -324,7 +324,7 @@ def load_dense_movielens(
         dense.write_delta(
             dense_delta,
             mode="overwrite",
-            delta_write_options={"overwrite_schema": True},
+            delta_write_options={"schema_mode": "overwrite"},
         )
         optimize_delta_table(dense_delta, ["is_train", "is_val", "is_test"])
         logger.info("dense saved: {}, shape: {}", dense_delta, dense.shape)
