@@ -54,10 +54,13 @@ def train_loop_per_worker(config: dict[str, bool | float | int | str]) -> None:
     from mf_torch.data.lightning import Movielens1mPipeDataModule
     from mf_torch.lightning import LitMatrixFactorization
 
-    num_embeddings = 2 ** config["num_embeddings_exp"] + 1
-    max_norm = 2.0 ** config["max_norm_exp"] if config["use_max_norm"] else None
     batch_size = 2 ** (config["batch_size_exp"] - config["negatives_ratio_exp"])
     negatives_ratio = 2 ** config["negatives_ratio_exp"] - 1
+
+    num_embeddings = 2 ** config["num_embeddings_exp"] + 1
+    max_norm = 2.0 ** config["max_norm_exp"] if config["use_max_norm"] else None
+    num_heads = 2 ** config["num_heads_exp"]
+
     hard_negatives_ratio = (
         config["hard_negatives_ratio"] if config["use_hard_negatives"] else None
     )
@@ -77,6 +80,9 @@ def train_loop_per_worker(config: dict[str, bool | float | int | str]) -> None:
             train_loss=config["train_loss"],
             max_norm=max_norm,
             sparse=config["sparse"],
+            embedder_type=config["embedder_type"],
+            num_heads=num_heads,
+            dropout=config["dropout"],
             normalize=config["normalize"],
             hard_negatives_ratio=hard_negatives_ratio,
             learning_rate=config["learning_rate"],
@@ -116,12 +122,12 @@ def get_ray_trainer() -> ray_torch.TorchTrainer:
 
     import ray.train.torch as ray_torch
 
-    from mf_torch.params import DATA_DIR
+    from mf_torch.params import DATA_DIR, MLFLOW_DIR, TENSORBOARD_DIR
 
     train_loop_config = {
         # tracking
-        "tensorboard_save_dir": Path("lightning_logs").absolute(),
-        "mlflow_tracking_uri": Path("mlruns").absolute(),
+        "tensorboard_save_dir": Path(TENSORBOARD_DIR).absolute(),
+        "mlflow_tracking_uri": Path(MLFLOW_DIR).absolute(),
         # trainer
         "precision": "bf16-true",
         "max_epochs": 1,
@@ -138,7 +144,7 @@ def get_ray_trainer() -> ray_torch.TorchTrainer:
         "max_norm_exp": 0.0,
         "sparse": True,
         "embedder_type": None,
-        "num_heads": 1,
+        "num_heads_exp": 0,
         "dropout": 0.0,
         "normalize": True,
         # lightning module
@@ -171,12 +177,14 @@ def get_tuner() -> ray.tune.Tuner:
         # "embedding_dim_exp": ray.tune.randint(2, 7),
         # "use_max_norm": ray.tune.choice([False, True]),
         # "max_norm_exp": ray.tune.randint(0, 6),
-        "embedder_type": ray.tune.choice([None, "attention", "transformer"]),
+        "embedder_type": ray.tune.choice(["attention", "transformer"]),
+        "num_heads_exp": ray.tune.randint(0, 3),
+        "dropout": ray.tune.quniform(0.0, 0.5, 0.01),
         # "normalize": ray.tune.choice([True, False]),
         # "train_loss": ray.tune.choice(train_losses),
-        "use_hard_negatives": ray.tune.choice([True, False]),
-        "hard_negatives_ratio": ray.tune.quniform(0.5, 2.0, 0.01),
-        "learning_rate": ray.tune.qloguniform(0.001, 1.0, 0.001),
+        # "use_hard_negatives": ray.tune.choice([True, False]),
+        # "hard_negatives_ratio": ray.tune.quniform(0.5, 2.0, 0.01),
+        "learning_rate": ray.tune.qloguniform(0.001, 0.1, 0.001),
         # "precision": ray.tune.choice(["bf16-true", "bf16-mixed"]),
     }
     low_cost_partial_config = {
@@ -189,8 +197,8 @@ def get_tuner() -> ray.tune.Tuner:
         "embedder_type": None,
         # "normalize": True,
         # "train_loss": "PairwiseHingeLoss",
-        "use_hard_negatives": True,
-        "hard_negatives_ratio": 1.0,
+        # "use_hard_negatives": True,
+        # "hard_negatives_ratio": 1.0,
         # "learning_rate": 0.1,
         # "precision": "bf16-true",
     }

@@ -11,25 +11,29 @@ license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-# python pinned to 3.11 due to ray
-python = "^3.11,<3.12"
+python = "^3.11"
 bentoml = "^1.2"
-deltalake = ">=0.17,<0.18"
-docarray = ">=0.40.0"
+deltalake = ">=0.18,<0.19"
+docarray = ">=0.40"
 flaml = "^2.1"
-lancedb = ">=0.8"
-lightning = { extras = ["pytorch-extra"], version = "^2.2.5" }
-loguru = ">=0.7"
-mlflow = "^2.13"
+jsonargparse = { extras = ["signatures"], version = "^4.31.0" }
+lancedb = ">=0.10"
+lightning = "^2.3"
+loguru = ">=0.7,<0.8"
+mlflow = "^2.14"
 mmh3 = "^4.1"
-polars = { extras = ["pandas"], version = ">=0.20" }
-ray = { extras = ["train", "tune"], version = "^2.24" }
+polars = { extras = ["pandas"], version = "^1.2" }
+ray = { extras = ["train", "tune"], version = "^2.32" }
 tensorboard = "^2.17"
-torch = "^2.2,<2.3"
+torch = [
+    # torch==2.3 not available for macOS x86_64
+    { platform = "darwin", markers = "platform_system == 'Darwin'", version = "^2.2,<2.3" },
+    { platform = "linux", markers = "platform_system == 'Linux'", version = "*" },
+]
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.7"
-ruff = ">=0.4"
+ruff = ">=0.5,<0.6"
 
 [tool.ruff]
 fix = true
