@@ -170,9 +170,9 @@ class ParquetDictLoaderIterDataPipe(torch_data.IterDataPipe):
 @torch_data.functional_datapipe("load_delta_table_as_dict")
 class DeltaTableDictLoaderIterDataPipe(ParquetDictLoaderIterDataPipe):
     def pyarrow_dataset(self: Self, source: str) -> ds.Dataset:
-        import deltalake as dl
+        import deltalake
 
-        return dl.DeltaTable(source).to_pyarrow_dataset()
+        return deltalake.DeltaTable(source).to_pyarrow_dataset()
 
 
 @torch_data.functional_datapipe("cycle")
