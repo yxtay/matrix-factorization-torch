@@ -38,6 +38,13 @@ class LitMatrixFactorization(L.LightningModule):
         self.model = None
         self.metrics = None
 
+        supported_embedder = {None, "attention", "transformer"}
+        if self.hparams.embedder_type not in supported_embedder:
+            msg = (
+                f"only {supported_embedder} supported: {self.hparams.embedder_type = }"
+            )
+            raise ValueError(msg)
+
     def forward(
         self: Self,
         feature_hashes: torch.Tensor,
@@ -229,9 +236,6 @@ class LitMatrixFactorization(L.LightningModule):
                 num_heads=self.hparams.num_heads,
                 dropout=self.hparams.dropout,
             )
-        elif isinstance(self.hparams.embedder_type, str):
-            msg = f"{self.hparams.embedder_type = } not supported"
-            raise ValueError(msg)
         else:
             embedder_class = partial(torch.nn.EmbeddingBag, padding_idx=0, mode="sum")
 
