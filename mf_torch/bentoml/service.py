@@ -20,32 +20,25 @@ from mf_torch.params import (
 class Embedder:
     model_ref = bentoml.models.get(MODEL_NAME)
 
+    @logger.catch()
     def __init__(self: Self) -> None:
-        try:
-            path = self.model_ref.path_of(EMBEDDER_PATH)
-            self.model = torch.jit.load(path)
-            logger.info("embedder loaded: {}", path)
-        except Exception as e:
-            logger.exception(e)
-            raise
+        path = self.model_ref.path_of(EMBEDDER_PATH)
+        self.model = torch.jit.load(path)
+        logger.info("embedder loaded: {}", path)
 
     @bentoml.api(batchable=True)
+    @logger.catch()
     def embed(self: Self, queries: list[Query]) -> list[Query]:
-        try:
-            with torch.inference_mode():
-                queries = DocList[Query](queries)
-                feature_hashes = torch.nested.nested_tensor(
-                    queries.feature_hashes
-                ).to_padded_tensor(padding=0)
-                feature_weights = torch.nested.nested_tensor(
-                    queries.feature_weights
-                ).to_padded_tensor(padding=0)
+        with torch.inference_mode():
+            queries = DocList[Query](queries)
+            feature_hashes = torch.nested.nested_tensor(
+                queries.feature_hashes
+            ).to_padded_tensor(padding=0)
+            feature_weights = torch.nested.nested_tensor(
+                queries.feature_weights
+            ).to_padded_tensor(padding=0)
 
-                queries.embedding = list(self.model(feature_hashes, feature_weights))
-        except Exception as e:
-            logger.exception(e)
-            raise
-        else:
+            queries.embedding = list(self.model(feature_hashes, feature_weights))
             return queries
 
 
@@ -53,6 +46,7 @@ class Embedder:
 class MovieIndex:
     model_ref = bentoml.models.get(MODEL_NAME)
 
+    @logger.catch()
     def __init__(self: Self) -> None:
         import lancedb
 
@@ -62,21 +56,16 @@ class MovieIndex:
         self.refine_factor = 5
 
     @bentoml.api()
+    @logger.catch()
     def search(self: Self, query: Query) -> list[MovieCandidate]:
-        try:
-            results_df = (
-                self.tbl.search(query.embedding)
-                .refine_factor(self.refine_factor)
-                .to_pandas()
-                .assign(score=lambda df: 1 - df["_distance"])
-                .drop(columns="_distance")
-            )
-            results = DocList[MovieCandidate].from_dataframe(results_df)
-        except Exception as e:
-            logger.exception(e)
-            raise
-        else:
-            return results
+        results_df = (
+            self.tbl.search(query.embedding)
+            .refine_factor(self.refine_factor)
+            .to_pandas()
+            .assign(score=lambda df: 1 - df["_distance"])
+            .drop(columns="_distance")
+        )
+        return DocList[MovieCandidate].from_dataframe(results_df)
 
 
 @bentoml.service()
@@ -86,62 +75,39 @@ class Service:
     movie_index = bentoml.depends(MovieIndex)
 
     @bentoml.api(batchable=True)
+    @logger.catch()
     async def embed_queries(self: Self, queries: list[Query]) -> list[Query]:
-        try:
-            queries = await self.embedder.to_async.embed(queries)
-        except Exception as e:
-            logger.exception(e)
-            raise
-        else:
-            return queries
+        return await self.embedder.to_async.embed(queries)
 
     @bentoml.api()
+    @logger.catch()
     async def search_movies(self: Self, query: Query) -> list[MovieCandidate]:
-        try:
-            results = await self.movie_index.to_async.search(query)
-        except Exception as e:
-            logger.exception(e)
-            raise
-        else:
-            return results
+        return await self.movie_index.to_async.search(query)
 
     @bentoml.api()
+    @logger.catch()
     async def recommend_with_query(self: Self, query: Query) -> list[MovieCandidate]:
-        try:
-            queries = await self.embed_queries([query])
-            results = await self.search_movies(queries[0])
-        except Exception as e:
-            logger.exception(e)
-            raise
-        else:
-            return results
+        queries = await self.embed_queries([query])
+        return await self.search_movies(queries[0])
 
     @bentoml.api()
+    @logger.catch()
     async def recommend_with_movie(
         self: Self, movie: MovieQuery
     ) -> list[MovieCandidate]:
-        try:
-            results = await self.recommend_with_query(movie.to_query())
-        except Exception as e:
-            logger.exception(e)
-            raise
-        else:
-            return results
+        return await self.recommend_with_query(movie.to_query())
 
     @bentoml.api()
+    @logger.catch()
     async def recommend_with_user(self: Self, user: UserQuery) -> list[MovieCandidate]:
-        try:
-            results = await self.recommend_with_query(user.to_query())
-        except Exception as e:
-            logger.exception(e)
-            raise
-        else:
-            return results
+        return await self.recommend_with_query(user.to_query())
 
     @bentoml.api()
+    @logger.catch()
     async def model_version(self: Service) -> str:
         return self.model_ref.tag.version
 
     @bentoml.api()
+    @logger.catch()
     async def model_name(self: Service) -> str:
         return self.model_ref.tag.name
