@@ -97,8 +97,6 @@ class AttentionEmbeddingBag(torch.nn.Module):
     def forward(self: Self, hashes: torch.Tensor, **kwargs: dict) -> torch.Tensor:
         mask = hashes != 0
         # shape: (batch_size, num_features)
-        denominator = mask.sum(dim=-1, keepdim=True)
-        # shape: (batch_size, 1)
 
         embedded = self.embedder(hashes)
         # shape: (batch_size, num_features, embed_dim)
@@ -107,7 +105,7 @@ class AttentionEmbeddingBag(torch.nn.Module):
         )
         # shape: (batch_size, num_features, embed_dim)
         # output: (batch_size, embed_dim)
-        return (encoded * mask[:, :, None] / denominator[:, :, None]).sum(dim=-2)
+        return (encoded * mask[:, :, None]).sum(dim=-2)
 
 
 class TransformerEmbeddingBag(torch.nn.Module):
@@ -143,12 +141,10 @@ class TransformerEmbeddingBag(torch.nn.Module):
     def forward(self: Self, hashes: torch.Tensor, **kwargs: dict) -> torch.Tensor:
         mask = hashes != 0
         # shape: (batch_size, num_features)
-        denominator = mask.sum(dim=-1, keepdim=True)
-        # shape: (batch_size, 1)
 
         embedded = self.embedder(hashes)
         # shape: (batch_size, num_features, embed_dim)
         encoded = self.encoder(embedded, src_key_padding_mask=~mask)
         # shape: (batch_size, num_features, embed_dim)
         # output: (batch_size, embed_dim)
-        return (encoded * mask[:, :, None] / denominator[:, :, None]).sum(dim=-2)
+        return (encoded * mask[:, :, None]).sum(dim=-2)
