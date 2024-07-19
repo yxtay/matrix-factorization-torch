@@ -6,15 +6,13 @@ from typing import TYPE_CHECKING
 import torch
 from docarray import DocList
 
-from mf_torch.bentoml.models import (
+from mf_torch.bentoml.schemas import MovieCandidate, MovieSchema, Query
+from mf_torch.params import (
     EMBEDDER_PATH,
     LANCE_DB_PATH,
     MODEL_NAME,
     MOVIES_DOC_PATH,
     MOVIES_TABLE_NAME,
-    MovieCandidate,
-    MovieSchema,
-    Query,
 )
 
 if TYPE_CHECKING:

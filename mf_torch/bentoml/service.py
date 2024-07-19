@@ -1,19 +1,18 @@
 from __future__ import annotations
 
+from typing import Self
+
 import bentoml
 import torch
 from docarray import DocList
 from loguru import logger
 
-from mf_torch.bentoml.models import (
+from mf_torch.bentoml.schemas import MovieCandidate, MovieQuery, Query, UserQuery
+from mf_torch.params import (
     EMBEDDER_PATH,
     LANCE_DB_PATH,
     MODEL_NAME,
     MOVIES_TABLE_NAME,
-    MovieCandidate,
-    MovieQuery,
-    Query,
-    UserQuery,
 )
 
 
@@ -21,7 +20,7 @@ from mf_torch.bentoml.models import (
 class Embedder:
     model_ref = bentoml.models.get(MODEL_NAME)
 
-    def __init__(self: Embedder) -> None:
+    def __init__(self: Self) -> None:
         try:
             path = self.model_ref.path_of(EMBEDDER_PATH)
             self.model = torch.jit.load(path)
@@ -31,7 +30,7 @@ class Embedder:
             raise
 
     @bentoml.api(batchable=True)
-    def embed(self: Embedder, queries: list[Query]) -> list[Query]:
+    def embed(self: Self, queries: list[Query]) -> list[Query]:
         try:
             with torch.inference_mode():
                 queries = DocList[Query](queries)
@@ -54,7 +53,7 @@ class Embedder:
 class MovieIndex:
     model_ref = bentoml.models.get(MODEL_NAME)
 
-    def __init__(self: MovieIndex) -> None:
+    def __init__(self: Self) -> None:
         import lancedb
 
         src_path = self.model_ref.path_of(LANCE_DB_PATH)
@@ -63,7 +62,7 @@ class MovieIndex:
         self.refine_factor = 5
 
     @bentoml.api()
-    def search(self: MovieIndex, query: Query) -> list[MovieCandidate]:
+    def search(self: Self, query: Query) -> list[MovieCandidate]:
         try:
             results_df = (
                 self.tbl.search(query.embedding)
@@ -86,8 +85,8 @@ class Service:
     embedder = bentoml.depends(Embedder)
     movie_index = bentoml.depends(MovieIndex)
 
-    @bentoml.api()
-    async def embed_queries(self: Service, queries: list[Query]) -> list[Query]:
+    @bentoml.api(batchable=True)
+    async def embed_queries(self: Self, queries: list[Query]) -> list[Query]:
         try:
             queries = await self.embedder.to_async.embed(queries)
         except Exception as e:
@@ -97,7 +96,7 @@ class Service:
             return queries
 
     @bentoml.api()
-    async def search_movies(self: Service, query: Query) -> list[MovieCandidate]:
+    async def search_movies(self: Self, query: Query) -> list[MovieCandidate]:
         try:
             results = await self.movie_index.to_async.search(query)
         except Exception as e:
@@ -107,7 +106,7 @@ class Service:
             return results
 
     @bentoml.api()
-    async def recommend_with_query(self: Service, query: Query) -> list[MovieCandidate]:
+    async def recommend_with_query(self: Self, query: Query) -> list[MovieCandidate]:
         try:
             queries = await self.embed_queries([query])
             results = await self.search_movies(queries[0])
@@ -119,7 +118,7 @@ class Service:
 
     @bentoml.api()
     async def recommend_with_movie(
-        self: Service, movie: MovieQuery
+        self: Self, movie: MovieQuery
     ) -> list[MovieCandidate]:
         try:
             results = await self.recommend_with_query(movie.to_query())
@@ -130,9 +129,7 @@ class Service:
             return results
 
     @bentoml.api()
-    async def recommend_with_user(
-        self: Service, user: UserQuery
-    ) -> list[MovieCandidate]:
+    async def recommend_with_user(self: Self, user: UserQuery) -> list[MovieCandidate]:
         try:
             results = await self.recommend_with_query(user.to_query())
         except Exception as e:
@@ -148,11 +145,3 @@ class Service:
     @bentoml.api()
     async def model_name(self: Service) -> str:
         return self.model_ref.tag.name
-
-    @bentoml.api()
-    async def version(self: Service) -> str:
-        return bentoml.get(MODEL_NAME).tag.version
-
-    @bentoml.api()
-    async def name(self: Service) -> str:
-        return bentoml.get(MODEL_NAME).tag.name

@@ -7,11 +7,10 @@ from typing import TYPE_CHECKING
 import polars as pl
 from loguru import logger
 
+from mf_torch.params import DATA_DIR, MOVIELENS_1M_URL
+
 if TYPE_CHECKING:
     import deltalake
-
-MOVIELENS_1M_URL = "https://files.grouplens.org/datasets/movielens/ml-1m.zip"
-DATA_DIR = "data"
 
 
 ###

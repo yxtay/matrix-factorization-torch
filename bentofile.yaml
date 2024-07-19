@@ -13,6 +13,7 @@ python:
     - mmh3
     - pandas
     - torch
+  pip_args: --extra-index-url https://download.pytorch.org/whl/cpu
 envs:
   - name: PIP_EXTRA_INDEX_URL
     value: https://download.pytorch.org/whl/cpu

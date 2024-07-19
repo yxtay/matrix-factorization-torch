@@ -8,103 +8,101 @@ import torch.utils.data._utils.collate as torch_collate
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-    from typing import Iterator
+    from typing import Iterator, Self
 
-    import numpy as np
     import pyarrow.dataset as ds
 
 
+def collate_features(
+    value: None | str | float | dict | list, key: str = ""
+) -> tuple[list[str], torch.Tensor]:
+    import itertools
+
+    if value is None:
+        # ignore null values
+        return [], torch.zeros(0)
+
+    if isinstance(value, (str | int)):
+        # category feature
+        return [f"{key}:{value}"], torch.ones(1)
+
+    if isinstance(value, float):
+        # float feature
+        return [key], torch.as_tensor([value])
+
+    if isinstance(value, list):
+        # list feature, potentially nested
+        values, weights = zip(*[collate_features(v, key) for v in value])
+    elif isinstance(value, dict):
+        # nested feature
+        key_fmt = f"{key}:{{}}" if key else "{}"
+        values, weights = zip(
+            *[collate_features(v, key_fmt.format(k)) for k, v in value.items()]
+        )
+
+    values = list(itertools.chain(*values))
+    weights = torch.concatenate(weights) / len(value)
+    return values, weights
+
+
 def hash_features(
-    row: dict[str, int | float | str | list[int, str]],
+    values: list[str],
+    weights: torch.Tensor,
+    *,
+    num_hashes: int = 2,
+    num_embeddings: int = 2**16 + 1,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    import mmh3
+
+    hashes = [mmh3.hash(val, seed) for val in values for seed in range(num_hashes)]
+    hashes = torch.as_tensor(hashes) % (num_embeddings - 1) + 1
+    weights = weights.repeat_interleave(num_hashes) / num_hashes
+    return hashes, weights
+
+
+def process_features(
+    row: dict,
     *,
     idx: str,
     feature_names: list[str],
+    prefix: str = "",
     num_hashes: int = 2,
-    num_buckets: int = 2**16 + 1,
-    out_prefix: str = "",
-    keep_input: bool = True,
-) -> dict[str, int | float | str | list[int, str] | torch.Tensor]:
-    from collections.abc import Iterable
-
-    import mmh3
-
-    feature_values: list[str] = []
-    feature_weights: list[torch.Tensor] = []
-    num_features = 0
-    # categorical features
-    cat_features = [
-        f"{key}:{row[key]}" for key in feature_names if isinstance(row[key], (int, str))
-    ]
-    if len(cat_features) > 0:
-        feature_values.extend(cat_features)
-        feature_weights.append(torch.ones(len(cat_features)))
-        num_features += len(cat_features)
-
-    # float features
-    float_features = [key for key in feature_names if isinstance(row[key], float)]
-    if len(float_features) > 0:
-        feature_values.extend(float_features)
-        feature_weights.append(torch.as_tensor([row[key] for key in float_features]))
-        num_features += len(float_features)
-
-    # multi categorical features
-    for key in feature_names:
-        if isinstance(row[key], Iterable) and not isinstance(row[key], str):
-            iter_feature_values = [
-                f"{key}:{value}" for value in row[key] if isinstance(value, (int, str))
-            ]
-            num_values = len(iter_feature_values)
-            if num_values == 0:
-                continue
-            iter_feature_weights = torch.ones(num_values) / num_values
-
-            feature_values.extend(iter_feature_values)
-            feature_weights.append(iter_feature_weights)
-            num_features += 1
-
-    feature_hashes = [
-        mmh3.hash(values, seed)
-        for seed in range(num_hashes)
-        for values in feature_values
-    ]
-    feature_hashes = torch.as_tensor(feature_hashes) % (num_buckets - 1) + 1
-    feature_weights = (
-        torch.cat(feature_weights).tile(num_hashes) / num_features / num_hashes
+    num_embeddings: int = 2**16 + 1,
+) -> dict:
+    features = select_fields(row, fields=feature_names)
+    feature_values, feature_weights = collate_features(features)
+    feature_hashes, feature_weights = hash_features(
+        feature_values,
+        feature_weights,
+        num_hashes=num_hashes,
+        num_embeddings=num_embeddings,
     )
-
-    new_row = {
-        f"{out_prefix}idx": row[idx] or 0,
-        f"{out_prefix}feature_hashes": feature_hashes.to(torch.int32),
-        f"{out_prefix}feature_weights": feature_weights.to(torch.float32),
+    return {
+        **row,
+        f"{prefix}idx": row[idx] or 0,
+        f"{prefix}feature_hashes": feature_hashes,
+        f"{prefix}feature_weights": feature_weights,
     }
-    if not keep_input:
-        return new_row
-    row.update(new_row)
-    return row
 
 
-def gather_inputs(
-    row: dict[str, int | float | list[int | float] | None],
-    *,
-    label: str = "label",
-    weight: str = "weight",
-) -> dict[str, int | float | list[int | float]]:
+def score_interactions(
+    row: dict, *, label: str = "label", weight: str = "weight"
+) -> dict:
     label_value = row[label] or 0
     return {
+        **row,
         "label": bool(label_value > 0) - bool(label_value < 0),
         "weight": row[weight] or 0,
-        "user_idx": row["user_idx"],
-        "user_feature_hashes": row["user_feature_hashes"],
-        "user_feature_weights": row["user_feature_weights"],
-        "item_idx": row["item_idx"],
-        "item_feature_hashes": row["item_feature_hashes"],
-        "item_feature_weights": row["item_feature_weights"],
     }
 
 
-def merge_rows(rows: list[dict]) -> dict:
-    new_row = {**rows[0]}
-    for row in rows[1:]:
+def select_fields(row: dict, *, fields: list[str]) -> dict:
+    return {key: row[key] for key in fields}
+
+
+def merge_rows(rows: Iterable[dict]) -> dict:
+    new_row = {}
+    for row in rows:
         new_row = {**new_row, **row}
     return new_row
 
@@ -131,22 +129,10 @@ def collate_tensor_fn(
 torch_collate.default_collate_fn_map[torch.Tensor] = collate_tensor_fn
 
 
-def ray_collate_fn(
-    batch: np.ndarray | dict[str, np.ndarray],
-) -> torch.Tensor | dict[str, torch.Tensor]:
-    if isinstance(batch, dict):
-        return {
-            col_name: torch_data.default_collate(col_batch)
-            for col_name, col_batch in batch.items()
-        }
-
-    return torch_data.default_collate(batch)
-
-
 @torch_data.functional_datapipe("load_parquet_as_dict")
 class ParquetDictLoaderIterDataPipe(torch_data.IterDataPipe):
     def __init__(
-        self: ParquetDictLoaderIterDataPipe,
+        self: Self,
         source_datapipe: Iterable[str],
         *,
         columns: Iterable[str] | None = None,
@@ -159,18 +145,18 @@ class ParquetDictLoaderIterDataPipe(torch_data.IterDataPipe):
         self.filter_expr = filter_expr
         self.batch_size = batch_size
 
-    def pyarrow_dataset(self: ParquetDictLoaderIterDataPipe, source: str) -> ds.Dataset:
+    def pyarrow_dataset(self: Self, source: str) -> ds.Dataset:
         import pyarrow.dataset as ds
 
         return ds.dataset(source)
 
-    def __len__(self: ParquetDictLoaderIterDataPipe) -> int:
+    def __len__(self: Self) -> int:
         return sum(
             self.pyarrow_dataset(source).count_rows(filter=self.filter_expr)
             for source in self.source_datapipe
         )
 
-    def __iter__(self: ParquetDictLoaderIterDataPipe) -> Iterator[dict]:
+    def __iter__(self: Self) -> Iterator[dict]:
         for source in self.source_datapipe:
             dataset = self.pyarrow_dataset(source)
             for batch in dataset.to_batches(
@@ -183,18 +169,16 @@ class ParquetDictLoaderIterDataPipe(torch_data.IterDataPipe):
 
 @torch_data.functional_datapipe("load_delta_table_as_dict")
 class DeltaTableDictLoaderIterDataPipe(ParquetDictLoaderIterDataPipe):
-    def pyarrow_dataset(
-        self: DeltaTableDictLoaderIterDataPipe, source: str
-    ) -> ds.Dataset:
-        import deltalake as dl
+    def pyarrow_dataset(self: Self, source: str) -> ds.Dataset:
+        import deltalake
 
-        return dl.DeltaTable(source).to_pyarrow_dataset()
+        return deltalake.DeltaTable(source).to_pyarrow_dataset()
 
 
 @torch_data.functional_datapipe("cycle")
 class CyclerIterDataPipe(torch_data.IterDataPipe):
     def __init__(
-        self: CyclerIterDataPipe,
+        self: Self,
         source_datapipe: Iterable[dict],
         count: int | None = None,
     ) -> None:
@@ -205,13 +189,13 @@ class CyclerIterDataPipe(torch_data.IterDataPipe):
             msg = f"requires count >= 0, but {count = }"
             raise ValueError(msg)
 
-    def __len__(self: CyclerIterDataPipe) -> int:
+    def __len__(self: Self) -> int:
         if self.count is None:
             # use arbitrary large number so that valid length is shown for zip
             return 2**31 - 1  # max 32-bit signed integer
         return len(self.source_datapipe) * self.count
 
-    def __iter__(self: CyclerIterDataPipe) -> Iterator[dict]:
+    def __iter__(self: Self) -> Iterator[dict]:
         i = 0
         while self.count is None or i < self.count:
             yield from self.source_datapipe
