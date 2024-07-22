@@ -18,10 +18,10 @@ from mf_torch.params import (
 if TYPE_CHECKING:
     import lancedb.table
 
-    from mf_torch.lightning import LitMatrixFactorization
+    from mf_torch.lightning import MatrixFactorizationLitModule
 
 
-def prepare_model() -> LitMatrixFactorization:
+def prepare_model() -> MatrixFactorizationLitModule:
     from mf_torch.lightning import cli_main
 
     cli = cli_main(["fit"])
@@ -53,7 +53,7 @@ def prepare_movies() -> DocList[MovieCandidate]:
 
 
 def embed_movies(
-    movies: DocList[MovieCandidate], model: LitMatrixFactorization
+    movies: DocList[MovieCandidate], model: MatrixFactorizationLitModule
 ) -> DocList[MovieCandidate]:
     with torch.inference_mode():
         feature_hashes = torch.nested.nested_tensor(
@@ -93,7 +93,9 @@ def prepare_index(movies: DocList[MovieCandidate]) -> lancedb.table.LanceTable:
     return table
 
 
-def save_model(movies: DocList[MovieCandidate], model: LitMatrixFactorization) -> None:
+def save_model(
+    movies: DocList[MovieCandidate], model: MatrixFactorizationLitModule
+) -> None:
     import shutil
 
     import bentoml
