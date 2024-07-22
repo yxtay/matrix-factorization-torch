@@ -101,24 +101,21 @@ class AttentionEmbeddingBag(torch.nn.Module):
         denominator = mask.sum(dim=-1, keepdim=True)
         # shape: (batch_size, 1)
 
-        embedded = self.embedder(hashes).transpose(0, 1)
+        embedded = self.embedder(hashes)
         # shape: (batch_size, num_features, embed_dim)
         # transpose so that dimensions is (seq_len, batch_size, embed_dim)
         embedded = embedded.transpose(0, 1)
-        key_padding_mask = ~mask.transpose(0, 1)
         encoded, _ = self.encoder(
             query=embedded,
             key=embedded,
             value=embedded,
-            key_padding_mask=key_padding_mask,
+            key_padding_mask=~mask,
             need_weights=False,
         )
         encoded = encoded.transpose(0, 1)
         # shape: (batch_size, num_features, embed_dim)
         # output: (batch_size, embed_dim)
-        return (
-            encoded.transpose(0, 1) * mask[:, :, None] / denominator[:, :, None]
-        ).sum(dim=-2)
+        return (encoded * mask[:, :, None] / denominator[:, :, None]).sum(dim=-2)
 
 
 class TransformerEmbeddingBag(torch.nn.Module):
