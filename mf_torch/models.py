@@ -91,21 +91,34 @@ class AttentionEmbeddingBag(torch.nn.Module):
             embed_dim=embedding_dim,
             num_heads=num_heads,
             dropout=dropout,
-            batch_first=True,
+            # use batch_first=False due to issue with tracing fastpath
+            batch_first=False,
         )
 
     def forward(self: Self, hashes: torch.Tensor, **kwargs: dict) -> torch.Tensor:
         mask = hashes != 0
         # shape: (batch_size, num_features)
+        denominator = mask.sum(dim=-1, keepdim=True)
+        # shape: (batch_size, 1)
 
-        embedded = self.embedder(hashes)
+        embedded = self.embedder(hashes).transpose(0, 1)
         # shape: (batch_size, num_features, embed_dim)
+        # transpose so that dimensions is (seq_len, batch_size, embed_dim)
+        embedded = embedded.transpose(0, 1)
+        key_padding_mask = ~mask.transpose(0, 1)
         encoded, _ = self.encoder(
-            embedded, embedded, embedded, key_padding_mask=~mask, need_weights=False
+            query=embedded,
+            key=embedded,
+            value=embedded,
+            key_padding_mask=key_padding_mask,
+            need_weights=False,
         )
+        encoded = encoded.transpose(0, 1)
         # shape: (batch_size, num_features, embed_dim)
         # output: (batch_size, embed_dim)
-        return (encoded * mask[:, :, None]).sum(dim=-2)
+        return (
+            encoded.transpose(0, 1) * mask[:, :, None] / denominator[:, :, None]
+        ).sum(dim=-2)
 
 
 class TransformerEmbeddingBag(torch.nn.Module):
@@ -135,16 +148,22 @@ class TransformerEmbeddingBag(torch.nn.Module):
             nhead=num_heads,
             dim_feedforward=embedding_dim,
             dropout=dropout,
-            batch_first=True,
+            # use batch_first=False due to issue with tracing fastpath
+            batch_first=False,
         )
 
     def forward(self: Self, hashes: torch.Tensor, **kwargs: dict) -> torch.Tensor:
         mask = hashes != 0
         # shape: (batch_size, num_features)
+        denominator = mask.sum(dim=-1, keepdim=True)
+        # shape: (batch_size, 1)
 
         embedded = self.embedder(hashes)
         # shape: (batch_size, num_features, embed_dim)
+        # transpose so that dimensions is (seq_len, batch_size, embed_dim)
+        embedded = embedded.transpose(0, 1)
         encoded = self.encoder(embedded, src_key_padding_mask=~mask)
+        encoded = encoded.transpose(0, 1)
         # shape: (batch_size, num_features, embed_dim)
         # output: (batch_size, embed_dim)
-        return (encoded * mask[:, :, None]).sum(dim=-2)
+        return (encoded * mask[:, :, None] / denominator[:, :, None]).sum(dim=-2)

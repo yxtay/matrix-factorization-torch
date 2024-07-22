@@ -9,51 +9,12 @@ import ray.tune
 if TYPE_CHECKING:
     import lightning as L
     import ray.train.torch as ray_torch
+    from lightning.pytorch.cli import LightningCLI
 
 
-def prepare_trainer(config: dict[str, bool | float | int | str]) -> L.Trainer:
-    import lightning as L
-    import lightning.pytorch.loggers as lp_loggers
-    import ray.train.lightning as ray_lightning
-
-    experiment_name = ray.train.get_context().get_experiment_name()
-    trial_name = ray.train.get_context().get_trial_name()
-    logger = [
-        lp_loggers.TensorBoardLogger(
-            save_dir=config["tensorboard_save_dir"],
-            name=experiment_name or "lightning_logs",
-            version=trial_name,
-            log_graph=True,
-            default_hp_metric=False,
-        ),
-        lp_loggers.MLFlowLogger(
-            tracking_uri=str(config["mlflow_tracking_uri"]),
-            experiment_name=experiment_name,
-            run_name=trial_name,
-            log_model=True,
-        ),
-    ]
-    trainer = L.Trainer(
-        precision=config["precision"],
-        max_epochs=config["max_epochs"],
-        max_time=config["max_time"],
-        enable_checkpointing=False,
-        enable_progress_bar=False,
-        enable_model_summary=False,
-        strategy=ray_lightning.RayDDPStrategy(),
-        logger=logger,
-        callbacks=[ray_lightning.RayTrainReportCallback()],
-        plugins=[ray_lightning.RayLightningEnvironment()],
-    )
-    return ray_lightning.prepare_trainer(trainer)
-
-
-def train_loop_per_worker(config: dict[str, bool | float | int | str]) -> None:
-    import ray.train.lightning as ray_lightning
-
-    from mf_torch.data.lightning import Movielens1mPipeDataModule
-    from mf_torch.lightning import LitMatrixFactorization
-
+def get_lightning_args(
+    config: dict[str, bool | float | int | str],
+) -> dict[str, bool | float | int | str]:
     batch_size = 2 ** (config["batch_size_exp"] - config["negatives_ratio_exp"])
     negatives_ratio = 2 ** config["negatives_ratio_exp"] - 1
 
@@ -65,28 +26,80 @@ def train_loop_per_worker(config: dict[str, bool | float | int | str]) -> None:
         config["hard_negatives_ratio"] if config["use_hard_negatives"] else None
     )
 
-    trainer = prepare_trainer(config)
-    with trainer.init_module():
-        datamodule = Movielens1mPipeDataModule(
-            data_dir=config["data_dir"],
-            batch_size=batch_size,
-            num_hashes=config["num_hashes"],
-            num_embeddings=num_embeddings,
-            negatives_ratio=negatives_ratio,
-        )
-        model = LitMatrixFactorization(
-            num_embeddings=num_embeddings,
-            embedding_dim=2 ** config["embedding_dim_exp"],
-            train_loss=config["train_loss"],
-            max_norm=max_norm,
-            sparse=config["sparse"],
-            embedder_type=config["embedder_type"],
-            num_heads=num_heads,
-            dropout=config["dropout"],
-            normalize=config["normalize"],
-            hard_negatives_ratio=hard_negatives_ratio,
-            learning_rate=config["learning_rate"],
-        )
+    model_args = {
+        "num_embeddings": num_embeddings,
+        "embedding_dim": 2 ** config["embedding_dim_exp"],
+        "train_loss": config["train_loss"],
+        "max_norm": max_norm,
+        "sparse": config["sparse"],
+        "embedder_type": config["embedder_type"],
+        "num_heads": num_heads,
+        "dropout": config["dropout"],
+        "normalize": config["normalize"],
+        "hard_negatives_ratio": hard_negatives_ratio,
+        "learning_rate": config["learning_rate"],
+    }
+    data_args = {
+        "data_dir": config["data_dir"],
+        "batch_size": batch_size,
+        "num_hashes": config["num_hashes"],
+        "num_embeddings": num_embeddings,
+        "negatives_ratio": negatives_ratio,
+    }
+    return {"model": model_args, "data": data_args}
+
+
+def get_cli(config: dict[str, bool | float | int | str]) -> LightningCLI:
+    from mf_torch.lightning import EXPERIMENT_NAME, cli_main
+
+    experiment_name = ray.train.get_context().get_experiment_name()
+    trial_name = ray.train.get_context().get_trial_name()
+    tensorboard_logger = {
+        "class_path": "TensorBoardLogger",
+        "init_args": {
+            "save_dir": config["tensorboard_save_dir"],
+            "name": experiment_name or EXPERIMENT_NAME,
+            "version": trial_name,
+            "log_graph": True,
+            "default_hp_metric": False,
+        },
+    }
+    mlflow_logger = {
+        "class_path": "MLFlowLogger",
+        "init_args": {
+            "tracking_uri": config["mlflow_tracking_uri"],
+            "experiment_name": experiment_name,
+            "run_name": trial_name,
+            "log_model": True,
+        },
+    }
+    strategy = {"class_path": "ray.train.lightning.RayDDPStrategy"}
+    callbacks = [{"class_path": "ray.train.lightning.RayTrainReportCallback"}]
+    plugins = [{"class_path": "ray.train.lightning.RayLightningEnvironment"}]
+    trainer_args = {
+        "precision": config["precision"],
+        "max_epochs": config["max_epochs"],
+        "max_time": config["max_time"],
+        "enable_model_summary": False,
+        "strategy": strategy,
+        "logger": [tensorboard_logger, mlflow_logger],
+        "callbacks": callbacks,
+        "plugins": plugins,
+    }
+    args = {"trainer": trainer_args, **get_lightning_args(config)}
+    return cli_main(args, run=False)
+
+
+def train_loop_per_worker(
+    config: dict[str, bool | float | int | str],
+) -> None:
+    import numpy as np
+    import ray.train.lightning as ray_lightning
+
+    config = {
+        key: value.item() if isinstance(value, np.generic) else value
+        for key, value in config.items()
+    }
 
     ckpt_path = None
     if checkpoint := ray.train.get_checkpoint():
@@ -94,7 +107,9 @@ def train_loop_per_worker(config: dict[str, bool | float | int | str]) -> None:
         with checkpoint.as_directory() as ckpt_dir:
             ckpt_path = Path(ckpt_dir, checkpoint_name)
 
-    trainer.fit(model, datamodule=datamodule, ckpt_path=ckpt_path)
+    cli = get_cli(config)
+    trainer: L.Trainer = ray_lightning.prepare_trainer(cli.trainer)
+    trainer.fit(cli.model, datamodule=cli.datamodule, ckpt_path=ckpt_path)
 
 
 def get_run_config() -> ray.train.RunConfig:
@@ -126,14 +141,14 @@ def get_ray_trainer() -> ray_torch.TorchTrainer:
 
     train_loop_config = {
         # tracking
-        "tensorboard_save_dir": Path(TENSORBOARD_DIR).absolute(),
-        "mlflow_tracking_uri": Path(MLFLOW_DIR).absolute(),
+        "tensorboard_save_dir": str(Path(TENSORBOARD_DIR).absolute()),
+        "mlflow_tracking_uri": str(Path(MLFLOW_DIR).absolute()),
         # trainer
         "precision": "bf16-true",
         "max_epochs": 1,
         "max_time": "00:01:00:00",
         # datamodule
-        "data_dir": Path(DATA_DIR).absolute(),
+        "data_dir": str(Path(DATA_DIR).absolute()),
         "batch_size_exp": 11,
         "num_hashes": 2,
         "negatives_ratio_exp": 1,
@@ -195,8 +210,8 @@ def get_tuner() -> ray.tune.Tuner:
         # "use_max_norm": False,
         # "max_norm_exp": 0,
         # "embedder_type": None,
-        "num_heads_exp": 0,
-        "dropout": 0.0,
+        # "num_heads_exp": 0,
+        # "dropout": 0.0,
         # "normalize": True,
         # "train_loss": "PairwiseHingeLoss",
         # "use_hard_negatives": True,
@@ -205,32 +220,24 @@ def get_tuner() -> ray.tune.Tuner:
         # "precision": "bf16-true",
     }
     point_to_evaluate = {
-        # "num_hashes": 2,
-        # "negatives_ratio_exp": 1,
-        # "num_embeddings_exp": 16,
-        # "embedding_dim_exp": 5,
-        # "train_loss": "PairwiseHingeLoss",
-        # "use_max_norm": False,
-        # "max_norm_exp": 0,
-        # "embedder_type": None,
+        "embedder_type": "transformer",
         "num_heads_exp": 0,
         "dropout": 0.0,
-        # "normalize": True,
-        # "use_hard_negatives": True,
-        # "hard_negatives_ratio": 1.0,
-        # "learning_rate": 0.1,
-        # "precision": "bf16-true",
+        "learning_rate": 0.01,
     }
     search_alg = flaml.BlendSearch(
         low_cost_partial_config={"train_loop_config": low_cost_partial_config},
-        points_to_evaluate=[{"train_loop_config": point_to_evaluate}],
+        points_to_evaluate=[
+            {"train_loop_config": {**point_to_evaluate, "embedder_type": "attention"}},
+            {"train_loop_config": point_to_evaluate},
+        ],
     )
     tune_config = ray.tune.TuneConfig(
         metric=METRIC["name"],
         mode=METRIC["mode"],
         search_alg=search_alg,
         num_samples=-1,
-        time_budget_s=60 * 60 * 1,
+        time_budget_s=60 * 60 * 2,
         max_concurrent_trials=1,
     )
     return ray.tune.Tuner(

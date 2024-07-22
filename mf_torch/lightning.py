@@ -15,9 +15,10 @@ if TYPE_CHECKING:
 
 
 METRIC = {"name": "val/RetrievalNormalizedDCG", "mode": "max"}
+EXPERIMENT_NAME = datetime.datetime.now(datetime.UTC).astimezone().isoformat()
 
 
-class LitMatrixFactorization(L.LightningModule):
+class MatrixFactorizationLitModule(L.LightningModule):
     def __init__(
         self: Self,
         num_embeddings: int = 2**16 + 1,
@@ -31,7 +32,7 @@ class LitMatrixFactorization(L.LightningModule):
         dropout: float = 0.0,
         normalize: bool = True,
         hard_negatives_ratio: float | None = None,
-        learning_rate: float = 0.1,
+        learning_rate: float = 0.01,
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
@@ -293,7 +294,10 @@ class LitMatrixFactorization(L.LightningModule):
 
     @cached_property
     def example_input_array(self: Self) -> tuple[torch.Tensor, torch.Tensor]:
-        return (torch.zeros(1, 1).int(), torch.zeros(1, 1))
+        return (
+            torch.zeros((1, 1), dtype=torch.int, device=self.device),
+            torch.zeros((1, 1), dtype=self.dtype, device=self.device),
+        )
 
     def save_torchscript(self: Self, path: str) -> torch.jit.ScriptModule:
         script_module = torch.jit.script(self.model.eval())
@@ -301,11 +305,13 @@ class LitMatrixFactorization(L.LightningModule):
         return script_module
 
 
-def get_local_time_now() -> datetime.datetime:
-    return datetime.datetime.now(datetime.UTC).astimezone()
-
-
-def cli_main(args: ArgsType = None, *, experiment_name: str = "") -> LightningCLI:
+def cli_main(
+    args: ArgsType = None,
+    *,
+    run: bool = True,
+    experiment_name: str | None = None,
+    run_name: str | None = None,
+) -> LightningCLI:
     import lightning.pytorch.callbacks as lp_callbacks
     from jsonargparse import lazy_instance
     from lightning.pytorch.cli import LightningCLI
@@ -313,12 +319,12 @@ def cli_main(args: ArgsType = None, *, experiment_name: str = "") -> LightningCL
     from mf_torch.data.lightning import Movielens1mPipeDataModule
     from mf_torch.params import MLFLOW_DIR, TENSORBOARD_DIR
 
-    experiment_name = experiment_name or get_local_time_now().isoformat()
     tensorboard_logger = {
         "class_path": "TensorBoardLogger",
         "init_args": {
             "save_dir": TENSORBOARD_DIR,
-            "name": experiment_name,
+            "name": experiment_name or EXPERIMENT_NAME,
+            "version": run_name,
             "log_graph": True,
             "default_hp_metric": False,
         },
@@ -327,36 +333,29 @@ def cli_main(args: ArgsType = None, *, experiment_name: str = "") -> LightningCL
         "class_path": "MLFlowLogger",
         "init_args": {
             "tracking_uri": MLFLOW_DIR,
-            "experiment_name": experiment_name,
+            "experiment_name": experiment_name or EXPERIMENT_NAME,
+            "run_name": run_name,
             "log_model": True,
         },
     }
-    callbacks = [lazy_instance(lp_callbacks.RichProgressBar)]
+    progress_bar = lazy_instance(lp_callbacks.RichProgressBar)
     trainer_defaults = {
         "precision": "bf16-mixed",
         "logger": [tensorboard_logger, mlflow_logger],
-        "callbacks": callbacks,
+        "callbacks": [progress_bar],
         "max_epochs": 1,
         "max_time": "00:01:00:00",
         # "fast_dev_run": True,
     }
     return LightningCLI(
-        LitMatrixFactorization,
+        MatrixFactorizationLitModule,
         Movielens1mPipeDataModule,
         trainer_defaults=trainer_defaults,
         args=args,
+        run=run,
     )
 
 
 if __name__ == "__main__":
     cli_main()
-    # experiment_name = get_local_time_now().isoformat()
-    # cli_main(args=["fit"], experiment_name=experiment_name)
-    # cli_main(
-    #     args=["fit", "--model.embedder_type=attention", "--model.learning_rate=0.01"],
-    #     experiment_name=experiment_name,
-    # )
-    # cli_main(
-    #     args=["fit", "--model.embedder_type=transformer", "--model.learning_rate=0.01"],
-    #     experiment_name=experiment_name,
-    # )
+    # cli_main(args={"fit": {"trainer": {"overfit_batches": 1}}})
