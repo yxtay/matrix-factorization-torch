@@ -12,11 +12,11 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-bentoml = "^1.2"
+bentoml = "^1.3"
 deltalake = ">=0.18,<0.19"
 docarray = ">=0.40"
 flaml = "^2.1"
-jsonargparse = { extras = ["signatures"], version = "^4.31.0" }
+jsonargparse = { extras = ["signatures"], version = "^4.32.0" }
 lancedb = ">=0.10"
 lightning = "^2.3"
 loguru = ">=0.7,<0.8"
