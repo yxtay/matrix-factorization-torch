@@ -13,7 +13,7 @@ class MatrixFactorization(torch.nn.Module):
         self: Self, embedder: torch.nn.Module, *, normalize: bool = True
     ) -> None:
         super().__init__()
-        self.embedder = embedder
+        self.embedder = torch.jit.script(embedder)
         self.normalize = normalize
         self.sparse = self.embedder.sparse
 
@@ -87,10 +87,7 @@ class EmbeddingBag(torch.nn.Module):
             mode="sum",
             sparse=True,
         )
-
-    @property
-    def sparse(self: Self) -> bool:
-        return self.embedder.sparse
+        self.sparse = self.embedder.sparse
 
     def forward(
         self: Self, hashes: torch.Tensor, weights: torch.Tensor | None
@@ -121,13 +118,9 @@ class AttentionEmbeddingBag(torch.nn.Module):
             embed_dim=embedding_dim,
             num_heads=num_heads,
             dropout=dropout,
-            # use batch_first=False due to issue with tracing fastpath
             batch_first=True,
         )
-
-    @property
-    def sparse(self: Self) -> bool:
-        return self.embedder.sparse
+        self.sparse = self.embedder.sparse
 
     def forward(
         self: Self,
@@ -142,8 +135,6 @@ class AttentionEmbeddingBag(torch.nn.Module):
 
         embedded = self.embedder(hashes)
         # shape: (batch_size, num_features, embed_dim)
-        # transpose so that dimensions is (seq_len, batch_size, embed_dim)
-        # embedded = embedded.transpose(0, 1)
         encoded, _ = self.encoder(
             query=embedded,
             key=embedded,
@@ -151,7 +142,6 @@ class AttentionEmbeddingBag(torch.nn.Module):
             key_padding_mask=~mask,
             need_weights=False,
         )
-        # encoded = encoded.transpose(0, 1)
         # shape: (batch_size, num_features, embed_dim)
         # output: (batch_size, embed_dim)
         return (encoded * mask[:, :, None] / denominator[:, :, None]).sum(dim=-2)
@@ -181,13 +171,9 @@ class TransformerEmbeddingBag(torch.nn.Module):
             nhead=num_heads,
             dim_feedforward=embedding_dim,
             dropout=dropout,
-            # use batch_first=False due to issue with tracing fastpath
             batch_first=True,
         )
-
-    @property
-    def sparse(self: Self) -> bool:
-        return self.embedder.sparse
+        self.sparse = self.embedder.sparse
 
     def forward(
         self: Self,
@@ -202,10 +188,7 @@ class TransformerEmbeddingBag(torch.nn.Module):
 
         embedded = self.embedder(hashes)
         # shape: (batch_size, num_features, embed_dim)
-        # transpose so that dimensions is (seq_len, batch_size, embed_dim)
-        # embedded = embedded.transpose(0, 1)
         encoded = self.encoder(embedded, src_key_padding_mask=~mask)
-        # encoded = encoded.transpose(0, 1)
         # shape: (batch_size, num_features, embed_dim)
         # output: (batch_size, embed_dim)
         return (encoded * mask[:, :, None] / denominator[:, :, None]).sum(dim=-2)

@@ -371,21 +371,5 @@ def cli_main(
 
 
 if __name__ == "__main__":
-    # cli_main()
-    cli_main(args={"fit": {"trainer": {"overfit_batches": 1}}})
-    cli_main(
-        args={
-            "fit": {
-                "trainer": {"overfit_batches": 1},
-                "model": {"embedder_type": "attention"},
-            }
-        }
-    )
-    cli_main(
-        args={
-            "fit": {
-                "trainer": {"overfit_batches": 1},
-                "model": {"embedder_type": "transformer"},
-            }
-        }
-    )
+    cli_main()
+    # cli_main(args={"fit": {"trainer": {"overfit_batches": 1}}})
