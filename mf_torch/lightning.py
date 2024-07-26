@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import torch
 from lightning import LightningModule
 
-from mf_torch.params import NUM_EMBEDDINGS
+from mf_torch.params import EMBEDDING_DIM, NUM_EMBEDDINGS
 
 if TYPE_CHECKING:
     from typing import Self
@@ -26,10 +26,10 @@ EXPERIMENT_NAME = (
 class MatrixFactorizationLitModule(LightningModule):
     def __init__(
         self: Self,
-        num_embeddings: int = NUM_EMBEDDINGS,
-        embedding_dim: int = 32,
-        train_loss: str = "PairwiseHingeLoss",
         *,
+        num_embeddings: int = NUM_EMBEDDINGS,
+        embedding_dim: int = EMBEDDING_DIM,
+        train_loss: str = "PairwiseHingeLoss",
         max_norm: float | None = None,
         norm_type: float = 2.0,
         embedder_type: str | None = None,
@@ -209,10 +209,9 @@ class MatrixFactorizationLitModule(LightningModule):
         self.log_dict(metrics, sync_dist=True)
 
     def configure_optimizers(self: Self) -> torch.optim.Optimizer:
-        if self.model.sparse:
-            optimizer_class = torch.optim.SparseAdam
-        else:
-            optimizer_class = torch.optim.AdamW
+        optimizer_class = (
+            torch.optim.SparseAdam if self.model.sparse else torch.optim.AdamW
+        )
         return optimizer_class(self.parameters(), lr=self.hparams.learning_rate)
 
     def configure_callbacks(self: Self) -> list[Callback]:
@@ -327,12 +326,14 @@ def cli_main(
     run_name: str | None = None,
 ) -> LightningCLI:
     import lightning.pytorch.callbacks as lp_callbacks
+    import mlflow
     from jsonargparse import lazy_instance
     from lightning.pytorch.cli import LightningCLI
 
     from mf_torch.data.lightning import MatrixFactorizationPipeDataModule
     from mf_torch.params import MLFLOW_DIR, TENSORBOARD_DIR
 
+    mlflow.config.enable_system_metrics_logging()
     tensorboard_logger = {
         "class_path": "TensorBoardLogger",
         "init_args": {
@@ -370,5 +371,21 @@ def cli_main(
 
 
 if __name__ == "__main__":
-    cli_main()
-    # cli_main(args={"fit": {"trainer": {"overfit_batches": 1}}})
+    # cli_main()
+    cli_main(args={"fit": {"trainer": {"overfit_batches": 1}}})
+    cli_main(
+        args={
+            "fit": {
+                "trainer": {"overfit_batches": 1},
+                "model": {"embedder_type": "attention"},
+            }
+        }
+    )
+    cli_main(
+        args={
+            "fit": {
+                "trainer": {"overfit_batches": 1},
+                "model": {"embedder_type": "transformer"},
+            }
+        }
+    )

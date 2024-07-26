@@ -13,6 +13,7 @@ ITEM_FEATURE_NAMES = ["movie_id", "genres"]
 # model
 NUM_HASHES = 2
 NUM_EMBEDDINGS = 2**16 + 1
+EMBEDDING_DIM = 32
 PADDING_IDX = 0
 
 # serving
