@@ -5,6 +5,8 @@ from typing import Self
 import torch
 import torch.nn.functional as F
 
+from mf_torch.params import PADDING_IDX
+
 
 class MatrixFactorization(torch.nn.Module):
     def __init__(
@@ -13,6 +15,10 @@ class MatrixFactorization(torch.nn.Module):
         super().__init__()
         self.embedder = embedder
         self.normalize = normalize
+
+    @property
+    def sparse(self: Self) -> bool:
+        return self.embedder.sparse
 
     def embed(
         self: Self,
@@ -34,11 +40,11 @@ class MatrixFactorization(torch.nn.Module):
     ) -> torch.Tensor:
         return self.embed(feature_hashes, feature_weights)
 
+    @torch.jit.export
     def score(
         self: Self,
         user_feature_hashes: torch.Tensor,
         item_feature_hashes: torch.Tensor,
-        *,
         user_feature_weights: torch.Tensor | None = None,
         item_feature_weights: torch.Tensor | None = None,
     ) -> torch.Tensor:
@@ -49,20 +55,50 @@ class MatrixFactorization(torch.nn.Module):
         # output shape: (batch_size)
         return (user_embed * item_embed).sum(-1)
 
-    def full_predict(
+    @torch.jit.export
+    def score_full(
         self: Self,
         user_feature_hashes: torch.Tensor,
         item_feature_hashes: torch.Tensor,
-        *,
         user_feature_weights: torch.Tensor | None = None,
         item_feature_weights: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        user_embed = self(user_feature_hashes, per_sample_weights=user_feature_weights)
+        user_embed = self(user_feature_hashes, feature_weights=user_feature_weights)
         # shape: (batch_size, embed_dim)
-        item_embed = self(item_feature_hashes, per_sample_weights=item_feature_weights)
+        item_embed = self(item_feature_hashes, feature_weights=item_feature_weights)
         # shape: (batch_size, embed_dim)
         # output shape: (batch_size, batch_size)
         return torch.mm(user_embed, item_embed.T)
+
+
+class EmbeddingBag(torch.nn.Module):
+    def __init__(
+        self: Self,
+        num_embeddings: int,
+        embedding_dim: int,
+        *,
+        max_norm: float | None = None,
+        norm_type: float = 2.0,
+    ) -> None:
+        super().__init__()
+        self.embedder = torch.nn.EmbeddingBag(
+            num_embeddings=num_embeddings,
+            embedding_dim=embedding_dim,
+            padding_idx=PADDING_IDX,
+            max_norm=max_norm,
+            norm_type=norm_type,
+            mode="sum",
+            sparse=True,
+        )
+
+    @property
+    def sparse(self: Self) -> bool:
+        return self.embedder.sparse
+
+    def forward(
+        self: Self, hashes: torch.Tensor, per_sample_weights: torch.Tensor | None
+    ) -> torch.Tensor:
+        return self.embedder(hashes, per_sample_weights=per_sample_weights)
 
 
 class AttentionEmbeddingBag(torch.nn.Module):
@@ -71,10 +107,8 @@ class AttentionEmbeddingBag(torch.nn.Module):
         num_embeddings: int,
         embedding_dim: int,
         *,
-        padding_idx: int = 0,
         max_norm: float | None = None,
         norm_type: float = 2.0,
-        sparse: bool = False,
         num_heads: int = 1,
         dropout: float = 0.0,
     ) -> None:
@@ -82,10 +116,9 @@ class AttentionEmbeddingBag(torch.nn.Module):
         self.embedder = torch.nn.Embedding(
             num_embeddings=num_embeddings,
             embedding_dim=embedding_dim,
-            padding_idx=padding_idx,
+            padding_idx=PADDING_IDX,
             max_norm=max_norm,
             norm_type=norm_type,
-            sparse=sparse,
         )
         self.encoder = torch.nn.MultiheadAttention(
             embed_dim=embedding_dim,
@@ -95,8 +128,14 @@ class AttentionEmbeddingBag(torch.nn.Module):
             batch_first=False,
         )
 
-    def forward(self: Self, hashes: torch.Tensor, **kwargs: dict) -> torch.Tensor:
-        mask = hashes != 0
+    @property
+    def sparse(self: Self) -> bool:
+        return self.embedder.sparse
+
+    def forward(
+        self: Self, hashes: torch.Tensor, _: torch.Tensor | None
+    ) -> torch.Tensor:
+        mask = hashes != PADDING_IDX
         # shape: (batch_size, num_features)
         denominator = mask.sum(dim=-1, keepdim=True)
         # shape: (batch_size, 1)
@@ -124,10 +163,8 @@ class TransformerEmbeddingBag(torch.nn.Module):
         num_embeddings: int,
         embedding_dim: int,
         *,
-        padding_idx: int = 0,
         max_norm: float | None = None,
         norm_type: float = 2.0,
-        sparse: bool = False,
         num_heads: int = 1,
         dropout: float = 0.0,
     ) -> None:
@@ -135,10 +172,9 @@ class TransformerEmbeddingBag(torch.nn.Module):
         self.embedder = torch.nn.Embedding(
             num_embeddings=num_embeddings,
             embedding_dim=embedding_dim,
-            padding_idx=padding_idx,
+            padding_idx=PADDING_IDX,
             max_norm=max_norm,
             norm_type=norm_type,
-            sparse=sparse,
         )
         self.encoder = torch.nn.TransformerEncoderLayer(
             d_model=embedding_dim,
@@ -149,8 +185,14 @@ class TransformerEmbeddingBag(torch.nn.Module):
             batch_first=False,
         )
 
-    def forward(self: Self, hashes: torch.Tensor, **kwargs: dict) -> torch.Tensor:
-        mask = hashes != 0
+    @property
+    def sparse(self: Self) -> bool:
+        return self.embedder.sparse
+
+    def forward(
+        self: Self, hashes: torch.Tensor, _: torch.Tensor | None
+    ) -> torch.Tensor:
+        mask = hashes != PADDING_IDX
         # shape: (batch_size, num_features)
         denominator = mask.sum(dim=-1, keepdim=True)
         # shape: (batch_size, 1)

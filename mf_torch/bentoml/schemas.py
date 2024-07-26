@@ -15,6 +15,7 @@ from mf_torch.params import (
 
 
 class Query(BaseDoc):
+    feature_values: list[str]
     feature_hashes: NdArray
     feature_weights: NdArray
     embedding: NdArray[32] | None = None

@@ -9,10 +9,11 @@ from docarray import DocList
 from mf_torch.bentoml.schemas import MovieCandidate, MovieSchema, Query
 from mf_torch.params import (
     EMBEDDER_PATH,
+    ITEMS_DOC_PATH,
+    ITEMS_TABLE_NAME,
     LANCE_DB_PATH,
     MODEL_NAME,
-    MOVIES_DOC_PATH,
-    MOVIES_TABLE_NAME,
+    PADDING_IDX,
 )
 
 if TYPE_CHECKING:
@@ -38,7 +39,6 @@ def prepare_movies() -> DocList[MovieCandidate]:
         .select(
             pl.col("movie_id").alias("id"),
             pl.col("movie_id"),
-            pl.col("movie_idx"),
             pl.col("title"),
             pl.col("genres"),
         )
@@ -58,10 +58,10 @@ def embed_movies(
     with torch.inference_mode():
         feature_hashes = torch.nested.nested_tensor(
             movies.feature_hashes
-        ).to_padded_tensor(padding=0)
+        ).to_padded_tensor(padding=PADDING_IDX)
         feature_weights = torch.nested.nested_tensor(
             movies.feature_weights
-        ).to_padded_tensor(padding=0)
+        ).to_padded_tensor(padding=PADDING_IDX)
         embeddings = model(feature_hashes, feature_weights)
         movies.embedding = list(embeddings)
     return movies
@@ -77,7 +77,7 @@ def prepare_index(movies: DocList[MovieCandidate]) -> lancedb.table.LanceTable:
 
     db = lancedb.connect(LANCE_DB_PATH)
     table = db.create_table(
-        MOVIES_TABLE_NAME,
+        ITEMS_TABLE_NAME,
         movies.to_dataframe(),
         mode="overwrite",
         schema=MovieSchema,
@@ -102,7 +102,7 @@ def save_model(
 
     with bentoml.models.create(MODEL_NAME) as model_ref:
         shutil.copytree(LANCE_DB_PATH, model_ref.path_of(LANCE_DB_PATH))
-        movies.push(Path(model_ref.path_of(MOVIES_DOC_PATH)).as_uri())
+        movies.push(Path(model_ref.path_of(ITEMS_DOC_PATH)).as_uri())
         model.save_torchscript(model_ref.path_of(EMBEDDER_PATH))
 
 
@@ -110,7 +110,7 @@ def load_embedded_movies() -> DocList[MovieCandidate]:
     import bentoml
 
     model_ref = bentoml.models.get(MODEL_NAME)
-    path = Path(model_ref.path_of(MOVIES_DOC_PATH)).as_uri()
+    path = Path(model_ref.path_of(ITEMS_DOC_PATH)).as_uri()
     return DocList[MovieCandidate].pull(path)
 
 

@@ -3856,13 +3856,14 @@ aiosignal = "*"
 click = ">=7.0"
 filelock = "*"
 frozenlist = "*"
-fsspec = {version = "*", optional = true, markers = "extra == \"train\" or extra == \"tune\""}
+fsspec = {version = "*", optional = true, markers = "extra == \"data\" or extra == \"train\" or extra == \"tune\""}
 jsonschema = "*"
 msgpack = ">=1.0.0,<2.0.0"
+numpy = {version = ">=1.20", optional = true, markers = "extra == \"data\""}
 packaging = "*"
-pandas = {version = "*", optional = true, markers = "extra == \"train\" or extra == \"tune\""}
+pandas = {version = ">=1.3", optional = true, markers = "extra == \"train\" and extra == \"data\" or extra == \"tune\" and extra == \"data\""}
 protobuf = ">=3.15.3,<3.19.5 || >3.19.5"
-pyarrow = {version = ">=6.0.1", optional = true, markers = "extra == \"train\" or extra == \"tune\""}
+pyarrow = {version = ">=6.0.1", optional = true, markers = "extra == \"data\" or extra == \"train\" or extra == \"tune\""}
 pyyaml = "*"
 requests = "*"
 tensorboardX = {version = ">=1.9", optional = true, markers = "extra == \"train\" or extra == \"tune\""}
@@ -5164,4 +5165,4 @@ test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", 
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "6ba5dd694d9def7a0960bf3e5b2b43c9de87b3f3abcbc5c8af97a7f5ea71b6a1"
+content-hash = "53c2b2e983e1d9a4c5d562939326fa6e36269202e0af60f917cd1ec3be6f235b"

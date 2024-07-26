@@ -7,8 +7,8 @@ import ray.train
 import ray.tune
 
 if TYPE_CHECKING:
-    import lightning as L
     import ray.train.torch as ray_torch
+    from lightning import Trainer
     from lightning.pytorch.cli import LightningCLI
 
 
@@ -31,7 +31,6 @@ def get_lightning_args(
         "embedding_dim": 2 ** config["embedding_dim_exp"],
         "train_loss": config["train_loss"],
         "max_norm": max_norm,
-        "sparse": config["sparse"],
         "embedder_type": config["embedder_type"],
         "num_heads": num_heads,
         "dropout": config["dropout"],
@@ -67,7 +66,7 @@ def get_cli(config: dict[str, bool | float | int | str]) -> LightningCLI:
     mlflow_logger = {
         "class_path": "MLFlowLogger",
         "init_args": {
-            "tracking_uri": config["mlflow_tracking_uri"],
+            "save_dir": config["mlflow_save_dir"],
             "experiment_name": experiment_name,
             "run_name": trial_name,
             "log_model": True,
@@ -108,7 +107,7 @@ def train_loop_per_worker(
             ckpt_path = Path(ckpt_dir, checkpoint_name)
 
     cli = get_cli(config)
-    trainer: L.Trainer = ray_lightning.prepare_trainer(cli.trainer)
+    trainer: Trainer = ray_lightning.prepare_trainer(cli.trainer)
     trainer.fit(cli.model, datamodule=cli.datamodule, ckpt_path=ckpt_path)
 
 
@@ -142,7 +141,7 @@ def get_ray_trainer() -> ray_torch.TorchTrainer:
     train_loop_config = {
         # tracking
         "tensorboard_save_dir": str(Path(TENSORBOARD_DIR).absolute()),
-        "mlflow_tracking_uri": str(Path(MLFLOW_DIR).absolute()),
+        "mlflow_save_dir": str(Path(MLFLOW_DIR).absolute()),
         # trainer
         "precision": "bf16-true",
         "max_epochs": 1,
@@ -157,7 +156,6 @@ def get_ray_trainer() -> ray_torch.TorchTrainer:
         "embedding_dim_exp": 5,
         "use_max_norm": False,
         "max_norm_exp": 0.0,
-        "sparse": False,
         "embedder_type": None,
         "num_heads_exp": 0,
         "dropout": 0.0,
@@ -237,7 +235,7 @@ def get_tuner() -> ray.tune.Tuner:
         mode=METRIC["mode"],
         search_alg=search_alg,
         num_samples=-1,
-        time_budget_s=60 * 60 * 2,
+        time_budget_s=60 * 60 * 10,
         max_concurrent_trials=1,
     )
     return ray.tune.Tuner(
