@@ -94,11 +94,10 @@ def process_features(
 def score_interactions(
     row: dict, *, label: str = "label", weight: str = "weight"
 ) -> dict:
-    label_value = row[label] or 0
     return {
         **row,
-        "label": bool(label_value > 0) - bool(label_value < 0),
-        "weight": row[weight] or 0,
+        "label": row[label] or 0,
+        "weight": abs(row[weight] or 0),
     }
 
 

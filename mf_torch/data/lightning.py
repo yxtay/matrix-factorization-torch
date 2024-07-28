@@ -47,7 +47,7 @@ class MatrixFactorizationPipeDataModule(LightningDataModule):
         num_embeddings: int = NUM_EMBEDDINGS,
         negatives_ratio: int = 1,
         batch_size: int = 2**10,
-        num_workers: int | None = None,
+        num_workers: int | None = 1,
     ) -> None:
         super().__init__()
         self.save_hyperparameters()

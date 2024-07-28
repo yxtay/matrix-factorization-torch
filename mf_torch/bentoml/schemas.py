@@ -4,8 +4,8 @@ from typing import Self
 
 from docarray import BaseDoc
 from docarray.typing import NdArray  # noqa: TCH002
-from lancedb.pydantic import LanceModel, Vector
 
+from lancedb.pydantic import LanceModel, Vector
 from mf_torch.params import (
     ITEM_FEATURE_NAMES,
     ITEM_IDX,
@@ -15,6 +15,7 @@ from mf_torch.params import (
 
 
 class Query(BaseDoc):
+    idx: int
     feature_values: list[str]
     feature_hashes: NdArray
     feature_weights: NdArray
@@ -22,7 +23,6 @@ class Query(BaseDoc):
 
 
 class MovieQuery(BaseDoc):
-    movie_idx: int | None = None
     movie_id: int | None = None
     title: str | None = None
     genres: list[str] | None = None
@@ -37,7 +37,6 @@ class MovieQuery(BaseDoc):
 
 
 class MovieCandidate(MovieQuery):
-    movie_idx: int
     movie_id: int
     title: str
     genres: list[str]
@@ -49,7 +48,6 @@ class MovieCandidate(MovieQuery):
 
 class MovieSchema(LanceModel):
     id: str
-    movie_idx: int
     movie_id: int
     title: str
     genres: list[str]
@@ -59,7 +57,6 @@ class MovieSchema(LanceModel):
 
 
 class UserQuery(BaseDoc):
-    user_idx: int | None = None
     user_id: int | None = None
     gender: str | None = None
     age: int | None = None
@@ -77,12 +74,16 @@ class UserQuery(BaseDoc):
 
 sample_movie_query = MovieQuery(
     id="1",
-    movie_idx=1,
     movie_id=1,
     title="Toy Story (1995)",
     genres=["Animation", "Children's", "Comedy"],
 )
 sample_query = sample_movie_query.to_query()
 sample_user_query = UserQuery(
-    id="1", user_idx=1, user_id=1, gender="F", age=1, occupation=10, zipcode="48067"
+    id="1",
+    user_id=1,
+    gender="F",
+    age=1,
+    occupation=10,
+    zipcode="48067",
 )

@@ -155,11 +155,17 @@ class MatrixFactorizationLitModule(LightningModule):
         batch: dict[str, torch.Tensor],
         step_name: str = "train",
     ) -> torchmetrics.MetricCollection:
+        import torchmetrics.retrieval as tm_retrieval
+
         user_idx = batch["user_idx"].long()
         label = batch["label"]
         score = self.score(batch)
-        metrics = self.metrics[step_name]
-        metrics.update(preds=score, target=label, indexes=user_idx)
+
+        metrics: torchmetrics.MetricCollection = self.metrics[step_name]
+        for metric in metrics.values():
+            if not isinstance(metric, tm_retrieval.RetrievalNormalizedDCG):
+                label = label > 0
+            metric.update(preds=score, target=label, indexes=user_idx)
         return metrics
 
     def on_fit_start(self: Self) -> None:
@@ -355,7 +361,7 @@ def cli_main(
     }
     progress_bar = lazy_instance(lp_callbacks.RichProgressBar)
     trainer_defaults = {
-        "precision": "bf16-mixed",
+        "precision": "bf16-true",
         "logger": [tensorboard_logger, mlflow_logger],
         "callbacks": [progress_bar],
         "max_epochs": 1,
