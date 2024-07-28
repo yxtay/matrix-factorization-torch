@@ -4,29 +4,34 @@ import datetime
 from functools import cached_property
 from typing import TYPE_CHECKING
 
-import lightning as L
 import torch
+from lightning import LightningModule
+
+from mf_torch.params import EMBEDDING_DIM, NUM_EMBEDDINGS
 
 if TYPE_CHECKING:
     from typing import Self
 
     import torchmetrics
+    from lightning import Callback
     from lightning.pytorch.cli import ArgsType, LightningCLI
 
 
 METRIC = {"name": "val/RetrievalNormalizedDCG", "mode": "max"}
-EXPERIMENT_NAME = datetime.datetime.now(datetime.UTC).astimezone().isoformat()
+EXPERIMENT_NAME = (
+    datetime.datetime.now(datetime.UTC).astimezone().isoformat(timespec="seconds")
+)
 
 
-class MatrixFactorizationLitModule(L.LightningModule):
+class MatrixFactorizationLitModule(LightningModule):
     def __init__(
         self: Self,
-        num_embeddings: int = 2**16 + 1,
-        embedding_dim: int = 32,
-        train_loss: str = "PairwiseHingeLoss",
         *,
+        num_embeddings: int = NUM_EMBEDDINGS,
+        embedding_dim: int = EMBEDDING_DIM,
+        train_loss: str = "PairwiseHingeLoss",
         max_norm: float | None = None,
-        sparse: bool = False,
+        norm_type: float = 2.0,
         embedder_type: str | None = None,
         num_heads: int = 1,
         dropout: float = 0.0,
@@ -150,11 +155,17 @@ class MatrixFactorizationLitModule(L.LightningModule):
         batch: dict[str, torch.Tensor],
         step_name: str = "train",
     ) -> torchmetrics.MetricCollection:
+        import torchmetrics.retrieval as tm_retrieval
+
         user_idx = batch["user_idx"].long()
         label = batch["label"]
         score = self.score(batch)
-        metrics = self.metrics[step_name]
-        metrics.update(preds=score, target=label, indexes=user_idx)
+
+        metrics: torchmetrics.MetricCollection = self.metrics[step_name]
+        for metric in metrics.values():
+            if not isinstance(metric, tm_retrieval.RetrievalNormalizedDCG):
+                label = label > 0
+            metric.update(preds=score, target=label, indexes=user_idx)
         return metrics
 
     def on_fit_start(self: Self) -> None:
@@ -204,9 +215,12 @@ class MatrixFactorizationLitModule(L.LightningModule):
         self.log_dict(metrics, sync_dist=True)
 
     def configure_optimizers(self: Self) -> torch.optim.Optimizer:
-        return torch.optim.AdamW(self.parameters(), lr=self.hparams.learning_rate)
+        optimizer_class = (
+            torch.optim.SparseAdam if self.model.sparse else torch.optim.AdamW
+        )
+        return optimizer_class(self.parameters(), lr=self.hparams.learning_rate)
 
-    def configure_callbacks(self: Self) -> list[L.Callback]:
+    def configure_callbacks(self: Self) -> list[Callback]:
         import lightning.pytorch.callbacks as lp_callbacks
 
         early_stop = lp_callbacks.EarlyStopping(
@@ -228,30 +242,35 @@ class MatrixFactorizationLitModule(L.LightningModule):
 
         import mf_torch.models as mf_models
 
-        if self.hparams.get("embedder_type") == "attention":
-            embedder_class = partial(
-                mf_models.AttentionEmbeddingBag,
-                num_heads=self.hparams.num_heads,
-                dropout=self.hparams.dropout,
-            )
-        elif self.hparams.get("embedder_type") == "transformer":
-            embedder_class = partial(
-                mf_models.TransformerEmbeddingBag,
-                num_heads=self.hparams.num_heads,
-                dropout=self.hparams.dropout,
-            )
-        else:
-            embedder_class = partial(torch.nn.EmbeddingBag, padding_idx=0, mode="sum")
+        match self.hparams.get("embedder_type"):
+            case None:
+                embedder_class = mf_models.EmbeddingBag
+            case "attention":
+                embedder_class = partial(
+                    mf_models.AttentionEmbeddingBag,
+                    num_heads=self.hparams.num_heads,
+                    dropout=self.hparams.dropout,
+                )
+            case "transformer":
+                embedder_class = partial(
+                    mf_models.TransformerEmbeddingBag,
+                    num_heads=self.hparams.num_heads,
+                    dropout=self.hparams.dropout,
+                )
+            case _:
+                msg = f"{self.hparams.embedder_type = }"
+                raise NotImplementedError(msg)
 
         embedder = embedder_class(
             num_embeddings=self.hparams.num_embeddings,
             embedding_dim=self.hparams.embedding_dim,
             max_norm=self.hparams.get("max_norm"),
-            sparse=self.hparams.sparse,
+            norm_type=self.hparams.norm_type,
         )
-        return mf_models.MatrixFactorization(
+        model = mf_models.MatrixFactorization(
             embedder=embedder, normalize=self.hparams.normalize
         )
+        return torch.jit.script(model)
 
     @cached_property
     def loss_fns(self: Self) -> torch.nn.ModuleList:
@@ -313,12 +332,14 @@ def cli_main(
     run_name: str | None = None,
 ) -> LightningCLI:
     import lightning.pytorch.callbacks as lp_callbacks
+    import mlflow
     from jsonargparse import lazy_instance
     from lightning.pytorch.cli import LightningCLI
 
-    from mf_torch.data.lightning import Movielens1mPipeDataModule
+    from mf_torch.data.lightning import MatrixFactorizationPipeDataModule
     from mf_torch.params import MLFLOW_DIR, TENSORBOARD_DIR
 
+    mlflow.config.enable_system_metrics_logging()
     tensorboard_logger = {
         "class_path": "TensorBoardLogger",
         "init_args": {
@@ -332,7 +353,7 @@ def cli_main(
     mlflow_logger = {
         "class_path": "MLFlowLogger",
         "init_args": {
-            "tracking_uri": MLFLOW_DIR,
+            "save_dir": MLFLOW_DIR,
             "experiment_name": experiment_name or EXPERIMENT_NAME,
             "run_name": run_name,
             "log_model": True,
@@ -340,16 +361,15 @@ def cli_main(
     }
     progress_bar = lazy_instance(lp_callbacks.RichProgressBar)
     trainer_defaults = {
-        "precision": "bf16-mixed",
+        "precision": "bf16-true",
         "logger": [tensorboard_logger, mlflow_logger],
         "callbacks": [progress_bar],
         "max_epochs": 1,
         "max_time": "00:01:00:00",
-        # "fast_dev_run": True,
     }
     return LightningCLI(
         MatrixFactorizationLitModule,
-        Movielens1mPipeDataModule,
+        MatrixFactorizationPipeDataModule,
         trainer_defaults=trainer_defaults,
         args=args,
         run=run,

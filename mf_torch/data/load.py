@@ -6,10 +6,13 @@ import torch
 import torch.utils.data as torch_data
 import torch.utils.data._utils.collate as torch_collate
 
+from mf_torch.params import NUM_EMBEDDINGS, NUM_HASHES, PADDING_IDX
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from typing import Iterator, Self
 
+    import numpy as np
     import pyarrow.dataset as ds
 
 
@@ -49,8 +52,8 @@ def hash_features(
     values: list[str],
     weights: torch.Tensor,
     *,
-    num_hashes: int = 2,
-    num_embeddings: int = 2**16 + 1,
+    num_hashes: int = NUM_HASHES,
+    num_embeddings: int = NUM_EMBEDDINGS,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     import mmh3
 
@@ -66,9 +69,11 @@ def process_features(
     idx: str,
     feature_names: list[str],
     prefix: str = "",
-    num_hashes: int = 2,
-    num_embeddings: int = 2**16 + 1,
+    num_hashes: int = NUM_HASHES,
+    num_embeddings: int = NUM_EMBEDDINGS,
 ) -> dict:
+    import mmh3
+
     features = select_fields(row, fields=feature_names)
     feature_values, feature_weights = collate_features(features)
     feature_hashes, feature_weights = hash_features(
@@ -79,7 +84,8 @@ def process_features(
     )
     return {
         **row,
-        f"{prefix}idx": row[idx] or 0,
+        f"{prefix}idx": mmh3.hash(str(row[idx])),
+        f"{prefix}feature_values": feature_values,
         f"{prefix}feature_hashes": feature_hashes,
         f"{prefix}feature_weights": feature_weights,
     }
@@ -88,11 +94,10 @@ def process_features(
 def score_interactions(
     row: dict, *, label: str = "label", weight: str = "weight"
 ) -> dict:
-    label_value = row[label] or 0
     return {
         **row,
-        "label": bool(label_value > 0) - bool(label_value < 0),
-        "weight": row[weight] or 0,
+        "label": row[label] or 0,
+        "weight": abs(row[weight] or 0),
     }
 
 
@@ -122,11 +127,25 @@ def collate_tensor_fn(
         )
     ):
         # pad tensor if only first or last dimensions are different
-        return torch.nested.as_nested_tensor(batch).to_padded_tensor(padding=0)
+        return torch.nested.as_nested_tensor(batch).to_padded_tensor(
+            padding=PADDING_IDX
+        )
     return torch_collate.collate_tensor_fn(batch, collate_fn_map=collate_fn_map)
 
 
 torch_collate.default_collate_fn_map[torch.Tensor] = collate_tensor_fn
+
+
+def ray_collate_fn(
+    batch: np.ndarray | dict[str, np.ndarray],
+) -> torch.Tensor | dict[str, torch.Tensor]:
+    if isinstance(batch, dict):
+        return {
+            col_name: torch_data.default_collate(col_batch)
+            for col_name, col_batch in batch.items()
+        }
+
+    return torch_data.default_collate(batch)
 
 
 @torch_data.functional_datapipe("load_parquet_as_dict")

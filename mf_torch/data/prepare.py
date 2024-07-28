@@ -108,9 +108,6 @@ def load_users(src_dir: str = DATA_DIR, *, overwrite: bool = False) -> pl.LazyFr
     ).pipe(pl.from_pandas)
     logger.info("users loaded: {}, shape: {}", users_dat, users.shape)
 
-    users = users.with_columns(
-        pl.col("user_id").rank().cast(pl.Int32).alias("user_idx")
-    )
     users.write_delta(
         users_delta, mode="overwrite", delta_write_options={"schema_mode": "overwrite"}
     )
@@ -144,7 +141,6 @@ def load_movies(src_dir: str = DATA_DIR, *, overwrite: bool = False) -> pl.LazyF
 
     movies = movies.with_columns(
         pl.col("genres").str.split("|").cast(pl.List(pl.Categorical)).alias("genres"),
-        pl.col("movie_id").rank().cast(pl.Int32).alias("movie_idx"),
     )
     movies.write_delta(
         movies_delta, mode="overwrite", delta_write_options={"schema_mode": "overwrite"}

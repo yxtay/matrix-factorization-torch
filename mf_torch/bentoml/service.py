@@ -10,9 +10,10 @@ from loguru import logger
 from mf_torch.bentoml.schemas import MovieCandidate, MovieQuery, Query, UserQuery
 from mf_torch.params import (
     EMBEDDER_PATH,
+    ITEMS_TABLE_NAME,
     LANCE_DB_PATH,
     MODEL_NAME,
-    MOVIES_TABLE_NAME,
+    PADDING_IDX,
 )
 
 
@@ -33,10 +34,10 @@ class Embedder:
             queries = DocList[Query](queries)
             feature_hashes = torch.nested.nested_tensor(
                 queries.feature_hashes
-            ).to_padded_tensor(padding=0)
+            ).to_padded_tensor(padding=PADDING_IDX)
             feature_weights = torch.nested.nested_tensor(
                 queries.feature_weights
-            ).to_padded_tensor(padding=0)
+            ).to_padded_tensor(padding=PADDING_IDX)
 
             queries.embedding = list(self.model(feature_hashes, feature_weights))
             return queries
@@ -51,7 +52,7 @@ class MovieIndex:
         import lancedb
 
         src_path = self.model_ref.path_of(LANCE_DB_PATH)
-        self.tbl = lancedb.connect(src_path).open_table(MOVIES_TABLE_NAME)
+        self.tbl = lancedb.connect(src_path).open_table(ITEMS_TABLE_NAME)
         logger.info("movies index loaded: {}", src_path)
         self.refine_factor = 5
 

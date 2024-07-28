@@ -57,6 +57,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         else:
             assert label.dim() == 1
             assert label.size(0) == user_embed.size(0)
+            label = (label > 0).int() - (label < 0).int()
         return label
 
     @staticmethod
