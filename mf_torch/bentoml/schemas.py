@@ -4,8 +4,8 @@ from typing import Self
 
 from docarray import BaseDoc
 from docarray.typing import NdArray  # noqa: TCH002
-
 from lancedb.pydantic import LanceModel, Vector
+
 from mf_torch.params import (
     ITEM_FEATURE_NAMES,
     ITEM_IDX,
