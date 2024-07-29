@@ -15,6 +15,7 @@ NUM_HASHES = 2
 NUM_EMBEDDINGS = 2**16 + 1
 EMBEDDING_DIM = 32
 PADDING_IDX = 0
+METRIC = {"name": "val/RetrievalNormalizedDCG", "mode": "max"}
 
 # serving
 EMBEDDER_PATH = "scripted_module.pt"

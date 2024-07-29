@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 import ray.train
 import ray.tune
 
+from mf_torch.params import DATA_DIR, METRIC, MLFLOW_DIR, TENSORBOARD_DIR
+
 if TYPE_CHECKING:
     import ray.train.torch as ray_torch
     from lightning import Trainer
@@ -41,7 +43,7 @@ def get_lightning_args(
 
 
 def get_cli(config: dict[str, bool | float | int | str]) -> LightningCLI:
-    from mf_torch.lightning import EXPERIMENT_NAME, cli_main
+    from mf_torch.lightning import cli_main
 
     experiment_name = ray.train.get_context().get_experiment_name()
     trial_name = ray.train.get_context().get_trial_name()
@@ -49,7 +51,7 @@ def get_cli(config: dict[str, bool | float | int | str]) -> LightningCLI:
         "class_path": "TensorBoardLogger",
         "init_args": {
             "save_dir": config["tensorboard_save_dir"],
-            "name": experiment_name or EXPERIMENT_NAME,
+            "name": experiment_name,
             "version": trial_name,
             "log_graph": True,
             "default_hp_metric": False,
@@ -103,8 +105,6 @@ def train_loop_per_worker(
 def get_run_config() -> ray.train.RunConfig:
     import ray.tune.stopper as ray_stopper
 
-    from mf_torch.lightning import METRIC
-
     checkpoint_config = ray.train.CheckpointConfig(
         num_to_keep=1,
         checkpoint_score_attribute=METRIC["name"],
@@ -124,8 +124,6 @@ def get_ray_trainer() -> ray_torch.TorchTrainer:
     import os
 
     import ray.train.torch as ray_torch
-
-    from mf_torch.params import DATA_DIR, MLFLOW_DIR, TENSORBOARD_DIR
 
     train_loop_config = {
         # tracking
@@ -160,8 +158,6 @@ def get_ray_trainer() -> ray_torch.TorchTrainer:
 
 def get_tuner() -> ray.tune.Tuner:
     import flaml
-
-    from mf_torch.lightning import METRIC
 
     search_space = {
         # "num_hashes": ray.tune.randint(1, 5),

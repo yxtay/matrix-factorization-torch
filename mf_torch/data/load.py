@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
     from typing import Iterator, Self
 
-    import numpy as np
     import pyarrow.dataset as ds
 
 
@@ -134,18 +133,6 @@ def collate_tensor_fn(
 
 
 torch_collate.default_collate_fn_map[torch.Tensor] = collate_tensor_fn
-
-
-def ray_collate_fn(
-    batch: np.ndarray | dict[str, np.ndarray],
-) -> torch.Tensor | dict[str, torch.Tensor]:
-    if isinstance(batch, dict):
-        return {
-            col_name: torch_data.default_collate(col_batch)
-            for col_name, col_batch in batch.items()
-        }
-
-    return torch_data.default_collate(batch)
 
 
 @torch_data.functional_datapipe("load_parquet_as_dict")

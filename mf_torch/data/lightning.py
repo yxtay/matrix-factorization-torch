@@ -9,14 +9,6 @@ import torch.utils.data as torch_data
 import torch.utils.data.datapipes as torch_datapipes
 from lightning import LightningDataModule
 
-from mf_torch.data.load import (
-    merge_rows,
-    process_features,
-    ray_collate_fn,
-    score_interactions,
-    select_fields,
-)
-from mf_torch.data.prepare import download_unpack_data, load_dense_movielens
 from mf_torch.params import (
     DATA_DIR,
     ITEM_FEATURE_NAMES,
@@ -32,7 +24,6 @@ if TYPE_CHECKING:
     from typing import Self
 
     import polars as pl
-    import ray.data
 
 
 LABEL = "rating"
@@ -40,6 +31,13 @@ WEIGHT = "rating"
 
 
 class MatrixFactorizationPipeDataModule(LightningDataModule):
+    label: str = LABEL
+    weight: str = WEIGHT
+    user_idx: str = USER_IDX
+    user_features: list[str] = USER_FEATURE_NAMES
+    item_idx: str = ITEM_IDX
+    item_features: list[str] = ITEM_FEATURE_NAMES
+
     def __init__(
         self: Self,
         data_dir: str = DATA_DIR,
@@ -54,6 +52,8 @@ class MatrixFactorizationPipeDataModule(LightningDataModule):
 
     def prepare_data(self: Self, *, overwrite: bool = False) -> pl.LazyFrame:
         from filelock import FileLock
+
+        from mf_torch.data.prepare import download_unpack_data, load_dense_movielens
 
         with FileLock(f"{self.hparams.data_dir}.lock"):
             download_unpack_data(
@@ -75,8 +75,10 @@ class MatrixFactorizationPipeDataModule(LightningDataModule):
     def get_items_dataset(
         self: Self, *, cycle_count: int | None = 1, prefix: str = "item_"
     ) -> torch_data.Dataset:
+        from mf_torch.data.load import process_features
+
         delta_path = self.items_delta_path
-        columns = {ITEM_IDX, *ITEM_FEATURE_NAMES}
+        columns = {self.item_idx, *self.item_features}
         return (
             torch_datapipes.iter.IterableWrapper([delta_path])
             .load_delta_table_as_dict(
@@ -89,8 +91,8 @@ class MatrixFactorizationPipeDataModule(LightningDataModule):
             .map(
                 partial(
                     process_features,
-                    idx=ITEM_IDX,
-                    feature_names=ITEM_FEATURE_NAMES,
+                    idx=self.item_idx,
+                    feature_names=self.item_features,
                     prefix=prefix,
                     num_hashes=self.hparams.num_hashes,
                     num_embeddings=self.hparams.num_embeddings,
@@ -101,17 +103,24 @@ class MatrixFactorizationPipeDataModule(LightningDataModule):
     def get_dataset(self: Self, subset: str) -> torch_data.Dataset:
         import pyarrow.dataset as ds
 
+        from mf_torch.data.load import (
+            merge_rows,
+            process_features,
+            score_interactions,
+            select_fields,
+        )
+
         assert subset in {"train", "val", "test", "predict"}
         delta_path = self.dataset_delta_path(subset)
         filter_col = f"is_{subset}"
 
         columns = {
-            LABEL,
-            WEIGHT,
-            USER_IDX,
-            ITEM_IDX,
-            *USER_FEATURE_NAMES,
-            *ITEM_FEATURE_NAMES,
+            self.label,
+            self.weight,
+            self.item_idx,
+            *self.item_features,
+            self.user_idx,
+            *self.user_features,
         }
         fields = [
             "label",
@@ -135,8 +144,8 @@ class MatrixFactorizationPipeDataModule(LightningDataModule):
             .map(
                 partial(
                     process_features,
-                    idx=ITEM_IDX,
-                    feature_names=ITEM_FEATURE_NAMES,
+                    idx=self.item_idx,
+                    feature_names=self.item_features,
                     prefix="item_",
                     num_hashes=self.hparams.num_hashes,
                     num_embeddings=self.hparams.num_embeddings,
@@ -145,8 +154,8 @@ class MatrixFactorizationPipeDataModule(LightningDataModule):
             .map(
                 partial(
                     process_features,
-                    idx=USER_IDX,
-                    feature_names=USER_FEATURE_NAMES,
+                    idx=self.user_idx,
+                    feature_names=self.user_features,
                     prefix="user_",
                     num_hashes=self.hparams.num_hashes,
                     num_embeddings=self.hparams.num_embeddings,
@@ -213,111 +222,6 @@ class MatrixFactorizationPipeDataModule(LightningDataModule):
 
     def predict_dataloader(self: Self) -> torch_data.DataLoader:
         return self.get_dataloader(self.predict_data)
-
-
-class MatrixFactorizationRayDataModule(MatrixFactorizationPipeDataModule):
-    def get_items_dataset(self: Self, *, prefix: str = "item_") -> ray.data.Dataset:
-        import deltalake
-        import ray.data
-
-        delta_path = self.items_delta_path
-        parquet_paths = deltalake.DeltaTable(delta_path).file_uris()
-        columns = {ITEM_IDX, *ITEM_FEATURE_NAMES}
-        return (
-            ray.data.read_parquet(parquet_paths, columns=list(columns))
-            .map(
-                partial(
-                    process_features,
-                    idx=ITEM_IDX,
-                    feature_names=ITEM_FEATURE_NAMES,
-                    prefix=prefix,
-                    num_hashes=self.hparams.num_hashes,
-                    num_embeddings=self.hparams.num_embeddings,
-                )
-            )
-            .random_shuffle()
-        )
-
-    def get_dataset(self: Self, subset: str) -> ray.data.Dataset:
-        import deltalake
-        import pyarrow.dataset as ds
-        import ray.data
-
-        assert subset in {"train", "val", "test", "predict"}
-        delta_path = self.dataset_delta_path(subset)
-        filter_col = f"is_{subset}"
-
-        parquet_paths = deltalake.DeltaTable(delta_path).file_uris()
-        columns = {
-            filter_col,
-            LABEL,
-            WEIGHT,
-            USER_IDX,
-            ITEM_IDX,
-            *USER_FEATURE_NAMES,
-            *ITEM_FEATURE_NAMES,
-        }
-        fields = [
-            "label",
-            "weight",
-            "user_idx",
-            "user_feature_hashes",
-            "user_feature_weights",
-            "item_idx",
-            "item_feature_hashes",
-            "item_feature_weights",
-        ]
-        dataset = (
-            ray.data.read_parquet(
-                parquet_paths, columns=list(columns), filter=ds.field(filter_col)
-            )
-            .map(
-                partial(
-                    process_features,
-                    idx=ITEM_IDX,
-                    feature_names=ITEM_FEATURE_NAMES,
-                    prefix="item_",
-                    num_hashes=self.hparams.num_hashes,
-                    num_embeddings=self.hparams.num_embeddings,
-                )
-            )
-            .map(
-                partial(
-                    process_features,
-                    idx=USER_IDX,
-                    feature_names=USER_FEATURE_NAMES,
-                    prefix="user_",
-                    num_hashes=self.hparams.num_hashes,
-                    num_embeddings=self.hparams.num_embeddings,
-                )
-            )
-            .map(partial(score_interactions, label=LABEL, weight=WEIGHT))
-            .select_columns(fields)
-        )
-        if subset == "train" and self.hparams.negatives_ratio > 0:
-            fields = [
-                "neg_item_idx",
-                "neg_item_feature_hashes",
-                "neg_item_feature_weights",
-            ]
-            items_dataset = self.get_items_dataset(prefix="neg_item_").select_columns(
-                fields
-            )
-
-            n_rows = dataset.count()
-            repeats = n_rows // items_dataset.count()
-            items_repeated = [items_dataset] * repeats
-
-            dataset = dataset.zip(items_dataset.union(*items_repeated).limit(n_rows))
-
-        return dataset
-
-    def get_dataloader(self: Self, dataset: ray.data.Dataset) -> ray.data.Dataset:
-        return dataset.iter_torch_batches(
-            batch_size=self.hparams.batch_size,
-            collate_fn=ray_collate_fn,
-            local_shuffle_buffer_size=self.hparams.batch_size * 2**4,
-        )
 
 
 if __name__ == "__main__":
