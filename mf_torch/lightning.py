@@ -1,26 +1,24 @@
 from __future__ import annotations
 
-import datetime
 from functools import cached_property
 from typing import TYPE_CHECKING
 
+import lightning.pytorch.callbacks as lp_callbacks
+import lightning.pytorch.loggers as lp_loggers
 import torch
 from lightning import LightningModule
+from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
+from lightning.pytorch.utilities.rank_zero import rank_zero_only
 
-from mf_torch.params import EMBEDDING_DIM, NUM_EMBEDDINGS
+from mf_torch.params import EMBEDDING_DIM, METRIC, NUM_EMBEDDINGS
 
 if TYPE_CHECKING:
     from typing import Self
 
     import torchmetrics
-    from lightning import Callback
-    from lightning.pytorch.cli import ArgsType, LightningCLI
-
-
-METRIC = {"name": "val/RetrievalNormalizedDCG", "mode": "max"}
-EXPERIMENT_NAME = (
-    datetime.datetime.now(datetime.UTC).astimezone().isoformat(timespec="seconds")
-)
+    from lightning import Callback, Trainer
+    from lightning.pytorch.cli import ArgsType
+    from mlflow import MlflowClient
 
 
 class MatrixFactorizationLitModule(LightningModule):
@@ -168,18 +166,32 @@ class MatrixFactorizationLitModule(LightningModule):
             metric.update(preds=score, target=label, indexes=user_idx)
         return metrics
 
+    @rank_zero_only
     def on_fit_start(self: Self) -> None:
-        import lightning.pytorch.loggers as lp_loggers
+        params = {**self.hparams, **self.trainer.datamodule.hparams}
+        metrics = {key.replace("val/", "hp/"): 0.0 for key in self.metrics["val"]}
+        for logger in self.loggers:
+            if isinstance(logger, lp_loggers.TensorBoardLogger):
+                logger.log_hyperparams(params=params, metrics=metrics)
+                logger.log_graph(self)
+            else:
+                logger.log_hyperparams(params=params)
 
-        if self.global_rank == 0:
-            params = {**self.hparams, **self.trainer.datamodule.hparams}
-            metrics = {key.replace("val/", "hp/"): 0.0 for key in self.metrics["val"]}
-            for logger in self.loggers:
-                if isinstance(logger, lp_loggers.TensorBoardLogger):
-                    logger.log_hyperparams(params=params, metrics=metrics)
-                    logger.log_graph(self)
-                else:
-                    logger.log_hyperparams(params=params)
+    @rank_zero_only
+    def on_train_start(self: Self) -> None:
+        import mlflow
+
+        for logger in self.loggers:
+            if isinstance(logger, lp_loggers.MLFlowLogger):
+                mlflow.start_run(run_id=logger.run_id, log_system_metrics=True)
+
+    @rank_zero_only
+    def on_train_end(self: Self) -> None:
+        import mlflow
+
+        for logger in self.loggers:
+            if isinstance(logger, lp_loggers.MLFlowLogger):
+                mlflow.end_run()
 
     def training_step(
         self: Self, batch: dict[str, torch.Tensor], batch_idx: int
@@ -221,8 +233,6 @@ class MatrixFactorizationLitModule(LightningModule):
         return optimizer_class(self.parameters(), lr=self.hparams.learning_rate)
 
     def configure_callbacks(self: Self) -> list[Callback]:
-        import lightning.pytorch.callbacks as lp_callbacks
-
         early_stop = lp_callbacks.EarlyStopping(
             monitor=METRIC["name"], mode=METRIC["mode"]
         )
@@ -324,6 +334,40 @@ class MatrixFactorizationLitModule(LightningModule):
         return script_module
 
 
+class LoggerSaveConfigCallback(SaveConfigCallback):
+    def save_config(
+        self, trainer: Trainer, pl_module: LightningModule, stage: str
+    ) -> None:
+        import tempfile
+        from pathlib import Path
+
+        for logger in trainer.loggers:
+            if isinstance(logger, lp_loggers.MLFlowLogger):
+                with tempfile.TemporaryDirectory() as path:
+                    config_path = Path(path) / self.config_filename
+                    self.parser.save(
+                        self.config,
+                        config_path,
+                        skip_none=False,
+                        overwrite=self.overwrite,
+                        multifile=self.multifile,
+                    )
+                    mlflow_client: MlflowClient = logger.experiment
+                    mlflow_client.log_artifact(
+                        run_id=logger.run_id, local_path=config_path
+                    )
+
+
+def time_now_isoformat() -> str:
+    import datetime
+
+    datetime_now = datetime.datetime.now(datetime.UTC).astimezone()
+    return datetime_now.isoformat(timespec="seconds")
+
+
+EXPERIMENT_NAME = time_now_isoformat()
+
+
 def cli_main(
     args: ArgsType = None,
     *,
@@ -331,20 +375,18 @@ def cli_main(
     experiment_name: str | None = None,
     run_name: str | None = None,
 ) -> LightningCLI:
-    import lightning.pytorch.callbacks as lp_callbacks
-    import mlflow
     from jsonargparse import lazy_instance
-    from lightning.pytorch.cli import LightningCLI
 
     from mf_torch.data.lightning import MatrixFactorizationPipeDataModule
     from mf_torch.params import MLFLOW_DIR, TENSORBOARD_DIR
 
-    mlflow.config.enable_system_metrics_logging()
+    experiment_name = experiment_name or EXPERIMENT_NAME
+    run_name = run_name or time_now_isoformat()
     tensorboard_logger = {
         "class_path": "TensorBoardLogger",
         "init_args": {
             "save_dir": TENSORBOARD_DIR,
-            "name": experiment_name or EXPERIMENT_NAME,
+            "name": experiment_name,
             "version": run_name,
             "log_graph": True,
             "default_hp_metric": False,
@@ -354,7 +396,7 @@ def cli_main(
         "class_path": "MLFlowLogger",
         "init_args": {
             "save_dir": MLFLOW_DIR,
-            "experiment_name": experiment_name or EXPERIMENT_NAME,
+            "experiment_name": experiment_name,
             "run_name": run_name,
             "log_model": True,
         },
@@ -370,6 +412,7 @@ def cli_main(
     return LightningCLI(
         MatrixFactorizationLitModule,
         MatrixFactorizationPipeDataModule,
+        save_config_callback=LoggerSaveConfigCallback,
         trainer_defaults=trainer_defaults,
         args=args,
         run=run,
