@@ -21,9 +21,9 @@ from mf_torch.params import (
 if TYPE_CHECKING:
     from typing import Self
 
+    import lancedb.table
     from lightning import Trainer
 
-    import lancedb.table
     from mf_torch.lightning import MatrixFactorizationLitModule
 
 
