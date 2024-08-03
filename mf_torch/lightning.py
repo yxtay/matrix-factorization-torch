@@ -166,33 +166,6 @@ class MatrixFactorizationLitModule(LightningModule):
             metric.update(preds=score, target=label, indexes=user_idx)
         return metrics
 
-    @rank_zero_only
-    def on_fit_start(self: Self) -> None:
-        params = {**self.hparams, **self.trainer.datamodule.hparams}
-        metrics = {key.replace("val/", "hp/"): 0.0 for key in self.metrics["val"]}
-        for logger in self.loggers:
-            if isinstance(logger, lp_loggers.TensorBoardLogger):
-                logger.log_hyperparams(params=params, metrics=metrics)
-                logger.log_graph(self)
-            else:
-                logger.log_hyperparams(params=params)
-
-    @rank_zero_only
-    def on_train_start(self: Self) -> None:
-        import mlflow
-
-        for logger in self.loggers:
-            if isinstance(logger, lp_loggers.MLFlowLogger):
-                mlflow.start_run(run_id=logger.run_id, log_system_metrics=True)
-
-    @rank_zero_only
-    def on_train_end(self: Self) -> None:
-        import mlflow
-
-        for logger in self.loggers:
-            if isinstance(logger, lp_loggers.MLFlowLogger):
-                mlflow.end_run()
-
     def training_step(
         self: Self, batch: dict[str, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
@@ -219,12 +192,16 @@ class MatrixFactorizationLitModule(LightningModule):
     ) -> torch.Tensor:
         return self.score(batch)
 
-    def on_validation_epoch_end(self: Self) -> None:
-        metrics = {
-            key.replace("val/", "hp/"): self.trainer.callback_metrics[key]
-            for key in self.metrics["val"]
-        }
-        self.log_dict(metrics, sync_dist=True)
+    @rank_zero_only
+    def on_train_start(self: Self) -> None:
+        params = {**self.hparams, **self.trainer.datamodule.hparams}
+        metrics = {key: 0.0 for key in self.metrics["val"]}
+        for logger in self.loggers:
+            if isinstance(logger, lp_loggers.TensorBoardLogger):
+                logger.log_hyperparams(params=params, metrics=metrics)
+                logger.log_graph(self)
+            else:
+                logger.log_hyperparams(params=params)
 
     def configure_optimizers(self: Self) -> torch.optim.Optimizer:
         optimizer_class = (
@@ -233,13 +210,13 @@ class MatrixFactorizationLitModule(LightningModule):
         return optimizer_class(self.parameters(), lr=self.hparams.learning_rate)
 
     def configure_callbacks(self: Self) -> list[Callback]:
+        checkpoint = lp_callbacks.ModelCheckpoint(
+            monitor=METRIC["name"], mode=METRIC["mode"]
+        )
         early_stop = lp_callbacks.EarlyStopping(
             monitor=METRIC["name"], mode=METRIC["mode"]
         )
-        checkpoint = lp_callbacks.ModelCheckpoint(
-            monitor=METRIC["name"], mode=METRIC["mode"], auto_insert_metric_name=False
-        )
-        return [early_stop, checkpoint]
+        return [checkpoint, early_stop]
 
     def configure_model(self: Self) -> None:
         if self.model is None:
@@ -321,7 +298,7 @@ class MatrixFactorizationLitModule(LightningModule):
         }
         return torch.nn.ModuleDict(metrics)
 
-    @cached_property
+    @property
     def example_input_array(self: Self) -> tuple[torch.Tensor, torch.Tensor]:
         return (
             torch.zeros((1, 1), dtype=torch.int, device=self.device),
@@ -335,6 +312,7 @@ class MatrixFactorizationLitModule(LightningModule):
 
 
 class LoggerSaveConfigCallback(SaveConfigCallback):
+    @rank_zero_only
     def save_config(
         self, trainer: Trainer, pl_module: LightningModule, stage: str
     ) -> None:
@@ -377,7 +355,7 @@ def cli_main(
 ) -> LightningCLI:
     from jsonargparse import lazy_instance
 
-    from mf_torch.data.lightning import MatrixFactorizationPipeDataModule
+    from mf_torch.data.lightning import MatrixFactorizationDataModule
     from mf_torch.params import MLFLOW_DIR, TENSORBOARD_DIR
 
     experiment_name = experiment_name or EXPERIMENT_NAME
@@ -411,7 +389,7 @@ def cli_main(
     }
     return LightningCLI(
         MatrixFactorizationLitModule,
-        MatrixFactorizationPipeDataModule,
+        MatrixFactorizationDataModule,
         save_config_callback=LoggerSaveConfigCallback,
         trainer_defaults=trainer_defaults,
         args=args,

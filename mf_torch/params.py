@@ -18,8 +18,9 @@ PADDING_IDX = 0
 METRIC = {"name": "val/RetrievalNormalizedDCG", "mode": "max"}
 
 # serving
-EMBEDDER_PATH = "scripted_module.pt"
-LANCE_DB_PATH = "lancedb"
-MODEL_NAME = "mf-torch"
+CHECKPOINT_PATH = "checkpoint.ckpt"
 ITEMS_DOC_PATH = "movies"
 ITEMS_TABLE_NAME = "movies"
+LANCE_DB_PATH = "lancedb"
+MODEL_NAME = "mf-torch"
+SCRIPTMODULE_PATH = "scriptmodule.pt"
