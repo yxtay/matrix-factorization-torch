@@ -30,7 +30,7 @@ LABEL = "rating"
 WEIGHT = "rating"
 
 
-class MatrixFactorizationPipeDataModule(LightningDataModule):
+class MatrixFactorizationDataModule(LightningDataModule):
     label: str = LABEL
     weight: str = WEIGHT
     user_idx: str = USER_IDX
@@ -78,13 +78,9 @@ class MatrixFactorizationPipeDataModule(LightningDataModule):
         from mf_torch.data.load import process_features
 
         delta_path = self.items_delta_path
-        columns = {self.item_idx, *self.item_features}
         return (
             torch_datapipes.iter.IterableWrapper([delta_path])
-            .load_delta_table_as_dict(
-                columns=list(columns),
-                batch_size=self.hparams.batch_size,
-            )
+            .load_delta_table_as_dict(batch_size=self.hparams.batch_size)
             .cycle(cycle_count)
             .shuffle(buffer_size=self.hparams.batch_size * 2**4)
             .sharding_filter()
@@ -227,7 +223,7 @@ class MatrixFactorizationPipeDataModule(LightningDataModule):
 if __name__ == "__main__":
     import rich
 
-    dm = MatrixFactorizationPipeDataModule(num_workers=1)
+    dm = MatrixFactorizationDataModule(num_workers=1)
     dm.prepare_data().head().collect().glimpse()
     dm.setup("fit")
 
