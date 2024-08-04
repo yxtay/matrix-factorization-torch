@@ -125,11 +125,11 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
 
         # negative masks log will be 0 or -inf
         hard_negetives = (losses + negative_masks.log()).topk(
-            k=num_hard_negatives, dim=1, sorted=False
+            k=num_hard_negatives, dim=-1, sorted=False
         )
-        losses = losses.gather(dim=1, index=hard_negetives.indices)
+        losses = losses.gather(dim=-1, index=hard_negetives.indices)
         # shape: (batch_size, num_hard_negatives)
-        negative_masks = negative_masks.gather(dim=1, index=hard_negetives.indices)
+        negative_masks = negative_masks.gather(dim=-1, index=hard_negetives.indices)
         # shape: (batch_size, num_hard_negatives)
         return losses, negative_masks
 
@@ -171,7 +171,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         # shape: (1, num_hard_negatives | batch_size * num_items)
         denominator = negative_masks.sum() + 1e-10
         # shape: scalar
-        return (losses + negative_masks.log() - denominator.log()).logsumexp(dim=1)
+        return (losses + negative_masks.log() - denominator.log()).logsumexp(dim=-1)
 
     @staticmethod
     def contrastive_loss(
@@ -197,7 +197,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
             losses, negative_masks, hard_negatives_ratio=hard_negatives_ratio
         )
         # shape: (batch_size, num_hard_negatives | num_items)
-        loss = weighted_mean(losses, negative_masks, dim=1)
+        loss = weighted_mean(losses, negative_masks, dim=-1)
         # shape: (batch_size)
         return weighted_mean(loss, sample_weight)
 
@@ -227,7 +227,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
             losses, negative_masks, hard_negatives_ratio=hard_negatives_ratio
         )
         # shape: (batch_size, num_hard_negatives | num_items)
-        logits = torch.cat([pos_loss[:, None], losses + negative_masks.log()], dim=1)
+        logits = torch.cat([pos_loss[:, None], losses + negative_masks.log()], dim=-1)
         # shape: (batch_size, num_hard_negatives | num_items + 1)
         loss = F.cross_entropy(
             logits, torch.zeros(logits.size(0), dtype=torch.long), reduction="none"
@@ -261,7 +261,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
             losses, negative_masks, hard_negatives_ratio=hard_negatives_ratio
         )
         # shape: (batch_size, num_hard_negatives | num_items)
-        negative_score = (losses + negative_masks.log()).logsumexp(dim=1)
+        negative_score = (losses + negative_masks.log()).logsumexp(dim=-1)
         # shape: (batch_size)
         loss = -pos_loss + negative_score
         # shape: (batch_size)
@@ -494,7 +494,7 @@ class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
             losses, negative_masks, hard_negatives_ratio=hard_negatives_ratio
         )
         # shape: (batch_size, num_hard_negatives | num_items)
-        loss = weighted_mean(losses, negative_masks, dim=1)
+        loss = weighted_mean(losses, negative_masks, dim=-1)
         # shape: (batch_size)
         return weighted_mean(loss, sample_weight)
 

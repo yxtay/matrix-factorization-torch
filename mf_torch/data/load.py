@@ -54,9 +54,13 @@ def hash_features(
     num_hashes: int = NUM_HASHES,
     num_embeddings: int = NUM_EMBEDDINGS,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    import mmh3
+    import xxhash
 
-    hashes = [mmh3.hash(val, seed) for val in values for seed in range(num_hashes)]
+    hashes = [
+        xxhash.xxh32_intdigest(val, seed)
+        for val in values
+        for seed in range(num_hashes)
+    ]
     hashes = torch.as_tensor(hashes) % (num_embeddings - 1) + 1
     weights = weights.repeat_interleave(num_hashes) / num_hashes
     return hashes, weights
@@ -71,7 +75,7 @@ def process_features(
     num_hashes: int = NUM_HASHES,
     num_embeddings: int = NUM_EMBEDDINGS,
 ) -> dict:
-    import mmh3
+    import xxhash
 
     features = select_fields(row, fields=feature_names)
     feature_values, feature_weights = collate_features(features)
@@ -83,7 +87,7 @@ def process_features(
     )
     return {
         **row,
-        f"{prefix}idx": mmh3.hash(str(row[idx])),
+        f"{prefix}idx": xxhash.xxh32_intdigest(str(row[idx])),
         f"{prefix}feature_values": feature_values,
         f"{prefix}feature_hashes": feature_hashes,
         f"{prefix}feature_weights": feature_weights,

@@ -10,9 +10,9 @@ python:
     - docarray
     - lancedb
     - loguru
-    - mmh3
     - pandas
     - torch
+    - xxhash
 envs:
   - name: UV_EXTRA_INDEX_URL
     value: https://download.pytorch.org/whl/cpu
