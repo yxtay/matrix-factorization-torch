@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import inspect
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -21,32 +20,25 @@ from mf_torch.params import (
 if TYPE_CHECKING:
     from typing import Self
 
-    import lancedb.table
     from lightning import Trainer
 
+    import lancedb.table
     from mf_torch.lightning import MatrixFactorizationLitModule
 
 
 def load_args(ckpt_path: str | None) -> dict:
-    from mf_torch.data.lightning import MatrixFactorizationDataModule
-    from mf_torch.lightning import MatrixFactorizationLitModule
-
     if not ckpt_path:
         return {}
 
     checkpoint = torch.load(ckpt_path)
     model_args = checkpoint["hyper_parameters"]
     model_args = {
-        key: value
-        for key, value in model_args.items()
-        if key in inspect.signature(MatrixFactorizationLitModule.__init__).parameters
+        key: value for key, value in model_args.items() if not key.startswith("_")
     }
 
     data_args = checkpoint["datamodule_hyper_parameters"]
     data_args = {
-        key: value
-        for key, value in data_args.items()
-        if key in inspect.signature(MatrixFactorizationDataModule.__init__).parameters
+        key: value for key, value in data_args.items() if not key.startswith("_")
     }
     return {"model": model_args, "data": data_args}
 
@@ -98,7 +90,7 @@ def embed_queries(
             queries.feature_weights
         ).to_padded_tensor(padding=PADDING_IDX)
 
-        embeddings = model(feature_hashes, feature_weights).float()
+        embeddings = model(feature_hashes, feature_weights)
         queries.embedding = list(embeddings)
     return queries
 
@@ -111,7 +103,7 @@ def index_items(
     import lancedb
     from lancedb.pydantic import LanceModel, Vector
 
-    embedding_dim = items[0].embedding.size
+    embedding_dim = items[0].embedding.shape[-1]
     num_partitions = int(len(items) ** 0.5)
     num_sub_vectors = embedding_dim // 8
 
