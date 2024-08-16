@@ -16,9 +16,9 @@ from mf_torch.params import (
 )
 
 if TYPE_CHECKING:
+    import lancedb.table
     from lightning import Trainer
 
-    import lancedb.table
     from mf_torch.lightning import MatrixFactorizationLitModule
 
 
@@ -139,9 +139,8 @@ def save_model(trainer: Trainer) -> None:
 
 def load_indexed_items() -> DocList[ItemCandidate]:
     import bentoml
-    from pydantic import TypeAdapter
-
     import lancedb
+    from pydantic import TypeAdapter
 
     lancedb_path = bentoml.models.get(MODEL_NAME).path_of(LANCE_DB_PATH)
     tbl = lancedb.connect(lancedb_path).open_table(ITEMS_TABLE_NAME)
