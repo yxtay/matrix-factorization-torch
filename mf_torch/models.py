@@ -10,7 +10,7 @@ from mf_torch.params import EMBEDDING_DIM, NUM_EMBEDDINGS, PADDING_IDX
 
 class MatrixFactorization(torch.nn.Module):
     def __init__(
-        self: Self, embedder: torch.nn.Module, *, normalize: bool = True
+        self: Self, *, embedder: torch.nn.Module, normalize: bool = True
     ) -> None:
         super().__init__()
         self.embedder = torch.jit.script(embedder)

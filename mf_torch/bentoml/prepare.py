@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import torch
@@ -9,17 +8,14 @@ from docarray import DocList
 from mf_torch.bentoml.schemas import ItemCandidate, Query
 from mf_torch.params import (
     CHECKPOINT_PATH,
-    ITEMS_DOC_PATH,
     ITEMS_TABLE_NAME,
     LANCE_DB_PATH,
     MODEL_NAME,
     PADDING_IDX,
-    SCRIPTMODULE_PATH,
+    SCRIPT_MODULE_PATH,
 )
 
 if TYPE_CHECKING:
-    from typing import Self
-
     import lancedb.table
     from lightning import Trainer
 
@@ -107,18 +103,10 @@ def index_items(
     num_partitions = int(len(items) ** 0.5)
     num_sub_vectors = embedding_dim // 8
 
-    class ItemSchema(LanceModel):
-        movie_id: int
-        title: str
-        genres: list[str]
-        feature_values: list[str]
-        feature_hashes: list[float]
+    class ItemSchema(ItemCandidate, LanceModel):
+        feature_hashes: list[int]
         feature_weights: list[float]
         embedding: Vector(embedding_dim)
-
-        @property
-        def id(self: Self) -> str:
-            return str(self.movie_id)
 
     db = lancedb.connect(lance_db_path)
     table = db.create_table(
@@ -138,24 +126,25 @@ def index_items(
     return table
 
 
-def save_model(items: DocList[ItemCandidate], trainer: Trainer) -> None:
+def save_model(trainer: Trainer) -> None:
     import shutil
 
     import bentoml
 
     with bentoml.models.create(MODEL_NAME) as model_ref:
         shutil.copytree(LANCE_DB_PATH, model_ref.path_of(LANCE_DB_PATH))
-        items.push(Path(model_ref.path_of(ITEMS_DOC_PATH)).as_uri())
         trainer.save_checkpoint(model_ref.path_of(CHECKPOINT_PATH))
-        trainer.model.save_torchscript(model_ref.path_of(SCRIPTMODULE_PATH))
+        trainer.model.save_torchscript(model_ref.path_of(SCRIPT_MODULE_PATH))
 
 
-def load_embedded_items() -> DocList[ItemCandidate]:
+def load_indexed_items() -> DocList[ItemCandidate]:
     import bentoml
+    import lancedb
+    from pydantic import TypeAdapter
 
-    model_ref = bentoml.models.get(MODEL_NAME)
-    path = Path(model_ref.path_of(ITEMS_DOC_PATH)).as_uri()
-    return DocList[ItemCandidate].pull(path)
+    lancedb_path = bentoml.models.get(MODEL_NAME).path_of(LANCE_DB_PATH)
+    tbl = lancedb.connect(lancedb_path).open_table(ITEMS_TABLE_NAME)
+    return TypeAdapter(list[ItemCandidate]).validate_python(tbl.to_arrow().to_pylist())
 
 
 def main(ckpt_path: str | None) -> None:
@@ -163,8 +152,10 @@ def main(ckpt_path: str | None) -> None:
     items = prepare_items(ckpt_path)
     items = embed_queries(queries=items, model=trainer.model)
     index_items(items=items)
-    save_model(items=items, trainer=trainer)
+    save_model(trainer=trainer)
 
 
 if __name__ == "__main__":
-    main()
+    from jsonargparse import CLI
+
+    CLI(main, as_positional=False)

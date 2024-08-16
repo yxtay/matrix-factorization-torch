@@ -4,7 +4,6 @@ from typing import Self
 
 import bentoml
 import torch
-from docarray import DocList
 from loguru import logger
 
 from mf_torch.bentoml.prepare import embed_queries, load_args
@@ -14,7 +13,7 @@ from mf_torch.params import (
     ITEMS_TABLE_NAME,
     LANCE_DB_PATH,
     MODEL_NAME,
-    SCRIPTMODULE_PATH,
+    SCRIPT_MODULE_PATH,
 )
 
 
@@ -24,13 +23,15 @@ class Embedder:
 
     @logger.catch(reraise=True)
     def __init__(self: Self) -> None:
-        path = self.model_ref.path_of(SCRIPTMODULE_PATH)
+        path = self.model_ref.path_of(SCRIPT_MODULE_PATH)
         self.model = torch.jit.load(path)
         logger.info("model loaded: {}", path)
 
     @bentoml.api(batchable=True)
     @logger.catch(reraise=True)
     def embed(self: Self, queries: list[Query]) -> list[Query]:
+        from docarray import DocList
+
         queries = DocList[Query](queries)
         return embed_queries(queries=queries, model=self.model)
 
@@ -46,19 +47,35 @@ class ItemIndex:
         src_path = self.model_ref.path_of(LANCE_DB_PATH)
         self.tbl = lancedb.connect(src_path).open_table(ITEMS_TABLE_NAME)
         logger.info("items index loaded: {}", src_path)
-        self.refine_factor = 5
 
     @bentoml.api()
     @logger.catch(reraise=True)
     def search(self: Self, query: Query) -> list[ItemCandidate]:
+        from pydantic import TypeAdapter
+
         results_df = (
             self.tbl.search(query.embedding)
-            .refine_factor(self.refine_factor)
+            .nprobes(20)
+            .refine_factor(5)
+            .limit(10)
             .to_pandas()
             .assign(score=lambda df: 1 - df["_distance"])
             .drop(columns="_distance")
         )
-        return DocList[ItemCandidate].from_dataframe(results_df)
+        return TypeAdapter(list[ItemCandidate]).validate_python(
+            results_df.itertuples(), from_attributes=True
+        )
+
+    @bentoml.api()
+    @logger.catch(reraise=True)
+    def item_id(self: Self, item_id: int) -> ItemCandidate:
+        from bentoml.exceptions import NotFound
+
+        result = self.tbl.search().where(f"movie_id = {item_id}").to_list()
+        if len(result) == 0:
+            msg = f"item not found: {item_id = }"
+            raise NotFound(msg)
+        return ItemCandidate.model_validate(result[0])
 
 
 @bentoml.service()
@@ -96,6 +113,12 @@ class Service:
             num_hashes=self.num_hashes, num_embeddings=self.num_embeddings
         )
         return await self.recommend_with_query(query)
+
+    @bentoml.api()
+    @logger.catch(reraise=True)
+    async def recommend_with_item_id(self: Self, item_id: int) -> list[ItemCandidate]:
+        item = self.item_index.item_id(item_id)
+        return await self.recommend_with_item(item)
 
     @bentoml.api()
     @logger.catch(reraise=True)

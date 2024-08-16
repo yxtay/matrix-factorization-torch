@@ -61,26 +61,19 @@ class MatrixFactorizationDataModule(LightningDataModule):
             )
             return load_dense_movielens(self.hparams.data_dir, overwrite=overwrite)
 
-    @property
-    def items_delta_path(self: Self) -> str:
-        return Path(self.hparams.data_dir, "ml-1m", "movies.delta")
-
-    def dataset_delta_path(self: Self, subset: str) -> str:
-        delta_file = {
-            "train": "sparse.delta",
-            "val": "val.delta",
-        }.get(subset, "dense.delta")
-        return Path(self.hparams.data_dir, "ml-1m", delta_file)
+    def get_raw_items_data(self: Self) -> str:
+        delta_path = Path(self.hparams.data_dir, "ml-1m", "movies.delta")
+        return torch_datapipes.iter.IterableWrapper(
+            [delta_path]
+        ).load_delta_table_as_dict(batch_size=self.hparams.batch_size)
 
     def get_items_dataset(
         self: Self, *, cycle_count: int | None = 1, prefix: str = "item_"
     ) -> torch_data.Dataset:
         from mf_torch.data.load import process_features
 
-        delta_path = self.items_delta_path
         return (
-            torch_datapipes.iter.IterableWrapper([delta_path])
-            .load_delta_table_as_dict(batch_size=self.hparams.batch_size)
+            self.get_raw_items_data()
             .cycle(cycle_count)
             .shuffle(buffer_size=self.hparams.batch_size * 2**4)
             .sharding_filter()
@@ -96,19 +89,19 @@ class MatrixFactorizationDataModule(LightningDataModule):
             )
         )
 
-    def get_dataset(self: Self, subset: str) -> torch_data.Dataset:
+    def get_raw_data(self: Self, subset: str) -> torch_data.Dataset:
         import pyarrow.dataset as ds
 
-        from mf_torch.data.load import (
-            merge_rows,
-            process_features,
-            score_interactions,
-            select_fields,
-        )
+        from mf_torch.data.load import score_interactions
 
         assert subset in {"train", "val", "test", "predict"}
-        delta_path = self.dataset_delta_path(subset)
         filter_col = f"is_{subset}"
+
+        delta_file = {
+            "train": "sparse.delta",
+            "val": "val.delta",
+        }.get(subset, "dense.delta")
+        delta_path = Path(self.hparams.data_dir, "ml-1m", delta_file)
 
         columns = {
             self.label,
@@ -118,6 +111,19 @@ class MatrixFactorizationDataModule(LightningDataModule):
             self.user_idx,
             *self.user_features,
         }
+        return (
+            torch_datapipes.iter.IterableWrapper([delta_path])
+            .load_delta_table_as_dict(
+                columns=list(columns),
+                filter_expr=ds.field(filter_col),
+                batch_size=self.hparams.batch_size,
+            )
+            .map(partial(score_interactions, label=self.label, weight=self.weight))
+        )
+
+    def get_dataset(self: Self, subset: str) -> torch_data.Dataset:
+        from mf_torch.data.load import merge_rows, process_features, select_fields
+
         fields = [
             "label",
             "weight",
@@ -129,12 +135,7 @@ class MatrixFactorizationDataModule(LightningDataModule):
             "item_feature_weights",
         ]
         datapipe = (
-            torch_datapipes.iter.IterableWrapper([delta_path])
-            .load_delta_table_as_dict(
-                columns=list(columns),
-                filter_expr=ds.field(filter_col),
-                batch_size=self.hparams.batch_size,
-            )
+            self.get_raw_data(subset)
             .shuffle(buffer_size=self.hparams.batch_size * 2**4)
             .sharding_filter()
             .map(
@@ -157,7 +158,6 @@ class MatrixFactorizationDataModule(LightningDataModule):
                     num_embeddings=self.hparams.num_embeddings,
                 )
             )
-            .map(partial(score_interactions, label=LABEL, weight=WEIGHT))
             .map(partial(select_fields, fields=fields))
         )
         if subset == "train" and self.hparams.negatives_ratio > 0:
