@@ -19,8 +19,7 @@ METRIC = {"name": "val/RetrievalNormalizedDCG", "mode": "max"}
 
 # serving
 CHECKPOINT_PATH = "checkpoint.ckpt"
-ITEMS_DOC_PATH = "movies"
 ITEMS_TABLE_NAME = "movies"
 LANCE_DB_PATH = "lancedb"
 MODEL_NAME = "mf-torch"
-SCRIPTMODULE_PATH = "scriptmodule.pt"
+SCRIPT_MODULE_PATH = "scriptmodule.pt"

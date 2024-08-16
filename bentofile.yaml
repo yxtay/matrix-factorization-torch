@@ -13,6 +13,7 @@ python:
     - pandas
     - torch
     - xxhash
+  lock_packages: false
 envs:
   - name: UV_EXTRA_INDEX_URL
     value: https://download.pytorch.org/whl/cpu

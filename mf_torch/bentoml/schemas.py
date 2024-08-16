@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Self
 
-from docarray import BaseDoc
+from docarray.base_doc.doc import BaseDocWithoutId
 from docarray.typing import NdArray  # noqa: TCH002
 
 from mf_torch.params import (
@@ -13,15 +13,14 @@ from mf_torch.params import (
 )
 
 
-class Query(BaseDoc):
-    idx: int
+class Query(BaseDocWithoutId):
     feature_values: list[str]
     feature_hashes: NdArray
     feature_weights: NdArray
     embedding: NdArray | None = None
 
 
-class ItemQuery(BaseDoc):
+class ItemQuery(BaseDocWithoutId):
     movie_id: int | None = None
     title: str | None = None
     genres: list[str] | None = None
@@ -35,18 +34,14 @@ class ItemQuery(BaseDoc):
         return Query.model_validate(query_dict)
 
 
-class ItemCandidate(ItemQuery):
+class ItemCandidate(Query, ItemQuery):
     movie_id: int
     title: str
     genres: list[str]
-    feature_values: list[str] = None
-    feature_hashes: NdArray = None
-    feature_weights: NdArray = None
-    embedding: NdArray = None
     score: float | None = None
 
 
-class UserQuery(BaseDoc):
+class UserQuery(BaseDocWithoutId):
     user_id: int | None = None
     gender: str | None = None
     age: int | None = None

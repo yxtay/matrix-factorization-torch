@@ -85,23 +85,22 @@ def process_features(
         num_hashes=num_hashes,
         num_embeddings=num_embeddings,
     )
-    return {
-        **row,
-        f"{prefix}idx": xxhash.xxh32_intdigest(str(row[idx])),
-        f"{prefix}feature_values": feature_values,
-        f"{prefix}feature_hashes": feature_hashes,
-        f"{prefix}feature_weights": feature_weights,
+    processed = {
+        "idx": xxhash.xxh32_intdigest(str(row[idx])),
+        "feature_values": feature_values,
+        "feature_hashes": feature_hashes,
+        "feature_weights": feature_weights,
     }
+    row.update({f"{prefix}{key}": value for key, value in processed.items()})
+    return row
 
 
 def score_interactions(
     row: dict, *, label: str = "label", weight: str = "weight"
 ) -> dict:
-    return {
-        **row,
-        "label": row[label] or 0,
-        "weight": abs(row[weight] or 0),
-    }
+    row["label"] = row[label] or 0
+    row["weight"] = abs(row[weight] or 0)
+    return row
 
 
 def select_fields(row: dict, *, fields: list[str]) -> dict:

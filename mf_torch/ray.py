@@ -86,20 +86,24 @@ def train_loop_per_worker(
     import numpy as np
     import ray.train.lightning as ray_lightning
 
-    config = {
-        key: value.item() if isinstance(value, np.generic) else value
-        for key, value in config.items()
-    }
-
     ckpt_path = None
     if checkpoint := ray.train.get_checkpoint():
         checkpoint_name = ray_lightning.RayTrainReportCallback.CHECKPOINT_NAME
         with checkpoint.as_directory() as ckpt_dir:
             ckpt_path = Path(ckpt_dir, checkpoint_name)
 
+    config = {
+        key: value.item() if isinstance(value, np.generic) else value
+        for key, value in config.items()
+    }
+
     cli = get_cli(config)
     trainer: Trainer = ray_lightning.prepare_trainer(cli.trainer)
-    trainer.fit(cli.model, datamodule=cli.datamodule, ckpt_path=ckpt_path)
+    try:
+        trainer.fit(cli.model, datamodule=cli.datamodule, ckpt_path=ckpt_path)
+    except SystemExit:
+        for logger in trainer.loggers:
+            logger.finalize()
 
 
 def get_run_config() -> ray.train.RunConfig:
@@ -158,6 +162,7 @@ def get_ray_trainer() -> ray_torch.TorchTrainer:
 
 def get_tuner() -> ray.tune.Tuner:
     import flaml
+    import ray.tune.schedulers
 
     search_space = {
         # "num_hashes": ray.tune.randint(1, 5),
@@ -192,15 +197,13 @@ def get_tuner() -> ray.tune.Tuner:
     search_alg = flaml.BlendSearch(
         low_cost_partial_config={"train_loop_config": low_cost_partial_config},
         points_to_evaluate=[{"train_loop_config": point_to_evaluate}],
-        resource_attr="limit_train_batches",
-        min_resource=0.125,
-        max_resource=1.0,
-        reduction_factor=2,
     )
+    scheduler = ray.tune.schedulers.AsyncHyperBandScheduler()
     tune_config = ray.tune.TuneConfig(
         metric=METRIC["name"],
         mode=METRIC["mode"],
         search_alg=search_alg,
+        scheduler=scheduler,
         num_samples=-1,
         time_budget_s=60 * 60 * 10,
         max_concurrent_trials=1,
