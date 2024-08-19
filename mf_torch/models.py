@@ -13,7 +13,7 @@ class MatrixFactorization(torch.nn.Module):
         self: Self, *, embedder: torch.nn.Module, normalize: bool = True
     ) -> None:
         super().__init__()
-        self.embedder = torch.jit.script(embedder)
+        self.embedder = embedder
         self.normalize = normalize
         self.sparse = self.embedder.sparse
 

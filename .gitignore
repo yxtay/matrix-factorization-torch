@@ -164,4 +164,4 @@ data.lock
 /lightning_logs
 /mlruns
 /ray_results
-/lancedb
+/lance_db

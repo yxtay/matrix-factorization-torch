@@ -61,7 +61,7 @@ class MatrixFactorizationDataModule(LightningDataModule):
             )
             return load_dense_movielens(self.hparams.data_dir, overwrite=overwrite)
 
-    def get_raw_items_data(self: Self) -> str:
+    def get_raw_items_data(self: Self) -> torch_data.IterDataPipe:
         delta_path = Path(self.hparams.data_dir, "ml-1m", "movies.delta")
         return torch_datapipes.iter.IterableWrapper(
             [delta_path]
@@ -69,7 +69,7 @@ class MatrixFactorizationDataModule(LightningDataModule):
 
     def get_items_dataset(
         self: Self, *, cycle_count: int | None = 1, prefix: str = "item_"
-    ) -> torch_data.Dataset:
+    ) -> torch_data.IterDataPipe:
         from mf_torch.data.load import process_features
 
         return (
@@ -89,7 +89,7 @@ class MatrixFactorizationDataModule(LightningDataModule):
             )
         )
 
-    def get_raw_data(self: Self, subset: str) -> torch_data.Dataset:
+    def get_raw_data(self: Self, subset: str) -> torch_data.IterDataPipe:
         import pyarrow.dataset as ds
 
         from mf_torch.data.load import score_interactions
@@ -121,7 +121,7 @@ class MatrixFactorizationDataModule(LightningDataModule):
             .map(partial(score_interactions, label=self.label, weight=self.weight))
         )
 
-    def get_dataset(self: Self, subset: str) -> torch_data.Dataset:
+    def get_dataset(self: Self, subset: str) -> torch_data.IterDataPipe:
         from mf_torch.data.load import merge_rows, process_features, select_fields
 
         fields = [

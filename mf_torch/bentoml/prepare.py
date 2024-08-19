@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import partial
 from typing import TYPE_CHECKING
 
 import torch
@@ -8,15 +9,18 @@ from docarray import DocList
 from mf_torch.bentoml.schemas import ItemCandidate, Query
 from mf_torch.params import (
     CHECKPOINT_PATH,
+    EXPORTED_PROGRAM_PATH,
     ITEMS_TABLE_NAME,
     LANCE_DB_PATH,
     MODEL_NAME,
     PADDING_IDX,
-    SCRIPT_MODULE_PATH,
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     import lancedb.table
+    import pandas as pd
     from lightning import Trainer
 
     from mf_torch.lightning import MatrixFactorizationLitModule
@@ -24,7 +28,7 @@ if TYPE_CHECKING:
 
 def load_args(ckpt_path: str | None) -> dict:
     if not ckpt_path:
-        return {}
+        return {"model": {}, "data": {}}
 
     checkpoint = torch.load(ckpt_path)
     model_args = checkpoint["hyper_parameters"]
@@ -64,14 +68,15 @@ def prepare_trainer(ckpt_path: str | None = None) -> Trainer:
     return cli.trainer
 
 
-def prepare_items(ckpt_path: str | None = None) -> DocList[ItemCandidate]:
-    from mf_torch.data.lightning import MatrixFactorizationDataModule
-
-    data_args = load_args(ckpt_path)["data"]
-    datamodule = MatrixFactorizationDataModule(**data_args)
-    items_dataset = datamodule.get_items_dataset(prefix="")
-    return DocList[ItemCandidate](
-        ItemCandidate.model_validate(item) for item in items_dataset
+def prepare_items(trainer: Trainer) -> Iterable[pd.DataFrame]:
+    datamodule = trainer.datamodule
+    return (
+        trainer.datamodule.get_items_dataset(prefix="")
+        .map(ItemCandidate.model_validate)
+        .batch(datamodule.hparams.batch_size)
+        .map(DocList[ItemCandidate])
+        .map(partial(embed_queries, model=trainer.model.original_model))
+        .map(DocList[ItemCandidate].to_dataframe)
     )
 
 
@@ -92,15 +97,20 @@ def embed_queries(
 
 
 def index_items(
-    items: DocList[ItemCandidate], lance_db_path: str = LANCE_DB_PATH
+    items: Iterable[pd.DataFrame], lance_db_path: str = LANCE_DB_PATH
 ) -> lancedb.table.LanceTable:
     import datetime
 
     import lancedb
     from lancedb.pydantic import LanceModel, Vector
 
-    embedding_dim = items[0].embedding.shape[-1]
-    num_partitions = int(len(items) ** 0.5)
+    iterator = iter(items)
+    batch = next(iterator)
+
+    num_items = len(items) * len(batch)
+    embedding_dim = batch.iloc[0, batch.columns.get_loc("embedding")].shape[-1]
+
+    num_partitions = int(num_items**0.5)
     num_sub_vectors = embedding_dim // 8
 
     class ItemSchema(ItemCandidate, LanceModel):
@@ -111,10 +121,11 @@ def index_items(
     db = lancedb.connect(lance_db_path)
     table = db.create_table(
         ITEMS_TABLE_NAME,
-        data=items.to_dataframe(),
+        data=batch,
         schema=ItemSchema,
         mode="overwrite",
     )
+    table.add(iterator)
     table.create_index(
         metric="cosine",
         num_partitions=num_partitions,
@@ -134,7 +145,7 @@ def save_model(trainer: Trainer) -> None:
     with bentoml.models.create(MODEL_NAME) as model_ref:
         shutil.copytree(LANCE_DB_PATH, model_ref.path_of(LANCE_DB_PATH))
         trainer.save_checkpoint(model_ref.path_of(CHECKPOINT_PATH))
-        trainer.model.save_torchscript(model_ref.path_of(SCRIPT_MODULE_PATH))
+        trainer.model.export_dynamo(model_ref.path_of(EXPORTED_PROGRAM_PATH))
 
 
 def load_indexed_items() -> DocList[ItemCandidate]:
@@ -149,8 +160,7 @@ def load_indexed_items() -> DocList[ItemCandidate]:
 
 def main(ckpt_path: str | None) -> None:
     trainer = prepare_trainer(ckpt_path)
-    items = prepare_items(ckpt_path)
-    items = embed_queries(queries=items, model=trainer.model)
+    items = prepare_items(trainer)
     index_items(items=items)
     save_model(trainer=trainer)
 
