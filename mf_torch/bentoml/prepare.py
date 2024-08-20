@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     import pandas as pd
     from lightning import Trainer
 
+    from mf_torch.data.lightning import MatrixFactorizationDataModule
     from mf_torch.lightning import MatrixFactorizationLitModule
 
 
@@ -69,13 +70,13 @@ def prepare_trainer(ckpt_path: str | None = None) -> Trainer:
 
 
 def prepare_items(trainer: Trainer) -> Iterable[pd.DataFrame]:
-    datamodule = trainer.datamodule
+    datamodule: MatrixFactorizationDataModule = trainer.datamodule
     return (
-        trainer.datamodule.get_items_dataset(prefix="")
+        datamodule.get_items_dataset(prefix="")
         .map(ItemCandidate.model_validate)
         .batch(datamodule.hparams.batch_size)
         .map(DocList[ItemCandidate])
-        .map(partial(embed_queries, model=trainer.model.original_model))
+        .map(partial(embed_queries, model=trainer.model.model))
         .map(DocList[ItemCandidate].to_dataframe)
     )
 
@@ -104,9 +105,7 @@ def index_items(
     import lancedb
     from lancedb.pydantic import LanceModel, Vector
 
-    iterator = iter(items)
-    batch = next(iterator)
-
+    batch = next(iter(items))
     num_items = len(items) * len(batch)
     embedding_dim = batch.iloc[0, batch.columns.get_loc("embedding")].shape[-1]
 
@@ -121,11 +120,10 @@ def index_items(
     db = lancedb.connect(lance_db_path)
     table = db.create_table(
         ITEMS_TABLE_NAME,
-        data=batch,
+        data=iter(items),
         schema=ItemSchema,
         mode="overwrite",
     )
-    table.add(iterator)
     table.create_index(
         metric="cosine",
         num_partitions=num_partitions,

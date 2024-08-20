@@ -227,6 +227,7 @@ class MatrixFactorizationLitModule(LightningModule):
     def configure_model(self: Self) -> None:
         if self.model is None:
             self.model = self.get_model()
+            self.compile()
         if self.metrics is None:
             self.metrics = self.get_metrics(top_k=20)
 
@@ -260,14 +261,9 @@ class MatrixFactorizationLitModule(LightningModule):
             max_norm=self.hparams.get("max_norm"),
             norm_type=self.hparams.norm_type,
         )
-        model = mf_models.MatrixFactorization(
+        return mf_models.MatrixFactorization(
             embedder=embedder, normalize=self.hparams.normalize
         )
-        return torch.compile(model)
-
-    @property
-    def original_model(self) -> torch.nn.Module:
-        return getattr(self.model, "_orig_mod", self.model)
 
     @cached_property
     def loss_fns(self: Self) -> torch.nn.ModuleList:
@@ -318,7 +314,7 @@ class MatrixFactorizationLitModule(LightningModule):
     def export_torchscript(
         self: Self, path: str | None = None
     ) -> torch.jit.ScriptModule:
-        script_module = torch.jit.script(self.original_model.eval())
+        script_module = torch.jit.script(self.model.eval())
 
         if path is None:
             path = Path(self.trainer.log_dir) / SCRIPT_MODULE_PATH
@@ -335,7 +331,7 @@ class MatrixFactorizationLitModule(LightningModule):
             "feature_weights": (batch, features),
         }
         exported_program = torch.export.export(
-            self.original_model.eval(),
+            self.model.eval(),
             self.example_input_array,
             dynamic_shapes=dynamic_shapes,
         )
@@ -447,7 +443,5 @@ def cli_main(
 
 
 if __name__ == "__main__":
-    # cli_main()
-    cli = cli_main(
-        args={"fit": {"trainer": {"logger": None, "overfit_batches": 1}}},
-    )
+    cli_main()
+    # cli = cli_main(args={"fit": {"trainer": {"overfit_batches": 1}}})
