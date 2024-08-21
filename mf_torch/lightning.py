@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import cached_property
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import lightning.pytorch.callbacks as lp_callbacks
@@ -10,7 +11,13 @@ from lightning import LightningModule
 from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
 from lightning.pytorch.utilities.rank_zero import rank_zero_only
 
-from mf_torch.params import EMBEDDING_DIM, METRIC, NUM_EMBEDDINGS
+from mf_torch.params import (
+    EMBEDDING_DIM,
+    EXPORTED_PROGRAM_PATH,
+    METRIC,
+    NUM_EMBEDDINGS,
+    SCRIPT_MODULE_PATH,
+)
 
 if TYPE_CHECKING:
     from typing import Self
@@ -192,16 +199,15 @@ class MatrixFactorizationLitModule(LightningModule):
     ) -> torch.Tensor:
         return self.score(batch)
 
-    @rank_zero_only
     def on_train_start(self: Self) -> None:
         params = {**self.hparams, **self.trainer.datamodule.hparams}
-        metrics = {key: 0.0 for key in self.metrics["val"]}
+        metrics = {
+            key: self.trainer.callback_metrics.get(key, 0.0)
+            for key in self.metrics["val"]
+        }
         for logger in self.loggers:
             if isinstance(logger, lp_loggers.TensorBoardLogger):
                 logger.log_hyperparams(params=params, metrics=metrics)
-                logger.log_graph(self)
-            else:
-                logger.log_hyperparams(params=params)
 
     def configure_optimizers(self: Self) -> torch.optim.Optimizer:
         optimizer_class = (
@@ -221,6 +227,7 @@ class MatrixFactorizationLitModule(LightningModule):
     def configure_model(self: Self) -> None:
         if self.model is None:
             self.model = self.get_model()
+            self.compile()
         if self.metrics is None:
             self.metrics = self.get_metrics(top_k=20)
 
@@ -254,10 +261,9 @@ class MatrixFactorizationLitModule(LightningModule):
             max_norm=self.hparams.get("max_norm"),
             norm_type=self.hparams.norm_type,
         )
-        model = mf_models.MatrixFactorization(
+        return mf_models.MatrixFactorization(
             embedder=embedder, normalize=self.hparams.normalize
         )
-        return torch.jit.script(model)
 
     @cached_property
     def loss_fns(self: Self) -> torch.nn.ModuleList:
@@ -301,14 +307,54 @@ class MatrixFactorizationLitModule(LightningModule):
     @property
     def example_input_array(self: Self) -> tuple[torch.Tensor, torch.Tensor]:
         return (
-            torch.zeros((1, 1), dtype=torch.int, device=self.device),
-            torch.zeros((1, 1), dtype=self.dtype, device=self.device),
+            torch.zeros((2, 2), dtype=torch.int, device=self.device),
+            torch.zeros((2, 2), dtype=self.dtype, device=self.device),
         )
 
-    def save_torchscript(self: Self, path: str) -> torch.jit.ScriptModule:
+    def export_torchscript(
+        self: Self, path: str | None = None
+    ) -> torch.jit.ScriptModule:
         script_module = torch.jit.script(self.model.eval())
+
+        if path is None:
+            path = Path(self.trainer.log_dir) / SCRIPT_MODULE_PATH
         torch.jit.save(script_module, path)
         return script_module
+
+    def export_dynamo(
+        self: Self, path: str | None = None
+    ) -> torch.export.ExportedProgram:
+        batch = torch.export.Dim("batch")
+        features = torch.export.Dim("features")
+        dynamic_shapes = {
+            "feature_hashes": (batch, features),
+            "feature_weights": (batch, features),
+        }
+        exported_program = torch.export.export(
+            self.model.eval(),
+            self.example_input_array,
+            dynamic_shapes=dynamic_shapes,
+        )
+
+        if path is None:
+            path = Path(self.trainer.log_dir) / EXPORTED_PROGRAM_PATH
+        torch.export.save(exported_program, path)
+        return exported_program
+
+    def export_dynamo_onnx(
+        self: Self, path: str | None = None
+    ) -> torch.onnx.ONNXProgram:
+        model = self.export_dynamo().module()
+
+        export_options = torch.onnx.ExportOptions(dynamic_shapes=True)
+        onnx_program = torch.onnx.dynamo_export(
+            model, *self.example_input_array, export_options=export_options
+        )
+
+        if path is None:
+            path = Path(self.trainer.log_dir) / "program.onnx"
+        onnx_program.save(path)
+        return onnx_program
 
 
 class LoggerSaveConfigCallback(SaveConfigCallback):
@@ -317,7 +363,6 @@ class LoggerSaveConfigCallback(SaveConfigCallback):
         self, trainer: Trainer, pl_module: LightningModule, stage: str
     ) -> None:
         import tempfile
-        from pathlib import Path
 
         for logger in trainer.loggers:
             if isinstance(logger, lp_loggers.MLFlowLogger):
@@ -366,7 +411,7 @@ def cli_main(
             "save_dir": TENSORBOARD_DIR,
             "name": experiment_name,
             "version": run_name,
-            "log_graph": True,
+            # "log_graph": True,
             "default_hp_metric": False,
         },
     }
@@ -399,4 +444,4 @@ def cli_main(
 
 if __name__ == "__main__":
     cli_main()
-    # cli_main(args={"fit": {"trainer": {"overfit_batches": 1}}})
+    # cli = cli_main(args={"fit": {"trainer": {"overfit_batches": 1}}})

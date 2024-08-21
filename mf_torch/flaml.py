@@ -11,9 +11,9 @@ if TYPE_CHECKING:
 def get_lightning_args(
     config: dict[str, bool | float | int | str],
 ) -> dict[str, bool | float | int | str]:
-    num_embeddings = 2 ** config["num_embeddings_exp"] + 1
-    embedding_dim = 2 ** config["embedding_dim_exp"]
-    num_heads = 2 ** config["num_heads_exp"]
+    num_embeddings = 2 ** config["log_num_embeddings"] + 1
+    embedding_dim = 2 ** config["log_embedding_dim"]
+    # num_heads = 2 ** config["log_num_heads"]
 
     hard_negatives_ratio = (
         config["hard_negatives_ratio"] if config["use_hard_negatives"] else None
@@ -23,9 +23,9 @@ def get_lightning_args(
         "num_embeddings": num_embeddings,
         "embedding_dim": embedding_dim,
         "train_loss": config["train_loss"],
-        "embedder_type": config["embedder_type"],
-        "num_heads": num_heads,
-        "dropout": config["dropout"],
+        # "embedder_type": config["embedder_type"],
+        # "num_heads": num_heads,
+        # "dropout": config["dropout"],
         "hard_negatives_ratio": hard_negatives_ratio,
         "learning_rate": config["learning_rate"],
     }
@@ -71,23 +71,24 @@ def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
     ]
     config = {
         "num_hashes": flaml.tune.randint(1, 5),
-        "num_embeddings_exp": flaml.tune.randint(12, 21),
-        "embedding_dim_exp": flaml.tune.randint(5, 9),
-        "embedder_type": flaml.tune.choice([None, "attention", "transformer"]),
-        "num_heads_exp": flaml.tune.randint(0, 3),
-        "dropout": flaml.tune.quniform(0.0, 0.5, 0.01),
+        "log_num_embeddings": flaml.tune.randint(12, 21),
+        "log_embedding_dim": flaml.tune.randint(5, 9),
+        # "embedder_type": flaml.tune.choice([None, "attention", "transformer"]),
+        # "log_num_heads": flaml.tune.randint(0, 3),
+        # "dropout": flaml.tune.quniform(0.0, 0.5, 0.01),
         "train_loss": flaml.tune.choice(train_losses),
         "use_hard_negatives": flaml.tune.choice([True, False]),
         "hard_negatives_ratio": flaml.tune.quniform(0.5, 2.0, 0.01),
         "learning_rate": flaml.tune.qloguniform(0.001, 0.1, 0.001),
     }
+    low_cost_partial_config = {}
     point_to_evaluate = {
         "num_hashes": 2,
-        "num_embeddings_exp": 16,
-        "embedding_dim_exp": 5,
-        "embedder_type": None,
-        "num_heads_exp": 0,
-        "dropout": 0.0,
+        "log_num_embeddings": 16,
+        "log_embedding_dim": 5,
+        # "embedder_type": None,
+        # "log_num_heads": 0,
+        # "dropout": 0.0,
         "train_loss": "PairwiseHingeLoss",
         "use_hard_negatives": False,
         "hard_negatives_ratio": 1.0,
@@ -98,11 +99,12 @@ def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
         metric=METRIC["name"],
         mode=METRIC["mode"],
         config=config,
+        low_cost_partial_config=low_cost_partial_config,
         points_to_evaluate=[point_to_evaluate],
-        time_budget_s=60 * 60 * 9,
+        time_budget_s=60 * 60 * 1,
         num_samples=-1,
         resource_attr="limit_train_batches",
-        min_resource=0.125,
+        min_resource=0.25,
         max_resource=1.0,
         reduction_factor=2,
     )

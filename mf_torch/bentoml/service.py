@@ -10,10 +10,10 @@ from mf_torch.bentoml.prepare import embed_queries, load_args
 from mf_torch.bentoml.schemas import ItemCandidate, ItemQuery, Query, UserQuery
 from mf_torch.params import (
     CHECKPOINT_PATH,
+    EXPORTED_PROGRAM_PATH,
     ITEMS_TABLE_NAME,
     LANCE_DB_PATH,
     MODEL_NAME,
-    SCRIPT_MODULE_PATH,
 )
 
 
@@ -23,8 +23,8 @@ class Embedder:
 
     @logger.catch(reraise=True)
     def __init__(self: Self) -> None:
-        path = self.model_ref.path_of(SCRIPT_MODULE_PATH)
-        self.model = torch.jit.load(path)
+        path = self.model_ref.path_of(EXPORTED_PROGRAM_PATH)
+        self.model = torch.export.load(path).module()
         logger.info("model loaded: {}", path)
 
     @bentoml.api(batchable=True)
