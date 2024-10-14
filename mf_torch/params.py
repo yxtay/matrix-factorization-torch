@@ -6,9 +6,15 @@ MLFLOW_DIR = "mlruns"
 
 # data
 USER_IDX = "user_id"
-USER_FEATURE_NAMES = ["user_id", "gender", "age", "occupation", "zipcode"]
+USER_FEATURE_NAMES = {
+    "user_id": "user_id",
+    "gender": "gender",
+    "age": "age",
+    "occupation": "occupation",
+    "zipcode": "zipcode",
+}
 ITEM_IDX = "movie_id"
-ITEM_FEATURE_NAMES = ["movie_id", "genres"]
+ITEM_FEATURE_NAMES = {"movie_id": "movie_id", "genres": "genres"}
 
 # model
 NUM_HASHES = 2

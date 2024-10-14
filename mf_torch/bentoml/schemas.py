@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from typing import Self
+from typing import TYPE_CHECKING, Self
 
-from docarray.base_doc.doc import BaseDocWithoutId
-from docarray.typing import NdArray  # noqa: TCH002
+from pydantic import BaseModel
 
 from mf_torch.params import (
     ITEM_FEATURE_NAMES,
@@ -12,15 +11,18 @@ from mf_torch.params import (
     USER_IDX,
 )
 
+if TYPE_CHECKING:
+    from numpydantic import NDArray, Shape
 
-class Query(BaseDocWithoutId):
+
+class Query(BaseModel):
     feature_values: list[str]
-    feature_hashes: NdArray
-    feature_weights: NdArray
-    embedding: NdArray | None = None
+    feature_hashes: NDArray[Shape["*"], int]
+    feature_weights: NDArray[Shape["*"], float]
+    embedding: NDArray[Shape["*"], float] | None = None
 
 
-class ItemQuery(BaseDocWithoutId):
+class ItemQuery(BaseModel):
     movie_id: int | None = None
     title: str | None = None
     genres: list[str] | None = None
@@ -41,7 +43,7 @@ class ItemCandidate(Query, ItemQuery):
     score: float | None = None
 
 
-class UserQuery(BaseDocWithoutId):
+class UserQuery(BaseModel):
     user_id: int | None = None
     gender: str | None = None
     age: int | None = None

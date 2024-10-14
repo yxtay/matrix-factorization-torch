@@ -37,7 +37,6 @@ class MatrixFactorization(torch.nn.Module):
     ) -> torch.Tensor:
         return self.embed(feature_hashes, feature_weights)
 
-    @torch.jit.export
     def score(
         self: Self,
         user_feature_hashes: torch.Tensor,
@@ -52,7 +51,6 @@ class MatrixFactorization(torch.nn.Module):
         # output shape: (batch_size)
         return (user_embed * item_embed).sum(-1)
 
-    @torch.jit.export
     def score_full(
         self: Self,
         user_feature_hashes: torch.Tensor,

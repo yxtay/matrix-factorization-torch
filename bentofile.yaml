@@ -1,15 +1,13 @@
 service: mf_torch.bentoml.service:Service
-name: mf-torch
+name: mf_torch
 include:
   - "**/*.py"
-models:
-  - mf-torch
 python:
   packages:
     - bentoml
-    - docarray
     - lancedb
     - loguru
+    - numpydantic
     - pandas
     - torch
     - xxhash
