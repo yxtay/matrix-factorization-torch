@@ -183,14 +183,10 @@ class MatrixFactorizationLitModule(LightningModule):
     def validation_step(
         self: Self, batch: dict[str, torch.Tensor], batch_idx: int
     ) -> None:
-        losses = self.compute_losses(batch, step_name="val")
-        self.log_dict(losses, sync_dist=True)
         metrics = self.update_metrics(batch, step_name="val")
         self.log_dict(metrics)
 
     def test_step(self: Self, batch: dict[str, torch.Tensor], batch_idx: int) -> None:
-        losses = self.compute_losses(batch, step_name="test")
-        self.log_dict(losses, sync_dist=True)
         metrics = self.update_metrics(batch, step_name="test")
         self.log_dict(metrics)
 
@@ -200,7 +196,7 @@ class MatrixFactorizationLitModule(LightningModule):
         return self.score(batch)
 
     def on_train_start(self: Self) -> None:
-        params = {**self.hparams, **self.trainer.datamodule.hparams}
+        params = self.hparams | self.trainer.datamodule.hparams
         metrics = {
             key: self.trainer.callback_metrics.get(key, 0.0)
             for key in self.metrics["val"]

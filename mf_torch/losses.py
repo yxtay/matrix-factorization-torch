@@ -10,7 +10,7 @@ import torch.nn.functional as F
 def squared_distance(
     query_embed: torch.Tensor, candidate_embed: torch.Tensor
 ) -> torch.Tensor:
-    return F.pairwise_distance(query_embed, candidate_embed) ** 2 / 2
+    return torch.cdist(query_embed, candidate_embed) ** 2 / 2
 
 
 def weighted_mean(
@@ -142,7 +142,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         sample_weight: torch.Tensor,
     ) -> torch.Tensor:
         batch_size = user_embed.size(0)
-        loss = squared_distance(user_embed, item_embed[:batch_size]) * label
+        loss = squared_distance(user_embed, item_embed[:batch_size]).diag() * label
         # shape: (batch_size)
         return weighted_mean(loss, sample_weight)
 
@@ -154,7 +154,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         hard_negatives_ratio: float | None = None,
         sigma: float = 1.0,
     ) -> torch.Tensor:
-        sq_distances = squared_distance(embed[:, None, :], embed[None, :, :])
+        sq_distances = squared_distance(embed, embed)
         # shape: (batch_size, num_items)
         losses = sq_distances * -sigma
         # shape: (batch_size, num_items)
@@ -185,7 +185,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         sigma: float = 1.0,
         margin: float = 1.0,
     ) -> torch.Tensor:
-        sq_distances = squared_distance(user_embed[:, None, :], item_embed[None, :, :])
+        sq_distances = squared_distance(user_embed, item_embed)
         # shape: (batch_size, num_items)
         losses = (margin - sq_distances * sigma).relu()
         # shape: (batch_size, num_items)
@@ -213,7 +213,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         hard_negatives_ratio: float | None = None,
         sigma: float = 1.0,
     ) -> torch.Tensor:
-        sq_distances = squared_distance(user_embed[:, None, :], item_embed[None, :, :])
+        sq_distances = squared_distance(user_embed, item_embed)
         # shape: (batch_size, num_items)
         losses = sq_distances * label[:, None] * -sigma
         # shape: (batch_size, num_items)
@@ -247,7 +247,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         hard_negatives_ratio: float | None = None,
         sigma: float = 1.0,
     ) -> torch.Tensor:
-        sq_distances = squared_distance(user_embed[:, None, :], item_embed[None, :, :])
+        sq_distances = squared_distance(user_embed, item_embed)
         # shape: (batch_size, num_items)
         losses = sq_distances * label[:, None] * -sigma
         # shape: (batch_size, num_items)
@@ -477,10 +477,7 @@ class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
         sigma: float = 1.0,
         margin: float = 1.0,
     ) -> torch.Tensor:
-        sq_distances = (
-            squared_distance(user_embed[:, None, :], item_embed[None, :, :])
-            * label[:, None]
-        )
+        sq_distances = squared_distance(user_embed, item_embed) * label[:, None]
         # shape: (batch_size, num_items)
         distances_diff = sq_distances - sq_distances.diag()[:, None]
         # shape: (batch_size, num_items)
