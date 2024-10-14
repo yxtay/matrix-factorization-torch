@@ -4,7 +4,6 @@ from functools import partial
 from typing import TYPE_CHECKING
 
 import torch
-from docarray import DocList
 
 from mf_torch.bentoml.schemas import ItemCandidate, Query
 from mf_torch.params import (
@@ -13,14 +12,12 @@ from mf_torch.params import (
     ITEMS_TABLE_NAME,
     LANCE_DB_PATH,
     MODEL_NAME,
-    PADDING_IDX,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     import lancedb.table
-    import pandas as pd
     from lightning import Trainer
 
     from mf_torch.data.lightning import MatrixFactorizationDataModule
@@ -69,36 +66,27 @@ def prepare_trainer(ckpt_path: str | None = None) -> Trainer:
     return cli.trainer
 
 
-def prepare_items(trainer: Trainer) -> Iterable[pd.DataFrame]:
+def prepare_items(trainer: Trainer) -> Iterable[list[dict]]:
     datamodule: MatrixFactorizationDataModule = trainer.datamodule
     return (
         datamodule.get_items_dataset(prefix="")
         .map(ItemCandidate.model_validate)
+        .map(partial(embed_query, model=trainer.model.model))
+        .map(ItemCandidate.model_dump)
         .batch(datamodule.hparams.batch_size)
-        .map(DocList[ItemCandidate])
-        .map(partial(embed_queries, model=trainer.model.model))
-        .map(DocList[ItemCandidate].to_dataframe)
     )
 
 
-def embed_queries(
-    queries: DocList[Query], model: MatrixFactorizationLitModule
-) -> DocList[ItemCandidate]:
+def embed_query(query: Query, model: MatrixFactorizationLitModule) -> ItemCandidate:
     with torch.inference_mode():
-        feature_hashes = torch.nested.nested_tensor(
-            queries.feature_hashes
-        ).to_padded_tensor(padding=PADDING_IDX)
-        feature_weights = torch.nested.nested_tensor(
-            queries.feature_weights
-        ).to_padded_tensor(padding=PADDING_IDX)
-
-        embeddings = model(feature_hashes, feature_weights)
-        queries.embedding = list(embeddings)
-    return queries
+        feature_hashes = torch.as_tensor(query.feature_hashes).unsqueeze(0)
+        feature_weights = torch.as_tensor(query.feature_weights).unsqueeze(0)
+        query.embedding = model(feature_hashes, feature_weights).squeeze(0).numpy()
+    return query
 
 
 def index_items(
-    items: Iterable[pd.DataFrame], lance_db_path: str = LANCE_DB_PATH
+    items: Iterable[list[dict]], lance_db_path: str = LANCE_DB_PATH
 ) -> lancedb.table.LanceTable:
     import datetime
 
@@ -107,7 +95,7 @@ def index_items(
 
     batch = next(iter(items))
     num_items = len(items) * len(batch)
-    embedding_dim = batch.iloc[0, batch.columns.get_loc("embedding")].shape[-1]
+    (embedding_dim,) = batch[0]["embedding"].shape
 
     num_partitions = int(num_items**0.5)
     num_sub_vectors = embedding_dim // 8
@@ -146,7 +134,7 @@ def save_model(trainer: Trainer) -> None:
         trainer.model.export_dynamo(model_ref.path_of(EXPORTED_PROGRAM_PATH))
 
 
-def load_indexed_items() -> DocList[ItemCandidate]:
+def load_indexed_items() -> list[ItemCandidate]:
     import bentoml
     import lancedb
     from pydantic import TypeAdapter

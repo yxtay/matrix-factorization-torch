@@ -6,7 +6,7 @@ import bentoml
 import torch
 from loguru import logger
 
-from mf_torch.bentoml.prepare import embed_queries, load_args
+from mf_torch.bentoml.prepare import embed_query, load_args
 from mf_torch.bentoml.schemas import ItemCandidate, ItemQuery, Query, UserQuery
 from mf_torch.params import (
     CHECKPOINT_PATH,
@@ -27,13 +27,10 @@ class Embedder:
         self.model = torch.export.load(path).module()
         logger.info("model loaded: {}", path)
 
-    @bentoml.api(batchable=True)
+    @bentoml.api()
     @logger.catch(reraise=True)
-    def embed(self: Self, queries: list[Query]) -> list[Query]:
-        from docarray import DocList
-
-        queries = DocList[Query](queries)
-        return embed_queries(queries=queries, model=self.model)
+    def embed(self: Self, query: Query) -> Query:
+        return embed_query(query=query, model=self.model)
 
 
 @bentoml.service()
@@ -90,10 +87,10 @@ class Service:
         self.num_hashes = args["data"]["num_hashes"]
         self.num_embeddings = args["data"]["num_embeddings"]
 
-    @bentoml.api(batchable=True)
+    @bentoml.api()
     @logger.catch(reraise=True)
-    async def embed_queries(self: Self, queries: list[Query]) -> list[Query]:
-        return await self.embedder.to_async.embed(queries)
+    async def embed_query(self: Self, query: Query) -> Query:
+        return await self.embedder.to_async.embed(query)
 
     @bentoml.api()
     @logger.catch(reraise=True)
@@ -103,8 +100,8 @@ class Service:
     @bentoml.api()
     @logger.catch(reraise=True)
     async def recommend_with_query(self: Self, query: Query) -> list[ItemCandidate]:
-        queries = await self.embed_queries([query])
-        return await self.search_items(queries[0])
+        query = await self.embed_query(query)
+        return await self.search_items(query)
 
     @bentoml.api()
     @logger.catch(reraise=True)

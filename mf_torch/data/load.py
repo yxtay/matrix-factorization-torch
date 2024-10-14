@@ -16,34 +16,38 @@ if TYPE_CHECKING:
 
 
 def collate_features(
-    value: None | str | float | dict | list, key: str = ""
+    value: None | str | int | dict | list,
+    key: str = "",
+    feature_names: dict[str, str] | None = None,
 ) -> tuple[list[str], torch.Tensor]:
     import itertools
 
+    if feature_names is None:
+        feature_names = {}
     if value is None:
         # ignore null values
         return [], torch.zeros(0)
 
     if isinstance(value, (str | int)):
         # category feature
-        return [f"{key}:{value}"], torch.ones(1)
-
-    if isinstance(value, float):
-        # float feature
-        return [key], torch.as_tensor([value])
+        return [f"{key}:{value}".lower()], torch.ones(1)
 
     if isinstance(value, list):
         # list feature, potentially nested
-        values, weights = zip(*[collate_features(v, key) for v in value])
+        values, weights = zip(*[collate_features(v, key, feature_names) for v in value])
     elif isinstance(value, dict):
         # nested feature
         key_fmt = f"{key}:{{}}" if key else "{}"
         values, weights = zip(
-            *[collate_features(v, key_fmt.format(k)) for k, v in value.items()]
+            *[
+                collate_features(v, key_fmt.format(feature_names[k]), feature_names)
+                for k, v in value.items()
+            ]
         )
 
+    num_values = sum(len(val) > 0 for val in values)
     values = list(itertools.chain(*values))
-    weights = torch.concatenate(weights) / len(value)
+    weights = torch.concatenate(weights) / num_values
     return values, weights
 
 
@@ -78,7 +82,9 @@ def process_features(
     import xxhash
 
     features = select_fields(row, fields=feature_names)
-    feature_values, feature_weights = collate_features(features)
+    feature_values, feature_weights = collate_features(
+        features, feature_names=feature_names
+    )
     feature_hashes, feature_weights = hash_features(
         feature_values,
         feature_weights,
@@ -110,8 +116,14 @@ def select_fields(row: dict, *, fields: list[str]) -> dict:
 def merge_rows(rows: Iterable[dict]) -> dict:
     new_row = {}
     for row in rows:
-        new_row = {**new_row, **row}
+        new_row |= row
     return new_row
+
+
+def pad_jagged_tensors(
+    tensors: list[torch.Tensor], padding: int = PADDING_IDX
+) -> torch.Tensor:
+    return torch.nested.nested_tensor(tensors).to_padded_tensor(padding=padding)
 
 
 def collate_tensor_fn(
@@ -129,9 +141,7 @@ def collate_tensor_fn(
         )
     ):
         # pad tensor if only first or last dimensions are different
-        return torch.nested.as_nested_tensor(batch).to_padded_tensor(
-            padding=PADDING_IDX
-        )
+        return pad_jagged_tensors(batch)
     return torch_collate.collate_tensor_fn(batch, collate_fn_map=collate_fn_map)
 
 
@@ -142,7 +152,7 @@ torch_collate.default_collate_fn_map[torch.Tensor] = collate_tensor_fn
 class ParquetDictLoaderIterDataPipe(torch_data.IterDataPipe):
     def __init__(
         self: Self,
-        source_datapipe: Iterable[str],
+        source_datapipe: torch_data.IterDataPipe,
         *,
         columns: Iterable[str] | None = None,
         filter_expr: ds.Expression | None = None,
@@ -188,7 +198,7 @@ class DeltaTableDictLoaderIterDataPipe(ParquetDictLoaderIterDataPipe):
 class CyclerIterDataPipe(torch_data.IterDataPipe):
     def __init__(
         self: Self,
-        source_datapipe: Iterable[dict],
+        source_datapipe: torch_data.IterDataPipe,
         count: int | None = None,
     ) -> None:
         super().__init__()
