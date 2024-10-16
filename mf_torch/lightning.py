@@ -42,6 +42,8 @@ class MatrixFactorizationLitModule(LightningModule):
         dropout: float = 0.0,
         normalize: bool = True,
         hard_negatives_ratio: float | None = None,
+        sigma: float = 1.0,
+        margin: float = 1.0,
         learning_rate: float = 0.01,
     ) -> None:
         super().__init__()
@@ -277,7 +279,11 @@ class MatrixFactorizationLitModule(LightningModule):
             mf_losses.PairwiseLogisticLoss,
         ]
         loss_fns = [
-            loss_class(hard_negatives_ratio=self.hparams.get("hard_negatives_ratio"))
+            loss_class(
+                hard_negatives_ratio=self.hparams.get("hard_negatives_ratio"),
+                sigma=self.hparams.get("sigma"),
+                margin=self.hparams.get("margin"),
+            )
             for loss_class in loss_classes
         ]
         return torch.nn.ModuleList(loss_fns)
@@ -440,4 +446,7 @@ def cli_main(
 
 if __name__ == "__main__":
     cli_main()
-    # cli = cli_main(args={"fit": {"trainer": {"overfit_batches": 1}}})
+    # cli = cli_main(
+    #     args={"fit": {"trainer": {"overfit_batches": 1, "num_sanity_val_steps": 0}}}
+    # )
+    # cli.model.export_dynamo_onnx()

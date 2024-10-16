@@ -49,6 +49,7 @@ class UserQuery(BaseModel):
     age: int | None = None
     occupation: int | None = None
     zipcode: str | None = None
+    movie_ids: list[int] | None = None
 
     def to_query(self: Self, **kwargs: dict[str, int]) -> Query:
         from mf_torch.data.load import process_features
