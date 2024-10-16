@@ -27,6 +27,8 @@ def get_lightning_args(
         # "num_heads": num_heads,
         # "dropout": config["dropout"],
         "hard_negatives_ratio": hard_negatives_ratio,
+        "sigma": config["sigma"],
+        "margin": config["margin"],
         "learning_rate": config["learning_rate"],
     }
     data_args = {
@@ -79,6 +81,8 @@ def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
         "train_loss": flaml.tune.choice(train_losses),
         "use_hard_negatives": flaml.tune.choice([True, False]),
         "hard_negatives_ratio": flaml.tune.quniform(0.5, 2.0, 0.01),
+        "sigma": flaml.tune.lograndint(1, 1000),
+        "margin": flaml.tune.quniform(-1.0, 1.0, 0.01),
         "learning_rate": flaml.tune.qloguniform(0.001, 0.1, 0.001),
     }
     low_cost_partial_config = {}
@@ -92,6 +96,8 @@ def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
         "train_loss": "PairwiseHingeLoss",
         "use_hard_negatives": False,
         "hard_negatives_ratio": 1.0,
+        "sigma": 1.0,
+        "margin": 1.0,
         "learning_rate": 0.1,
     }
     return flaml.tune.run(
