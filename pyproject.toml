@@ -23,7 +23,7 @@ numpydantic = "^1.6"
 onnxscript = { allow-prereleases = true, version = ">=0.0,<0.2" }
 onnxruntime = "^1.19"
 pandas = "^2.2"
-polars = { extras = ["pandas", "deltalake"], version = "^1.4" }
+polars = { extras = ["pandas", "deltalake"], version = "^1.10" }
 ray = { extras = ["data", "train", "tune"], version = "^2.32" }
 tensorboard = "^2.17"
 torch = [
@@ -35,7 +35,7 @@ xxhash = "^3.4"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^4.0"
-ruff = ">=0.6,<0.7"
+ruff = ">=0.6,<0.8"
 
 [tool.ruff]
 fix = true
