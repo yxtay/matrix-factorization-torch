@@ -9,8 +9,8 @@ import torch.utils.data._utils.collate as torch_collate
 from mf_torch.params import NUM_EMBEDDINGS, NUM_HASHES, PADDING_IDX
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
-    from typing import Iterator, Self
+    from collections.abc import Iterable, Iterator
+    from typing import Self
 
     import pyarrow.dataset as ds
 
