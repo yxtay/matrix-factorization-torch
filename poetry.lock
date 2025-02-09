@@ -2917,13 +2917,13 @@ sympy = "*"
 
 [[package]]
 name = "onnxscript"
-version = "0.1.0.dev20250108"
+version = "0.1.0"
 description = "Naturally author ONNX functions and models using a subset of Python"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "onnxscript-0.1.0.dev20250108-py3-none-any.whl", hash = "sha256:e0b551706f592d69037c0c5646cc77791f1c726b9ed2be25d0fc3d5fdd0a8622"},
-    {file = "onnxscript-0.1.0.dev20250108.tar.gz", hash = "sha256:2653b04da32048e7b4d8591a5d35b3ecbdf0f9de9b16f327a67c2d63df9589a0"},
+    {file = "onnxscript-0.1.0-py3-none-any.whl", hash = "sha256:ad3259318a1c9101dca464cdb7591f1342ef753f5d3b64ced76ede1dd3ab20b0"},
+    {file = "onnxscript-0.1.0.tar.gz", hash = "sha256:dbeca43757da1bf88436dccb7c68f76e770959ec6c7ebd7a6873a8e10061f005"},
 ]
 
 [package.dependencies]
@@ -2931,7 +2931,7 @@ ml_dtypes = "*"
 numpy = "*"
 onnx = ">=1.16"
 packaging = "*"
-typing_extensions = "*"
+typing_extensions = ">=4.10"
 
 [[package]]
 name = "opentelemetry-api"
