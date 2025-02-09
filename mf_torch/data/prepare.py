@@ -295,7 +295,10 @@ def load_dense_movielens(
     ratings = load_ratings(src_dir).pipe(ordered_split)
     users = users_split_activty(users, ratings).collect(streaming=True)
 
-    with tempfile.TemporaryDirectory() as temp_dir, concurrent.futures.ThreadPoolExecutor() as executor:
+    with (
+        tempfile.TemporaryDirectory() as temp_dir,
+        concurrent.futures.ThreadPoolExecutor() as executor,
+    ):
         slice_futures = [
             executor.submit(
                 get_dense_interactions,
