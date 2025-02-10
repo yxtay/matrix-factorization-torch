@@ -14,7 +14,10 @@ USER_FEATURE_NAMES = {
     "zipcode": "zipcode",
 }
 ITEM_IDX = "movie_id"
-ITEM_FEATURE_NAMES = {"movie_id": "movie_id", "genres": "genres"}
+ITEM_FEATURE_NAMES = {
+    "movie_id": "movie_id",
+    "genres": "genres",
+}
 
 # model
 NUM_HASHES = 2
