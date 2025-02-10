@@ -21,7 +21,7 @@ from mf_torch.params import (
 )
 
 if TYPE_CHECKING:
-    from typing import Self
+    from typing import ClassVar, Self
 
     import polars as pl
 
@@ -34,16 +34,16 @@ class MatrixFactorizationDataModule(LightningDataModule):
     label: str = LABEL
     weight: str = WEIGHT
     user_idx: str = USER_IDX
-    user_features: list[str] = USER_FEATURE_NAMES
+    user_features: ClassVar[dict[str, str]] = USER_FEATURE_NAMES
     item_idx: str = ITEM_IDX
-    item_features: list[str] = ITEM_FEATURE_NAMES
+    item_features: ClassVar[dict[str, str]] = ITEM_FEATURE_NAMES
 
     def __init__(
         self: Self,
         data_dir: str = DATA_DIR,
         num_hashes: int = NUM_HASHES,
         num_embeddings: int = NUM_EMBEDDINGS,
-        negatives_ratio: int = 1,
+        use_negatives: int = 1,
         batch_size: int = 2**10,
         num_workers: int | None = 1,
     ) -> None:
@@ -62,10 +62,10 @@ class MatrixFactorizationDataModule(LightningDataModule):
             return load_dense_movielens(self.hparams.data_dir, overwrite=overwrite)
 
     def get_raw_items_data(self: Self) -> torch_data.IterDataPipe:
-        delta_path = Path(self.hparams.data_dir, "ml-1m", "movies.delta")
+        parquet_path = Path(self.hparams.data_dir, "ml-1m", "movies.parquet")
         return torch_datapipes.iter.IterableWrapper(
-            [delta_path]
-        ).load_delta_table_as_dict(batch_size=self.hparams.batch_size)
+            [parquet_path]
+        ).load_parquet_as_dict(batch_size=self.hparams.batch_size)
 
     def get_items_dataset(
         self: Self, *, cycle_count: int | None = 1, prefix: str = "item_"
@@ -97,11 +97,11 @@ class MatrixFactorizationDataModule(LightningDataModule):
         assert subset in {"train", "val", "test", "predict"}
         filter_col = f"is_{subset}"
 
-        delta_file = {
-            "train": "sparse.delta",
-            "val": "val.delta",
-        }.get(subset, "dense.delta")
-        delta_path = Path(self.hparams.data_dir, "ml-1m", delta_file)
+        parquet_file = {
+            "train": "sparse.parquet",
+            "val": "val.parquet",
+        }.get(subset, "dense.parquet")
+        parquet_path = Path(self.hparams.data_dir, "ml-1m", parquet_file)
 
         columns = {
             self.label,
@@ -112,8 +112,8 @@ class MatrixFactorizationDataModule(LightningDataModule):
             *self.user_features,
         }
         return (
-            torch_datapipes.iter.IterableWrapper([delta_path])
-            .load_delta_table_as_dict(
+            torch_datapipes.iter.IterableWrapper([parquet_path])
+            .load_parquet_as_dict(
                 columns=list(columns),
                 filter_expr=ds.field(filter_col),
                 batch_size=self.hparams.batch_size,
@@ -160,18 +160,15 @@ class MatrixFactorizationDataModule(LightningDataModule):
             )
             .map(partial(select_fields, fields=fields))
         )
-        if subset == "train" and self.hparams.negatives_ratio > 0:
+        if subset == "train" and self.hparams.use_negatives:
             fields = [
                 "neg_item_idx",
                 "neg_item_feature_hashes",
                 "neg_item_feature_weights",
             ]
-            items_datapipe = (
-                self.get_items_dataset(cycle_count=None, prefix="neg_item_")
-                .map(partial(select_fields, fields=fields))
-                .batch(self.hparams.negatives_ratio)
-                .collate()
-            )
+            items_datapipe = self.get_items_dataset(
+                cycle_count=None, prefix="neg_item_"
+            ).map(partial(select_fields, fields=fields))
             datapipe = datapipe.zip(items_datapipe).map(merge_rows)
 
         return datapipe
