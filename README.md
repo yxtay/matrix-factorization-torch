@@ -16,10 +16,15 @@ Matrix Factorization Recommender Models in PyTorch with MovieLens
 - BPR: [[1205.2618] BPR: Bayesian Personalized Ranking from Implicit Feedback](bpr)
 - CCL: [[2109.12613] SimpleX: A Simple and Strong Baseline for Collaborative Filtering](ccl)
 - SSM: [[2201.02327] On the Effectiveness of Sampled Softmax Loss for Item Recommendation](ssm)
-- DirectAU: [[2206.12811] Towards Representation Alignment and Uniformity in Collaborative Filtering](direct-au)
-- MAWU: [[2308.06091] Toward a Better Understanding of Loss Functions for Collaborative Filtering](mawu)
-- InfoNCE+, MINE+: [[2312.08520] Revisiting Recommendation Loss Functions through Contrastive Learning (Technical Report)](mine+)
-- LogQ correction: [Sampling-Bias-Corrected Neural Modeling for Large Corpus Item Recommendations](logq)
+- DirectAU: [[2206.12811]]((direct-au))
+  Towards Representation Alignment and Uniformity in Collaborative Filtering
+- MAWU: [[2308.06091]](mawu)
+  Toward a Better Understanding of Loss Functions for Collaborative Filtering
+- InfoNCE+, MINE+: [[2312.08520]](mine+)
+  Revisiting Recommendation Loss Functions through Contrastive Learning
+  (Technical Report)
+- LogQ correction:
+  [Sampling-Bias-Corrected Neural Modeling for Large Corpus Item Recommendations](logq)
 - MNS: [Mixed Negative Sampling for Learning Two-tower Neural Networks in Recommendations](mns)
 - Hashing Trick: [[0902.2206] Feature Hashing for Large Scale Multitask Learning](hashing-trick)
 - Hash Embeddings: [[1709.03933] Hash Embeddings for Efficient Word Representations](hash-embeddings)
