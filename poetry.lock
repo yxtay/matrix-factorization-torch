@@ -1723,13 +1723,13 @@ files = [
 
 [[package]]
 name = "jsonargparse"
-version = "4.35.0"
+version = "4.36.0"
 description = "Implement minimal boilerplate CLIs derived from type hints and parse from command line, config files and environment variables."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "jsonargparse-4.35.0-py3-none-any.whl", hash = "sha256:8298ea953987fb41ed074e8802c77bb19166d632d972b23383cad63da7d7486b"},
-    {file = "jsonargparse-4.35.0.tar.gz", hash = "sha256:815ecd190e4004d2ce69b184fe16915f8f81fd32ae3e479fa37fbb9b89130446"},
+    {file = "jsonargparse-4.36.0-py3-none-any.whl", hash = "sha256:1140dc766957857282e81efbb88c51605c948aa3c3517ea98f3265d6df2df627"},
+    {file = "jsonargparse-4.36.0.tar.gz", hash = "sha256:95b9a5df843d0224acae1a9bb780745fa8f206784a87b2b30d5b1db11b00c125"},
 ]
 
 [package.dependencies]
@@ -1738,7 +1738,7 @@ PyYAML = ">=3.13"
 typeshed-client = {version = ">=2.1.0", optional = true, markers = "extra == \"signatures\""}
 
 [package.extras]
-all = ["jsonargparse[fsspec]", "jsonargparse[jsonnet]", "jsonargparse[jsonschema]", "jsonargparse[omegaconf]", "jsonargparse[reconplogger]", "jsonargparse[ruyaml]", "jsonargparse[signatures]", "jsonargparse[typing-extensions]", "jsonargparse[urls]"]
+all = ["jsonargparse[fsspec]", "jsonargparse[jsonnet]", "jsonargparse[jsonschema]", "jsonargparse[omegaconf]", "jsonargparse[reconplogger]", "jsonargparse[ruyaml]", "jsonargparse[signatures]", "jsonargparse[toml]", "jsonargparse[typing-extensions]", "jsonargparse[urls]"]
 argcomplete = ["argcomplete (>=3.5.1)"]
 coverage = ["jsonargparse[test-no-urls]", "pytest-cov (>=4.0.0)"]
 dev = ["build (>=0.10.0)", "jsonargparse[coverage]", "jsonargparse[doc]", "jsonargparse[test]", "pre-commit (>=2.19.0)", "tox (>=3.25.0)"]
@@ -1754,6 +1754,7 @@ shtab = ["shtab (>=1.7.1)"]
 signatures = ["docstring-parser (>=0.15)", "jsonargparse[typing-extensions]", "typeshed-client (>=2.1.0)"]
 test = ["attrs (>=22.2.0)", "jsonargparse[argcomplete]", "jsonargparse[shtab]", "jsonargparse[test-no-urls]", "pydantic (>=2.3.0)", "responses (>=0.12.0)", "types-PyYAML (>=6.0.11)", "types-requests (>=2.28.9)"]
 test-no-urls = ["pytest (>=6.2.5)", "pytest-subtests (>=0.8.0)"]
+toml = ["toml (>=0.10.2)"]
 typing-extensions = ["typing-extensions (>=3.10.0.0)"]
 urls = ["requests (>=2.18.4)"]
 
