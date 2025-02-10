@@ -1,31 +1,31 @@
 version: 2
 updates:
-    - package-ecosystem: docker
-      directory: /
-      schedule:
-          interval: weekly
-      commit-message:
-          prefix: build(docker)
-      groups:
-          docker:
-              patterns: ["*"]
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build(docker)
+    groups:
+      docker:
+        patterns: ["*"]
 
-    - package-ecosystem: github-actions
-      directory: /
-      schedule:
-          interval: weekly
-      commit-message:
-          prefix: ci(github-actions)
-      groups:
-          github-actions:
-              patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci(github-actions)
+    groups:
+      github-actions:
+        patterns: ["*"]
 
-    - package-ecosystem: pip
-      directory: /
-      schedule:
-          interval: weekly
-      commit-message:
-          prefix: build(pip)
-      groups:
-          pip:
-              patterns: ["*"]
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build(pip)
+    groups:
+      pip:
+        patterns: ["*"]
