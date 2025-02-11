@@ -5,7 +5,6 @@ updates:
     directory: /
     schedule:
       interval: daily
-    reviewers: [yxtay]
     commit-message:
       prefix: build(docker)
     groups:
@@ -16,7 +15,6 @@ updates:
     directory: /
     schedule:
       interval: daily
-    reviewers: [yxtay]
     commit-message:
       prefix: ci(github-actions)
     groups:
@@ -27,7 +25,6 @@ updates:
     directory: /
     schedule:
       interval: daily
-    reviewers: [yxtay]
     commit-message:
       prefix: build(pip)
     groups:
