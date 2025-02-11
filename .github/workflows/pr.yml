@@ -9,8 +9,7 @@ on:
       - synchronize
 
 jobs:
-  title-linter:
-    name: lint title
+  lint-title:
     permissions:
       pull-requests: read
     runs-on: ubuntu-latest
@@ -20,8 +19,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  labeler:
-    name: label
+  label:
     permissions:
       contents: read
       pull-requests: write
@@ -30,8 +28,7 @@ jobs:
       - name: labeler
         uses: actions/labeler@8558fd74291d67161a8a78ce36a881fa63b766a9 # v5
 
-  size-labeler:
-    name: label size
+  label-size:
     permissions:
       contents: read
       pull-requests: write
@@ -48,10 +45,10 @@ jobs:
 
   dependabot:
     if: github.actor == 'dependabot[bot]'
-    runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
+    runs-on: ubuntu-latest
     steps:
       - id: metadata
         uses: dependabot/fetch-metadata@v2
@@ -63,7 +60,7 @@ jobs:
 
       - name: automerge
         if: ${{ !contains(steps.metadata.outputs.update-type, 'major' ) }}
-        run: gh pr merge --merge ${PR_NUMBER}
+        run: gh pr merge --auto --squash ${PR_NUMBER}
         env:
-          MR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
           GH_TOKEN: ${{ github.token }}
