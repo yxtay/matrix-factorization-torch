@@ -1,31 +1,32 @@
 version: 2
+
 updates:
   - package-ecosystem: docker
     directory: /
     schedule:
-      interval: weekly
+      interval: daily
     commit-message:
       prefix: build(docker)
     groups:
       docker:
-        patterns: ["*"]
+        update-types: [minor, patch]
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: daily
     commit-message:
       prefix: ci(github-actions)
     groups:
       github-actions:
-        patterns: ["*"]
+        update-types: [minor, patch]
 
   - package-ecosystem: pip
     directory: /
     schedule:
-      interval: weekly
+      interval: daily
     commit-message:
       prefix: build(pip)
     groups:
       pip:
-        patterns: ["*"]
+        update-types: [minor, patch]
