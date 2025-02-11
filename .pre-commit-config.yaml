@@ -30,22 +30,22 @@ repos:
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext, md]
 
-      # files
       - id: check-case-conflict
+        # files
       - id: check-executables-have-shebangs
       - id: check-symlinks
       - id: destroyed-symlinks
       - id: fix-byte-order-marker
 
-      # git
       - id: check-added-large-files
+        # git
       - id: check-merge-conflict
       - id: check-vcs-permalinks
       - id: no-commit-to-branch
       - id: forbid-new-submodules
 
-      # security
       - id: detect-aws-credentials
+        # security
         args: [--allow-missing-credentials]
       - id: detect-private-key
 
@@ -70,7 +70,7 @@ repos:
       - id: markdownlint
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.5
+    rev: v0.9.6
     hooks:
       - id: ruff
         types_or: [python, pyi, jupyter]
@@ -84,11 +84,11 @@ repos:
       - id: taplo-format
 
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.5.29
+    rev: 0.5.30
     hooks:
       - id: uv-lock
 
   - repo: https://github.com/google/yamlfmt
-    rev: v0.15.0
+    rev: v0.16.0
     hooks:
       - id: yamlfmt
