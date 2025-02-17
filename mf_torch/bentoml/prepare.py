@@ -54,6 +54,7 @@ def prepare_trainer(ckpt_path: str | None = None) -> Trainer:
 
     with tempfile.TemporaryDirectory() as tmp:
         trainer_args = {
+            "accelerator": "cpu",
             "precision": "bf16-mixed",
             "num_sanity_val_steps": 0,
         }

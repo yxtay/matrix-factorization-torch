@@ -1,0 +1,161 @@
+name: scans
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  merge_group:
+    branches: [main]
+  workflow_call:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_name != github.event.repository.default_branch }}
+
+jobs:
+  devskim:
+    permissions:
+      contents: read
+      security-events: write
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - uses: microsoft/DevSkim-Action@a6b6966a33b497cd3ae2ebc406edf8f4cc2feec6 # v1
+
+      - uses: github/codeql-action/upload-sarif@9e8d0789d4a0fa9ceb6b1738f7e269594bdd67f0 # v3
+        with:
+          sarif_file: devskim-results.sarif
+
+  # megalinter:
+  #   permissions:
+  #     contents: write
+  #     pull-requests: write
+  #     security-events: write
+  #     statuses: write
+
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+  #       with:
+  #         repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+  #         ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+  #     - id: megalinter
+  #       # You can override MegaLinter flavor used to have faster performances
+  #       # More info at https://megalinter.io/latest/flavors/
+  #       uses: oxsecurity/megalinter@ec124f7998718d79379a3c5b39f5359952baf21d # v8
+  #       env:
+  #         # All available variables are described in documentation
+  #         # https://megalinter.io/latest/configuration/
+  #         APPLY_FIXES: all
+  #         DISABLE_LINTERS: JSON_JSONLINT,SPELL_CSPELL
+  #         FAIL_IF_UPDATED_SOURCES: true
+  #         GITHUB_STATUS_REPORTER: true
+  #         GITHUB_TOKEN: ${{ github.token }}
+  #         PYTHON_DEFAULT_STYLE: ruff
+  #         SARIF_REPORTER: true
+  #         VALIDATE_ALL_CODEBASE: false
+
+  #     - if: ${{ success() || failure() }}
+  #       uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4
+  #       with:
+  #         name: megalinter-reports
+  #         path: |
+  #           megalinter-reports
+  #           mega-linter.log
+
+  #     - if: ${{ success() || failure() }}
+  #       uses: github/codeql-action/upload-sarif@9e8d0789d4a0fa9ceb6b1738f7e269594bdd67f0 # v3
+  #       with:
+  #         sarif_file: megalinter-reports/megalinter-report.sarif
+  #         ref: ${{ github.head_ref && format('refs/heads/{0}', github.head_ref) || github.ref }}
+  #         sha: ${{ github.event.pull_request.head.sha || github.sha }}
+
+  #     - if: ${{ failure() && steps.megalinter.outputs.has_updated_sources == 1 && github.event_name == 'pull_request' }}
+  #       name: commit changes
+  #       run: |
+  #         git config user.email "${GITHUB_ACTOR_ID}+${GITHUB_ACTOR}@users.noreply.github.com"
+  #         git config user.name "${GITHUB_ACTOR}"
+  #         git commit --all --message "${COMMIT_MESSAGE}"
+  #         git push origin "HEAD:refs/heads/${GITHUB_HEAD_REF}"
+  #       env:
+  #         COMMIT_MESSAGE: "fix: apply megalinter fixes"
+  #         # https://api.github.com/users/megalinter-bot
+  #         GITHUB_ACTOR: megalinter-bot
+  #         GITHUB_ACTOR_ID: 129584137
+
+  msdo:
+    permissions:
+      contents: read
+      id-token: write
+      security-events: write
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - uses: microsoft/security-devops-action@08976cb623803b1b36d7112d4ff9f59eae704de0 # v1
+        id: msdo
+
+      - uses: github/codeql-action/upload-sarif@9e8d0789d4a0fa9ceb6b1738f7e269594bdd67f0 # v3
+        with:
+          sarif_file: ${{ steps.msdo.outputs.sarifFile }}
+
+  osv-scan-pr:
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@764c91816374ff2d8fc2095dab36eecd42d61638 # v1
+
+  osv-scan-push:
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    if: ${{ github.event_name == 'push' || github.event_name == 'schedule' }}
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@764c91816374ff2d8fc2095dab36eecd42d61638 # v1
+
+  trivy:
+    permissions:
+      contents: read
+      security-events: write
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394f2dd8c87dbb0 # 0.29.0
+        with:
+          scan-type: fs
+          exit-code: 1
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-results.sarif
+
+      - uses: github/codeql-action/upload-sarif@9e8d0789d4a0fa9ceb6b1738f7e269594bdd67f0 # v3
+        with:
+          sarif_file: "trivy-results.sarif"
+
+  trufflehog:
+    permissions:
+      contents: read
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 3
+
+      - uses: trufflesecurity/trufflehog@709cd089144a6b6452f0915e7ea0d5e4a39d3243 # v3
+        with:
+          extra_args: --results=verified,unknown
