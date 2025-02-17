@@ -1,4 +1,5 @@
 version = 1
+revision = 1
 requires-python = ">=3.11, <4"
 resolution-markers = [
     "python_full_version >= '3.13' and platform_machine == 'x86_64' and sys_platform == 'darwin'",
@@ -1497,7 +1498,7 @@ requires-dist = [
     { name = "mlflow", specifier = "~=2.19" },
     { name = "numpydantic", specifier = "~=1.6" },
     { name = "onnxruntime", specifier = "~=1.20" },
-    { name = "onnxscript", specifier = ">=0.0,<0.2" },
+    { name = "onnxscript", specifier = ">=0.2,<0.3" },
     { name = "pandas", specifier = "~=2.2" },
     { name = "polars", extras = ["pandas", "deltalake"], specifier = "~=1.19" },
     { name = "ray", extras = ["data", "train", "tune"], specifier = "~=2.40" },
@@ -1957,7 +1958,7 @@ wheels = [
 
 [[package]]
 name = "onnxscript"
-version = "0.1.0"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ml-dtypes" },
@@ -1966,9 +1967,9 @@ dependencies = [
     { name = "packaging" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/31/79/083f1fcea9a69c1b5c0b6d91e57aeee7dd5059615dab3f49302b0239e2d2/onnxscript-0.1.0.tar.gz", hash = "sha256:dbeca43757da1bf88436dccb7c68f76e770959ec6c7ebd7a6873a8e10061f005", size = 607722 }
+sdist = { url = "https://files.pythonhosted.org/packages/f8/d6/184936e15fef9e91751628c988a9eee3f2f2c27a016c49aa95c3775002b4/onnxscript-0.2.0.tar.gz", hash = "sha256:1f4506c533c17f196bba4653214f666c1ae0061f9f7eca05318f772f6e44bade", size = 599948 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4d/f1/ad1a02fff45d08d78cceae67300355954cab970c5e4c393b448db77edb75/onnxscript-0.1.0-py3-none-any.whl", hash = "sha256:ad3259318a1c9101dca464cdb7591f1342ef753f5d3b64ced76ede1dd3ab20b0", size = 702676 },
+    { url = "https://files.pythonhosted.org/packages/ba/ee/a75236ec74c3059c2b6a799c07a66d33d56ab800d00c8ecdee60b5d744a9/onnxscript-0.2.0-py3-none-any.whl", hash = "sha256:6f78b271e05e85cb703a6b28624768544b4315bfa16f31fe6d10c14e1cab6771", size = 691596 },
 ]
 
 [[package]]
