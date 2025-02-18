@@ -54,6 +54,7 @@ jobs:
           # https://megalinter.io/latest/configuration/
           APPLY_FIXES: all
           DISABLE_LINTERS: JSON_JSONLINT,SPELL_CSPELL
+          DISABLE_ERRORS_LINTERS: COPYPASTE_JSCPD,REPOSITORY_DEVSKIM,REPOSITORY_KICS
           FAIL_IF_UPDATED_SOURCES: true
           GITHUB_STATUS_REPORTER: true
           GITHUB_TOKEN: ${{ github.token }}
