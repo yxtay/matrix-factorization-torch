@@ -13,7 +13,7 @@ PYTHON_DEFAULT_STYLE: ruff
 SARIF_REPORTER: true
 VALIDATE_ALL_CODEBASE: false
 PRE_COMMANDS:
-  - command: python -m pip install -r "${GITHUB_WORKSPACE}/requirements.txt"
+  - command: python -m pip install "${GITHUB_WORKSPACE}"
     venv: pylint
-  - command: python -m pip install -r "${GITHUB_WORKSPACE}/requirements.txt"
+  - command: python -m pip install "${GITHUB_WORKSPACE}"
     venv: pyright
