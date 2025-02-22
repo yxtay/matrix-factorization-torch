@@ -33,11 +33,6 @@ jobs:
       - id: setup-python
         uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
 
-      - name: Set up environment
-        run: |
-          mkdir -p .venv
-          echo "$(realpath .venv)/bin" >> "${GITHUB_PATH}"
-
       - run: uv sync
 
-      - run: python -m mf_torch.data.prepare
+      - run: uv run python -m mf_torch.data.prepare

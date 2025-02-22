@@ -31,9 +31,6 @@ dependencies = [
   "xxhash~=3.4",
 ]
 
-[dependency-groups]
-dev = ["uv>=0.5"]
-
 [tool.ruff]
 fix = true
 src = [".", "src", "tests"]
