@@ -1,10 +1,15 @@
+APPLY_FIXES: all
+DISABLE_LINTERS: JSON_JSONLINT,PYTHON_ISORT,SPELL_CSPELL
+DISABLE_ERRORS_LINTERS: COPYPASTE_JSCPD,REPOSITORY_DEVSKIM,REPOSITORY_KICS
+FAIL_IF_UPDATED_SOURCES: true
+GITHUB_STATUS_REPORTER: true
+PYTHON_DEFAULT_STYLE: ruff
+SARIF_REPORTER: true
+VALIDATE_ALL_CODEBASE: false
 PRE_COMMANDS:
   - command: python -m pip install uv
-
-  - command: uv export --output-file requirements.txt --no-hashes --no-emit-project
-
+  - command: uv export --no-hashes --no-emit-project >| requirements.txt
   - command: python -m pip install -r requirements.txt
     venv: pylint
-
   - command: python -m pip install -r requirements.txt
     venv: pyright
