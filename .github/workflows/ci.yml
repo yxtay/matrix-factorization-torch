@@ -35,6 +35,7 @@ jobs:
 
       - run: |
           uv sync
-          uv tree --depth 2
+          uv pip list
+          echo "$(realpath .venv)/bin" >> "${GITHUB_PATH}"
 
-      - run: uv run python -m mf_torch.data.prepare
+      - run: python -m mf_torch.data.prepare
