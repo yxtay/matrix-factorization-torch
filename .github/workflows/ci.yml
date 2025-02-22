@@ -1,0 +1,54 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ["**"]
+  pull_request:
+    branches: [main]
+  merge_group:
+    branches: [main]
+  workflow_call:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_name != github.event.repository.default_branch }}
+
+jobs:
+  python:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python: [3.12]
+
+    runs-on: ${{ matrix.os }}
+    env:
+      ENVIRONMENT: ci
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - uses: astral-sh/setup-uv@4db96194c378173c656ce18a155ffc14a9fc4355 # v5
+
+      - id: setup-python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Set up environment
+        if: ${{ runner.os != 'Windows' }}
+        run: |
+          mkdir -p .venv
+          echo "$(realpath .venv)/bin" >> "${GITHUB_PATH}"
+
+      - name: Set up environment (Windows)
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          New-Item -Type Directory -Force .venv
+          "$(Resolve-Path .venv)/Scripts" | Out-File -FilePath "${env:GITHUB_PATH}" -Append
+
+      - run: uv sync
+
+      - run: python -m mf_torch.data.prepare

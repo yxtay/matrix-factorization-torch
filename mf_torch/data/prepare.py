@@ -57,79 +57,6 @@ def download_unpack_data(
 ###
 
 
-def load_users(src_dir: str = DATA_DIR, *, overwrite: bool = False) -> pl.LazyFrame:
-    users_parquet = Path(src_dir, "ml-1m", "users.parquet")
-    if users_parquet.exists() and not overwrite:
-        users = pl.scan_parquet(str(users_parquet))
-        logger.info("users loaded: {}", users_parquet)
-        return users
-
-    import pandas as pd
-
-    users_dat = Path(src_dir, "ml-1m", "users.dat")
-    dtype = {
-        "user_id": "int32",
-        "gender": "category",
-        "age": "int32",
-        "occupation": "int32",
-        "zipcode": "category",
-    }
-
-    users = (
-        pd.read_csv(
-            users_dat,
-            sep="::",
-            header=None,
-            names=list(dtype.keys()),
-            dtype=dtype,
-            engine="python",
-        )
-        .pipe(pl.from_pandas)
-        .with_row_index("user_rn")
-    )
-    logger.info("users loaded: {}, shape: {}", users_dat, users.shape)
-
-    users.write_parquet(users_parquet)
-    logger.info("users saved: {}", users_parquet)
-
-    return pl.scan_parquet(str(users_parquet))
-
-
-def load_movies(src_dir: str = DATA_DIR, *, overwrite: bool = False) -> pl.LazyFrame:
-    movies_parquet = Path(src_dir, "ml-1m", "movies.parquet")
-    if movies_parquet.exists() and not overwrite:
-        movies = pl.scan_parquet(str(movies_parquet))
-        logger.info("movies loaded: {}", movies_parquet)
-        return movies
-
-    import pandas as pd
-
-    movies_dat = Path(src_dir, "ml-1m", "movies.dat")
-    dtype = {"movie_id": "int32", "title": "category", "genres": "str"}
-    movies = (
-        pd.read_csv(
-            movies_dat,
-            sep="::",
-            header=None,
-            names=list(dtype.keys()),
-            dtype=dtype,
-            engine="python",
-            encoding="iso-8859-1",
-        )
-        .pipe(pl.from_pandas)
-        .with_row_index("movie_rn")
-    )
-    logger.info("movies loaded: {}, shape: {}", movies_dat, movies.shape)
-
-    movies = movies.with_columns(
-        pl.col("genres").str.split("|").cast(pl.List(pl.Categorical)).alias("genres"),
-    )
-    movies.write_parquet(movies_parquet)
-    logger.info("movies saved: {}", movies_parquet)
-
-    return pl.scan_parquet(str(movies_parquet))
-
-
 def load_ratings(src_dir: str = DATA_DIR) -> pl.LazyFrame:
     import pandas as pd
 
@@ -152,159 +79,194 @@ def load_ratings(src_dir: str = DATA_DIR) -> pl.LazyFrame:
     return ratings.lazy()
 
 
+def load_movies(src_dir: str = DATA_DIR) -> pl.LazyFrame:
+    import pandas as pd
+
+    movies_dat = Path(src_dir, "ml-1m", "movies.dat")
+    dtype = {"movie_id": "int32", "title": "category", "genres": "str"}
+    movies = pd.read_csv(
+        movies_dat,
+        sep="::",
+        header=None,
+        names=list(dtype.keys()),
+        dtype=dtype,
+        engine="python",
+        encoding="iso-8859-1",
+    ).pipe(pl.from_pandas)
+    logger.info("movies loaded: {}, shape: {}", movies_dat, movies.shape)
+
+    return movies.lazy()
+
+
+def load_users(src_dir: str = DATA_DIR) -> pl.LazyFrame:
+    import pandas as pd
+
+    users_dat = Path(src_dir, "ml-1m", "users.dat")
+    dtype = {
+        "user_id": "int32",
+        "gender": "category",
+        "age": "int32",
+        "occupation": "int32",
+        "zipcode": "category",
+    }
+
+    users = pd.read_csv(
+        users_dat,
+        sep="::",
+        header=None,
+        names=list(dtype.keys()),
+        dtype=dtype,
+        engine="python",
+    ).pipe(pl.from_pandas)
+    logger.info("users loaded: {}, shape: {}", users_dat, users.shape)
+    return users.lazy()
+
+
 ###
 # process data
 ###
 
 
 def ordered_split(
-    data: pl.LazyFrame,
+    ratings: pl.LazyFrame,
     *,
     group_col: str = "user_id",
     order_col: str = "timestamp",
     train_prop: float = 0.8,
 ) -> pl.LazyFrame:
     return (
-        data.lazy()
+        ratings.lazy()
         .with_columns(
             p=((pl.col(order_col).rank("ordinal") - 1) / pl.count(order_col)).over(
                 group_col
             )
         )
-        .with_columns(
-            is_rated=True,
-            is_train=pl.col("p") < train_prop,
-        )
+        .with_columns(is_train=pl.col("p") < train_prop)
         .drop("p")
     )
 
 
-def users_split_activty(
-    users: pl.LazyFrame, data: pl.LazyFrame, val_prop: float = 0.02
+def process_users(
+    users: pl.LazyFrame,
+    ratings: pl.LazyFrame,
+    val_prop: float = 0.1,
+    *,
+    src_dir: str = DATA_DIR,
+    overwrite: bool = False,
 ) -> pl.LazyFrame:
-    users_interactions_agg = (
-        data.lazy()
+    users_parquet = Path(src_dir, "ml-1m", "users.parquet")
+    if users_parquet.exists() and not overwrite:
+        users_procesed = pl.scan_parquet(str(users_parquet))
+        logger.info("users loaded: {}", users_parquet)
+        return users_procesed
+
+    users_interactions = (
+        ratings.lazy()
         .group_by("user_id")
-        .len()
+        .agg(
+            pl.len(),
+            pl.any("is_train").alias("is_train"),
+            pl.struct("movie_id", "rating").filter(pl.col("is_train")).alias("history"),
+            pl.struct("movie_id", "rating").filter(~pl.col("is_train")).alias("target"),
+        )
         .with_columns(p=((pl.col("len").rank("ordinal") - 1) / pl.count("len")))
-        .with_columns(is_val_user=pl.col("p") >= 1 - val_prop)
+        .with_columns(is_val=pl.col("p") >= 1 - val_prop)
         .drop("len", "p")
     )
-    return users.lazy().join(
-        users_interactions_agg, on="user_id", how="left", coalesce=True
+    users_procesed = (
+        users.lazy()
+        .with_row_index("user_rn")
+        .join(users_interactions, on="user_id", how="left", coalesce=True)
+        .collect(streaming=True)
     )
 
+    users_procesed.write_parquet(users_parquet)
+    logger.info("users saved: {}", users_parquet)
 
-def get_dense_interactions(
-    users: pl.LazyFrame | pl.DataFrame,
+    return pl.scan_parquet(str(users_parquet))
+
+
+def process_movies(
     movies: pl.LazyFrame,
-    data: pl.LazyFrame,
-    parquet_path: str | Path,
+    ratings: pl.LazyFrame,
+    *,
+    src_dir: str = DATA_DIR,
+    overwrite: bool = False,
 ) -> pl.LazyFrame:
-    dense_interactions = (
-        users.lazy()
-        .join(movies.lazy(), how="cross")
-        .join(data.lazy(), on=["user_id", "movie_id"], how="left", coalesce=True)
+    movies_parquet = Path(src_dir, "ml-1m", "movies.parquet")
+    if movies_parquet.exists() and not overwrite:
+        movies_processed = pl.scan_parquet(str(movies_parquet))
+        logger.info("movies loaded: {}", movies_parquet)
+        return movies_processed
+
+    movies_processed = (
+        movies.lazy()
         .with_columns(
-            is_rated=pl.col("is_rated").fill_null(value=False),
-            is_train=pl.col("is_train").fill_null(value=False),
+            pl.col("genres")
+            .str.split("|")
+            .cast(pl.List(pl.Categorical))
+            .alias("genres"),
         )
-        .with_columns(
-            is_val=~pl.col("is_train") & pl.col("is_val_user"),
-            is_test=~pl.col("is_train") & ~pl.col("is_val_user"),
-            is_predict=True,
+        .with_row_index("movie_rn")
+        .join(
+            ratings.lazy()
+            .group_by("movie_id")
+            .agg(pl.any("is_train").alias("is_train")),
+            on="movie_id",
+            how="left",
+            coalesce=True,
         )
         .collect(streaming=True)
     )
-    dense_interactions.write_parquet(parquet_path)
-    logger.info("slice saved: {}, shape: {}", parquet_path, dense_interactions.shape)
 
-    return pl.scan_parquet(str(parquet_path))
+    movies_processed.write_parquet(movies_parquet)
+    logger.info("movies saved: {}", movies_parquet)
+
+    return pl.scan_parquet(str(movies_parquet))
 
 
-def get_sparse_movielens(
-    data: pl.LazyFrame, src_dir: str = DATA_DIR, *, overwrite: bool = False
+def process_ratings(
+    ratings: pl.LazyFrame,
+    users: pl.LazyFrame | pl.DataFrame,
+    movies: pl.LazyFrame,
+    *,
+    src_dir: str = DATA_DIR,
+    overwrite: bool = False,
 ) -> pl.LazyFrame:
-    sparse_parquet = Path(src_dir, "ml-1m", "sparse.parquet")
-    if sparse_parquet.exists() and not overwrite:
-        sparse = pl.scan_parquet(str(sparse_parquet))
-        logger.info("sparse loaded: {}", sparse_parquet)
-        return sparse
+    ratings_parquet = Path(src_dir, "ml-1m", "sparse.parquet")
+    if ratings_parquet.exists() and not overwrite:
+        ratings_processed = pl.scan_parquet(str(ratings_parquet))
+        logger.info("sparse loaded: {}", ratings_parquet)
+        return ratings_processed
 
-    sparse = data.filter(pl.col("is_rated")).collect(streaming=True)
-    sparse.write_parquet(sparse_parquet)
-    logger.info("sparse saved: {}, shape: {}", sparse_parquet, sparse.shape)
+    ratings_processed = (
+        ratings.lazy()
+        .join(users.lazy().drop("is_train"), on="user_id")
+        .join(movies.lazy().drop("is_train"), on="movie_id")
+        .with_columns(
+            is_val=~pl.col("is_train") & pl.col("is_val"),
+            is_test=~pl.col("is_train") & ~pl.col("is_val"),
+        )
+        .collect(streaming=True)
+    )
+    ratings_processed.write_parquet(ratings_parquet)
+    logger.info("sparse saved: {}, shape: {}", ratings_parquet, ratings_processed.shape)
 
-    return pl.scan_parquet(str(sparse_parquet))
-
-
-def get_val_movielens(
-    data: pl.LazyFrame, src_dir: str = DATA_DIR, *, overwrite: bool = False
-) -> pl.LazyFrame:
-    val_parquet = Path(src_dir, "ml-1m", "val.parquet")
-    if val_parquet.exists() and not overwrite:
-        val = pl.scan_parquet(str(val_parquet))
-        logger.info("val loaded: {}", val_parquet)
-        return val
-
-    val = data.filter(pl.col("is_val_user")).collect(streaming=True)
-    val.write_parquet(val_parquet)
-    logger.info("val saved: {}, shape: {}", val_parquet, val.shape)
-
-    return pl.scan_parquet(str(val_parquet))
+    return pl.scan_parquet(str(ratings_parquet))
 
 
-def load_dense_movielens(
+def prepare_movielens(
     src_dir: str = DATA_DIR, *, overwrite: bool = False
 ) -> pl.LazyFrame:
-    dense_parquet = Path(src_dir, "ml-1m", "dense.parquet")
-    if dense_parquet.exists() and not overwrite:
-        dense = pl.scan_parquet(str(dense_parquet))
-        logger.info("dense loaded: {}", dense_parquet)
-        return dense
-
-    import concurrent.futures
-    import tempfile
-
-    users = load_users(src_dir, overwrite=overwrite)
-    movies = load_movies(src_dir, overwrite=overwrite)
     ratings = load_ratings(src_dir).pipe(ordered_split)
-    users = users_split_activty(users, ratings).collect(streaming=True)
+    users = load_users(src_dir)
+    movies = load_movies(src_dir)
 
-    with (
-        tempfile.TemporaryDirectory() as temp_dir,
-        concurrent.futures.ThreadPoolExecutor() as executor,
-    ):
-        slice_futures = [
-            executor.submit(
-                get_dense_interactions,
-                users_slice,
-                movies,
-                ratings,
-                Path(temp_dir, f"part-{idx}.parquet"),
-            )
-            for idx, users_slice in enumerate(users.iter_slices(users.height // 10))
-        ]
-        dense = (
-            pl.concat(
-                [
-                    futures.result()
-                    for futures in concurrent.futures.as_completed(slice_futures)
-                ]
-            )
-            .sort(["timestamp", "user_id", "movie_id"], nulls_last=True)
-            .collect()
-            .sample(fraction=1.0, shuffle=True, seed=0)
-        )
-        dense.write_parquet(dense_parquet)
-        logger.info("dense saved: {}, shape: {}", dense_parquet, dense.shape)
-
-    dense = pl.scan_parquet(str(dense_parquet))
-    get_sparse_movielens(dense, src_dir=src_dir, overwrite=overwrite)
-    get_val_movielens(dense, src_dir=src_dir, overwrite=overwrite)
-    return dense
+    users = process_users(users, ratings, src_dir=src_dir, overwrite=overwrite)
+    movies = process_movies(movies, ratings, src_dir=src_dir, overwrite=overwrite)
+    return process_ratings(ratings, users, movies, src_dir=src_dir, overwrite=overwrite)
 
 
 if __name__ == "__main__":
     download_unpack_data(overwrite=True)
-    load_dense_movielens(overwrite=True).head().collect().glimpse()
+    prepare_movielens(DATA_DIR, overwrite=True).head().collect().glimpse()

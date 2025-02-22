@@ -50,7 +50,7 @@ repos:
       - id: detect-private-key
 
   - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.23.3
+    rev: v8.24.0
     hooks:
       - id: gitleaks
 
@@ -70,7 +70,7 @@ repos:
       - id: markdownlint
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.6
+    rev: v0.9.7
     hooks:
       - id: ruff
         types_or: [python, pyi, jupyter]
@@ -84,7 +84,7 @@ repos:
       - id: taplo-format
 
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.6.1
+    rev: 0.6.2
     hooks:
       - id: uv-lock
 
