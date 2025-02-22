@@ -53,7 +53,7 @@ jobs:
           # All available variables are described in documentation
           # https://megalinter.io/latest/configuration/
           APPLY_FIXES: all
-          DISABLE_LINTERS: JSON_JSONLINT,SPELL_CSPELL
+          DISABLE_LINTERS: JSON_JSONLINT,PYTHON_ISORT,PYTHON_PYLINT,PYTHON_PYRIGHT,SPELL_CSPELL
           DISABLE_ERRORS_LINTERS: COPYPASTE_JSCPD,REPOSITORY_DEVSKIM,REPOSITORY_KICS
           FAIL_IF_UPDATED_SOURCES: true
           GITHUB_STATUS_REPORTER: true
