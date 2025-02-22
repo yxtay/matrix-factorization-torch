@@ -1,11 +1,13 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:best-practices", "group:allNonMajor"],
+  "extends": [
+    "config:best-practices",
+    "group:allNonMajor",
+    "group:allDigest",
+    ":automergeMinor",
+    ":automergeDigest"
+  ],
   "packageRules": [
-    {
-      "automerge": true,
-      "matchUpdateTypes": ["minor", "patch"]
-    },
     {
       "automerge": false,
       "groupName": "python",
