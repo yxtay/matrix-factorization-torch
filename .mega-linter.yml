@@ -10,6 +10,8 @@ PRE_COMMANDS:
   - command: python -m pip install uv
   - command: uv export --no-hashes --no-emit-project >| requirements.txt
   - command: python -m pip install -r requirements.txt
+    cwd: workspace
     venv: pylint
   - command: python -m pip install -r requirements.txt
+    cwd: workspace
     venv: pyright
