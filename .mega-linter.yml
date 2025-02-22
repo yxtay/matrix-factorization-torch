@@ -1,5 +1,5 @@
 PRE_COMMANDS:
-  - command: pip install -r requirements.txt
+  - command: python -m pip install -r requirements.txt
     venv: pylint
-  - command: pip install -r requirements.txt
+  - command: python -m pip install -r requirements.txt
     venv: pyright
