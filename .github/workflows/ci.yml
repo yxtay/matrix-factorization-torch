@@ -19,12 +19,10 @@ concurrency:
 
 jobs:
   python:
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-        python: [3.12]
+    permissions:
+      contents: read
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     env:
       ENVIRONMENT: ci
     steps:
@@ -34,20 +32,11 @@ jobs:
 
       - id: setup-python
         uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
-        with:
-          python-version: ${{ matrix.python }}
 
       - name: Set up environment
-        if: ${{ runner.os != 'Windows' }}
         run: |
           mkdir -p .venv
           echo "$(realpath .venv)/bin" >> "${GITHUB_PATH}"
-
-      - name: Set up environment (Windows)
-        if: ${{ runner.os == 'Windows' }}
-        run: |
-          New-Item -Type Directory -Force .venv
-          "$(Resolve-Path .venv)/Scripts" | Out-File -FilePath "${env:GITHUB_PATH}" -Append
 
       - run: uv sync
 
