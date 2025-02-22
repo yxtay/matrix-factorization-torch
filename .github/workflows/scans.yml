@@ -52,14 +52,14 @@ jobs:
         env:
           # All available variables are described in documentation
           # https://megalinter.io/latest/configuration/
-          APPLY_FIXES: all 
+          APPLY_FIXES: all
           DISABLE_LINTERS: JSON_JSONLINT,PYTHON_ISORT,PYTHON_PYLINT,PYTHON_PYRIGHT,SPELL_CSPELL
-          DISABLE_ERRORS_LINTERS: COPYPASTE_JSCPD,REPOSITORY_DEVSKIM,REPOSITORY_KICS 
-          FAIL_IF_UPDATED_SOURCES: true 
-          GITHUB_STATUS_REPORTER: true 
-          GITHUB_TOKEN: ${{ github.token }} 
-          PYTHON_DEFAULT_STYLE: ruff 
-          SARIF_REPORTER: true 
+          DISABLE_ERRORS_LINTERS: COPYPASTE_JSCPD,REPOSITORY_DEVSKIM,REPOSITORY_KICS
+          FAIL_IF_UPDATED_SOURCES: true
+          GITHUB_STATUS_REPORTER: true
+          GITHUB_TOKEN: ${{ github.token }}
+          PYTHON_DEFAULT_STYLE: ruff
+          SARIF_REPORTER: true
           VALIDATE_ALL_CODEBASE: false
 
       - if: ${{ success() || failure() }}
