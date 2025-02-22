@@ -559,22 +559,6 @@ wheels = [
 ]
 
 [[package]]
-name = "deltalake"
-version = "0.24.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pyarrow" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/0f/3d/fa40c41cc07fb911f58db3485e4c5a7d0d65686189e361749aa28176d71b/deltalake-0.24.0.tar.gz", hash = "sha256:0a33528b40067ee204b527efd88cc1a4cea4b61af4886ca57539d5b6b657e20f", size = 4954245 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b1/aa/df35473f67a5d88270c87dd95048096b747c630ec0c3981aac2ddab17f81/deltalake-0.24.0-cp39-abi3-macosx_10_12_x86_64.whl", hash = "sha256:1c4c5b2d3b8d467fb35504ef5649344bf3ad4f656303101e463ece3db2843c79", size = 40048854 },
-    { url = "https://files.pythonhosted.org/packages/8a/cc/1d790ccac050e7888d2e8b39beee2debe604fd4ee9bca2448f2c73dd4e48/deltalake-0.24.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:3d59e62305d42b76c78e0c3dcb479d9ad512a2bbe12867c24e3ed2d66492d2b4", size = 37646363 },
-    { url = "https://files.pythonhosted.org/packages/2d/19/0fdb5dc29293384a74ac4b3327c2015bf467e0d57e2f50b23658acab0343/deltalake-0.24.0-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:59487ae82c7de5950ec951e2dad7d4b2b281e81fac7b65d8187dac64b1506359", size = 44491693 },
-    { url = "https://files.pythonhosted.org/packages/f7/af/6d423118b7ce1f20a53e6eba2598b8494062a1f40c0da4ca3e7fe0815e47/deltalake-0.24.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:05dc5ee8adb05cc4aaf8988335c14720b4e7b042d0d1976bde10c2a5cc3b9654", size = 45955463 },
-    { url = "https://files.pythonhosted.org/packages/a1/74/be1d4d465b22526ecd2d2dc6b6cfa257285ac091a90ac86b99fcd043a7a5/deltalake-0.24.0-cp39-abi3-win_amd64.whl", hash = "sha256:1c423bdab46fa3c01a9364ba5533167d3b58099fd4a0599e6d0c363e9ba64799", size = 36586590 },
-]
-
-[[package]]
 name = "deprecated"
 version = "1.2.18"
 source = { registry = "https://pypi.org/simple" }
@@ -1496,7 +1480,7 @@ dependencies = [
     { name = "onnxruntime" },
     { name = "onnxscript" },
     { name = "pandas" },
-    { name = "polars", extra = ["deltalake", "pandas"] },
+    { name = "polars", extra = ["pandas"] },
     { name = "ray", extra = ["data", "train", "tune"] },
     { name = "tensorboard" },
     { name = "torch" },
@@ -1519,7 +1503,7 @@ requires-dist = [
     { name = "onnxruntime", specifier = "~=1.20" },
     { name = "onnxscript", specifier = ">=0.2,<0.3" },
     { name = "pandas", specifier = "~=2.2" },
-    { name = "polars", extras = ["pandas", "deltalake"], specifier = "~=1.19" },
+    { name = "polars", extras = ["pandas"], specifier = "~=1.19" },
     { name = "ray", extras = ["data", "train", "tune"], specifier = "~=2.40" },
     { name = "tensorboard", specifier = "~=2.17" },
     { name = "torch", specifier = "~=2.5" },
@@ -2314,9 +2298,6 @@ wheels = [
 ]
 
 [package.optional-dependencies]
-deltalake = [
-    { name = "deltalake" },
-]
 pandas = [
     { name = "pandas" },
     { name = "pyarrow" },
