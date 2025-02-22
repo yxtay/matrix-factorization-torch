@@ -35,6 +35,6 @@ jobs:
 
       - run: |
           uv sync
-          uv tree --depth 2
+          uv pip list
 
       - run: uv run python -m mf_torch.data.prepare
