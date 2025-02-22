@@ -47,8 +47,7 @@ jobs:
 
       - uses: astral-sh/setup-uv@4db96194c378173c656ce18a155ffc14a9fc4355 # v5
 
-      - id: setup-python
-        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+      - run: uv export --output-file requirements.txt --no-hashes --no-emit-project
 
       - id: megalinter
         # You can override MegaLinter flavor used to have faster performances
