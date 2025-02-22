@@ -8,7 +8,7 @@
     },
     {
       "automerge": false,
-      "matchManagers": ["pyenv"],
+      "matchPackageNames": ["python"],
       "matchUpdateTypes": ["minor"]
     }
   ]
