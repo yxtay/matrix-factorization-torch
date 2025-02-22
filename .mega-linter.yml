@@ -1,5 +1,10 @@
 PRE_COMMANDS:
+  - command: python -m pip install uv
+
+  - command: uv export --output-file requirements.txt --no-hashes --no-emit-project
+
   - command: python -m pip install -r requirements.txt
     venv: pylint
+
   - command: python -m pip install -r requirements.txt
     venv: pyright
