@@ -2,12 +2,21 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:best-practices",
-    "security:openssf-scorecard",
+    ":automergeDigest",
+    ":automergeMinor",
+    ":enableVulnerabilityAlerts",
+    ":separateMultipleMajorReleases",
     "group:allNonMajor",
     "group:allDigest",
-    ":automergeMinor",
-    ":automergeDigest"
+    "security:openssf-scorecard"
   ],
+  "dependencyDashboardOSVVulnerabilitySummary": "all",
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "automerge": true,
+    "enabled": true
+  },
   "packageRules": [
     {
       "automerge": false,
