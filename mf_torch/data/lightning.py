@@ -99,7 +99,7 @@ class FeatureProcessor(pydantic.BaseModel):
         fields = ["idx", "feature_hashes", "feature_weights"]
         return (
             self.get_data("train")
-            .shuffle(buffer_size=self.batch_size)
+            .shuffle(buffer_size=self.batch_size)  # devskim: ignore DS148264
             .sharding_filter()
             .map(functools.partial(select_fields, fields=fields))
             .batch(self.batch_size)
@@ -331,7 +331,7 @@ class MatrixFactorizationDataModule(LightningDataModule):
         train_data = MatrixFactorisationDataPipe(
             users_dataset=self.users_processor.get_train_data(),
             items_dataset=self.items_processor.get_train_data(),
-        ).shuffle(buffer_size=2**4)
+        ).shuffle(buffer_size=2**4)  # devskim: ignore DS148264
         return self.get_dataloader(train_data)
 
     def val_dataloader(self: Self) -> torch_data.DataLoader[FEATURES_TYPE]:
