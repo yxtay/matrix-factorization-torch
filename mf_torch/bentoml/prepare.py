@@ -27,8 +27,8 @@ def load_args(ckpt_path: str | None) -> dict:
     if not ckpt_path:
         return {"model": {}, "data": {}}
 
-    checkpoint = torch.load(  # nosec
-        ckpt_path, weights_only=False, map_location=torch.device("cpu")
+    checkpoint = torch.load(
+        ckpt_path, weights_only=True, map_location=torch.device("cpu")
     )
     model_args = checkpoint["hyper_parameters"]
     model_args = {
