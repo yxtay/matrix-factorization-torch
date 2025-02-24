@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+import torch
 from lightning import Trainer
 
 from mf_torch.bentoml.schemas import ItemCandidate, UserQuery
-from mf_torch.data.lightning import MatrixFactorizationDataModule
-from mf_torch.lightning import MatrixFactorizationLitModule
 from mf_torch.params import (
     CHECKPOINT_PATH,
     EXPORTED_PROGRAM_PATH,
@@ -14,18 +15,36 @@ from mf_torch.params import (
     USERS_TABLE_NAME,
 )
 
+if TYPE_CHECKING:
+    from lightning import Trainer
+
+
+def load_args(ckpt_path: str | None) -> dict:
+    if not ckpt_path:
+        return {"model": {}, "data": {}}
+
+    checkpoint = torch.load(  # nosec
+        ckpt_path, weights_only=False, map_location=torch.device("cpu")
+    )
+    model_args = checkpoint["hyper_parameters"]
+    model_args = {
+        key: value for key, value in model_args.items() if not key.startswith("_")
+    }
+
+    data_args = checkpoint["datamodule_hyper_parameters"]
+    data_args = {
+        key: value for key, value in data_args.items() if not key.startswith("_")
+    }
+    return {"model": model_args, "data": data_args}
+
 
 def prepare_trainer(ckpt_path: str | None = None) -> Trainer:
-    if ckpt_path:
-        datamodule = MatrixFactorizationDataModule.load_from_checkpoint(ckpt_path)
-        model = MatrixFactorizationLitModule.load_from_checkpoint(ckpt_path)
-    else:
-        datamodule = MatrixFactorizationDataModule()
-        model = MatrixFactorizationLitModule()
+    from mf_torch.lightning import cli_main
 
-    trainer = Trainer(logger=False, enable_checkpointing=False)
-    trainer.validate(model=model, datamodule=datamodule)
-    return trainer
+    trainer_args = {"fast_dev_run": True, "max_epochs": -1}
+    args = {"trainer": trainer_args, "ckpt_path": ckpt_path, **load_args(ckpt_path)}
+    cli = cli_main({"fit": args})
+    return cli.trainer
 
 
 def save_model(trainer: Trainer) -> None:
