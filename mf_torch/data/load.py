@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 from typing import TYPE_CHECKING, Any
 
 import torch
@@ -20,8 +21,6 @@ def collate_features(
     key: str = "",
     feature_names: dict[str, str] | None = None,
 ) -> tuple[list[str], torch.Tensor]:
-    import itertools
-
     if feature_names is None:
         feature_names = {}
     if value is None:
@@ -73,54 +72,8 @@ def hash_features(
     return hashes, weights
 
 
-def process_features(
-    row: dict[str, Any],
-    *,
-    idx: str,
-    feature_names: dict[str, str],
-    prefix: str = "",
-    num_hashes: int = NUM_HASHES,
-    num_embeddings: int = NUM_EMBEDDINGS,
-) -> dict[str, Any]:
-    import xxhash
-
-    features = select_fields(row, fields=list(feature_names))
-    feature_values, feature_weights = collate_features(
-        features, feature_names=feature_names
-    )
-    feature_hashes, feature_weights = hash_features(
-        feature_values,
-        feature_weights,
-        num_hashes=num_hashes,
-        num_embeddings=num_embeddings,
-    )
-    processed = {
-        "idx": xxhash.xxh32_intdigest(str(row[idx])),
-        "feature_values": feature_values,
-        "feature_hashes": feature_hashes,
-        "feature_weights": feature_weights,
-    }
-    row.update({f"{prefix}{key}": value for key, value in processed.items()})
-    return row
-
-
-def score_interactions(
-    row: dict[str, Any], *, label: str = "label", weight: str = "weight"
-) -> dict[str, Any]:
-    row["label"] = row[label] or 0
-    row["weight"] = abs(row[weight] or 0)
-    return row
-
-
 def select_fields(row: dict[str, Any], *, fields: list[str]) -> dict[str, Any]:
     return {key: row[key] for key in fields}
-
-
-def merge_rows(rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
-    new_row = {}
-    for row in rows:
-        new_row |= row
-    return new_row
 
 
 def pad_jagged_tensors(

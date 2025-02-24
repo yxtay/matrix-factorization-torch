@@ -5,6 +5,7 @@ TENSORBOARD_DIR = "lightning_logs"
 MLFLOW_DIR = "mlruns"
 
 # data
+TARGET = "rating"
 USER_IDX = "user_rn"
 USER_FEATURE_NAMES = {
     "user_id": "user_id",
