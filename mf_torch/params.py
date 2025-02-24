@@ -5,7 +5,8 @@ TENSORBOARD_DIR = "lightning_logs"
 MLFLOW_DIR = "mlruns"
 
 # data
-USER_IDX = "user_id"
+TARGET = "rating"
+USER_IDX = "user_rn"
 USER_FEATURE_NAMES = {
     "user_id": "user_id",
     "gender": "gender",
@@ -13,13 +14,14 @@ USER_FEATURE_NAMES = {
     "occupation": "occupation",
     "zipcode": "zipcode",
 }
-ITEM_IDX = "movie_id"
+ITEM_IDX = "movie_rn"
 ITEM_FEATURE_NAMES = {
     "movie_id": "movie_id",
     "genres": "genres",
 }
 
 # model
+BATCH_SIZE = 2**5
 NUM_HASHES = 2
 NUM_EMBEDDINGS = 2**16 + 1
 EMBEDDING_DIM = 32

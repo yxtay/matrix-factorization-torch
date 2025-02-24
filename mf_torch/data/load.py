@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import itertools
+from typing import TYPE_CHECKING, Any
 
 import torch
 import torch.utils.data as torch_data
@@ -16,12 +17,10 @@ if TYPE_CHECKING:
 
 
 def collate_features(
-    value: None | str | int | dict | list,
+    value: None | str | int | dict[str, Any] | list[Any],
     key: str = "",
     feature_names: dict[str, str] | None = None,
 ) -> tuple[list[str], torch.Tensor]:
-    import itertools
-
     if feature_names is None:
         feature_names = {}
     if value is None:
@@ -73,54 +72,8 @@ def hash_features(
     return hashes, weights
 
 
-def process_features(
-    row: dict,
-    *,
-    idx: str,
-    feature_names: list[str],
-    prefix: str = "",
-    num_hashes: int = NUM_HASHES,
-    num_embeddings: int = NUM_EMBEDDINGS,
-) -> dict:
-    import xxhash
-
-    features = select_fields(row, fields=feature_names)
-    feature_values, feature_weights = collate_features(
-        features, feature_names=feature_names
-    )
-    feature_hashes, feature_weights = hash_features(
-        feature_values,
-        feature_weights,
-        num_hashes=num_hashes,
-        num_embeddings=num_embeddings,
-    )
-    processed = {
-        "idx": xxhash.xxh32_intdigest(str(row[idx])),
-        "feature_values": feature_values,
-        "feature_hashes": feature_hashes,
-        "feature_weights": feature_weights,
-    }
-    row.update({f"{prefix}{key}": value for key, value in processed.items()})
-    return row
-
-
-def score_interactions(
-    row: dict, *, label: str = "label", weight: str = "weight"
-) -> dict:
-    row["label"] = row[label] or 0
-    row["weight"] = abs(row[weight] or 0)
-    return row
-
-
-def select_fields(row: dict, *, fields: list[str]) -> dict:
+def select_fields(row: dict[str, Any], *, fields: list[str]) -> dict[str, Any]:
     return {key: row[key] for key in fields}
-
-
-def merge_rows(rows: Iterable[dict]) -> dict:
-    new_row = {}
-    for row in rows:
-        new_row |= row
-    return new_row
 
 
 def pad_jagged_tensors(
@@ -144,7 +97,7 @@ def collate_tensor_fn(
         )
     ):
         # pad tensor if only first or last dimensions are different
-        return pad_jagged_tensors(batch)
+        return pad_jagged_tensors(list(batch))
     return torch_collate.collate_tensor_fn(batch, collate_fn_map=collate_fn_map)
 
 
@@ -152,10 +105,10 @@ torch_collate.default_collate_fn_map[torch.Tensor] = collate_tensor_fn
 
 
 @torch_data.functional_datapipe("load_parquet_as_dict")
-class ParquetDictLoaderIterDataPipe(torch_data.IterDataPipe):
+class ParquetDictLoaderIterDataPipe(torch_data.IterDataPipe[dict[str, Any]]):
     def __init__(
         self: Self,
-        source_datapipe: torch_data.IterDataPipe,
+        source_datapipe: torch_data.IterDataPipe[str],
         *,
         columns: Iterable[str] | None = None,
         filter_expr: ds.Expression | None = None,
@@ -178,7 +131,7 @@ class ParquetDictLoaderIterDataPipe(torch_data.IterDataPipe):
             for source in self.source_datapipe
         )
 
-    def __iter__(self: Self) -> Iterator[dict]:
+    def __iter__(self: Self) -> Iterator[dict[str, Any]]:
         for source in self.source_datapipe:
             dataset = self.pyarrow_dataset(source)
             for batch in dataset.to_batches(
@@ -198,10 +151,10 @@ class DeltaTableDictLoaderIterDataPipe(ParquetDictLoaderIterDataPipe):
 
 
 @torch_data.functional_datapipe("cycle")
-class CyclerIterDataPipe(torch_data.IterDataPipe):
+class CyclerIterDataPipe(torch_data.IterDataPipe[dict[str, Any]]):
     def __init__(
         self: Self,
-        source_datapipe: torch_data.IterDataPipe,
+        source_datapipe: torch_data.IterDataPipe[dict[str, Any]],
         count: int | None = None,
     ) -> None:
         super().__init__()
@@ -217,7 +170,7 @@ class CyclerIterDataPipe(torch_data.IterDataPipe):
             return 2**31 - 1  # max 32-bit signed integer
         return len(self.source_datapipe) * self.count
 
-    def __iter__(self: Self) -> Iterator[dict]:
+    def __iter__(self: Self) -> Iterator[dict[str, Any]]:
         i = 0
         while self.count is None or i < self.count:
             yield from self.source_datapipe

@@ -34,7 +34,10 @@ jobs:
         uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
 
       - run: |
-          uv sync
+          uv lock --check
+          uv sync --frozen
           uv pip list
 
       - run: uv run python -m mf_torch.data.prepare
+
+      - run: uv run python -m mf_torch.data.lightning

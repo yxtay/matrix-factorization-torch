@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -49,6 +48,7 @@ class MatrixFactorizationLitModule(LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.model = None
+        self.loss_fns = None
         self.metrics = None
 
         supported_embedder = {None, "attention", "transformer"}
@@ -226,6 +226,8 @@ class MatrixFactorizationLitModule(LightningModule):
         if self.model is None:
             self.model = self.get_model()
             self.compile()
+        if self.loss_fns is None:
+            self.loss_fns = self.get_loss_fns()
         if self.metrics is None:
             self.metrics = self.get_metrics(top_k=20)
 
@@ -263,8 +265,7 @@ class MatrixFactorizationLitModule(LightningModule):
             embedder=embedder, normalize=self.hparams.normalize
         )
 
-    @cached_property
-    def loss_fns(self: Self) -> torch.nn.ModuleList:
+    def get_loss_fns(self: Self) -> torch.nn.ModuleList:
         import mf_torch.losses as mf_losses
 
         loss_classes = [
@@ -316,11 +317,11 @@ class MatrixFactorizationLitModule(LightningModule):
     def export_torchscript(
         self: Self, path: str | None = None
     ) -> torch.jit.ScriptModule:
-        script_module = torch.jit.script(self.model.eval())
+        script_module = torch.jit.script(self.model.eval())  # devskim: ignore DS189424
 
         if path is None:
             path = Path(self.trainer.log_dir) / SCRIPT_MODULE_PATH
-        torch.jit.save(script_module, path)
+        torch.jit.save(script_module, path)  # nosec
         return script_module
 
     def export_dynamo(
@@ -340,7 +341,7 @@ class MatrixFactorizationLitModule(LightningModule):
 
         if path is None:
             path = Path(self.trainer.log_dir) / EXPORTED_PROGRAM_PATH
-        torch.export.save(exported_program, path)
+        torch.export.save(exported_program, path)  # nosec
         return exported_program
 
     def export_dynamo_onnx(
