@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
+import pydantic
 import torch
 from lightning import Trainer
 
@@ -17,6 +18,9 @@ from mf_torch.params import (
 
 if TYPE_CHECKING:
     from lightning import Trainer
+
+
+T = TypeVar("T", bound=pydantic.BaseModel)
 
 
 def load_args(ckpt_path: str | None) -> dict:
