@@ -155,12 +155,9 @@ class ItemsProcessor(FeaturesProcessor):
         import lancedb
         import pyarrow as pa
 
-        from mf_torch.data.load import ParquetDictLoaderIterDataPipe
-
         fields = ["movie_id", "title", "genres", "embedding"]
         dp = (
-            ParquetDictLoaderIterDataPipe([self.data_path])
-            .map(self.process)
+            self.get_data("predict")
             .map(
                 lambda example: {
                     **example,

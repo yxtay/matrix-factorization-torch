@@ -161,8 +161,9 @@ cython_debug/
 #.idea/
 
 data.lock
-/data
-/lightning_logs
-/mlruns
-/ray_results
-/lance_db
+data
+lightning_logs
+megalinter-reports
+mlruns
+ray_results
+lance_db
