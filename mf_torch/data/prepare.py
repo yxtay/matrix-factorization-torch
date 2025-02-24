@@ -169,15 +169,37 @@ def process_users(
             pl.struct("movie_id", "rating").filter(pl.col("is_train")).alias("history"),
             pl.struct("movie_id", "rating").filter(~pl.col("is_train")).alias("target"),
         )
-        .with_columns(p=((pl.col("len").rank("ordinal") - 1) / pl.count("len")))
+        .with_columns(
+            p=((pl.col("len").rank("ordinal") - 1) / pl.count("len")),
+            history=pl.struct(
+                pl.col("history")
+                .list.eval(pl.element().struct.field("movie_id"))
+                .alias("movie_id"),
+                pl.col("history")
+                .list.eval(pl.element().struct.field("rating"))
+                .alias("rating"),
+            ),
+            target=pl.struct(
+                pl.col("target")
+                .list.eval(pl.element().struct.field("movie_id"))
+                .alias("movie_id"),
+                pl.col("target")
+                .list.eval(pl.element().struct.field("rating"))
+                .alias("rating"),
+            ),
+        )
         .with_columns(is_val=pl.col("p") >= 1 - val_prop)
+        .with_columns(
+            is_test=~pl.col("is_val"),
+            is_predict=True,
+        )
         .drop("len", "p")
     )
     users_procesed = (
         users.lazy()
         .with_row_index("user_rn")
         .join(users_interactions, on="user_id", how="left", coalesce=True)
-        .collect(streaming=True)
+        .collect()
     )
 
     users_procesed.write_parquet(users_parquet)
@@ -216,7 +238,7 @@ def process_movies(
             how="left",
             coalesce=True,
         )
-        .collect(streaming=True)
+        .collect()
     )
 
     movies_processed.write_parquet(movies_parquet)
@@ -233,7 +255,7 @@ def process_ratings(
     src_dir: str = DATA_DIR,
     overwrite: bool = False,
 ) -> pl.LazyFrame:
-    ratings_parquet = Path(src_dir, "ml-1m", "sparse.parquet")
+    ratings_parquet = Path(src_dir, "ml-1m", "ratings.parquet")
     if ratings_parquet.exists() and not overwrite:
         ratings_processed = pl.scan_parquet(str(ratings_parquet))
         logger.info("sparse loaded: {}", ratings_parquet)
@@ -247,7 +269,7 @@ def process_ratings(
             is_val=~pl.col("is_train") & pl.col("is_val"),
             is_test=~pl.col("is_train") & ~pl.col("is_val"),
         )
-        .collect(streaming=True)
+        .collect()
     )
     ratings_processed.write_parquet(ratings_parquet)
     logger.info("sparse saved: {}, shape: {}", ratings_parquet, ratings_processed.shape)
@@ -269,4 +291,4 @@ def prepare_movielens(
 
 if __name__ == "__main__":
     download_unpack_data(overwrite=True)
-    prepare_movielens(DATA_DIR, overwrite=True).head().collect().glimpse()
+    prepare_movielens(DATA_DIR, overwrite=True).collect().head().glimpse()
