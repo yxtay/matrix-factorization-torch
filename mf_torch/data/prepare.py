@@ -173,18 +173,26 @@ def process_users(
             p=((pl.col("len").rank("ordinal") - 1) / pl.count("len")),
             history=pl.struct(
                 pl.col("history")
-                .list.eval(pl.element().struct.field("movie_id"))
+                .list.eval(
+                    pl.element().struct.field("movie_id")
+                )  # devskim: ignore DS189424
                 .alias("movie_id"),
                 pl.col("history")
-                .list.eval(pl.element().struct.field("rating"))
+                .list.eval(
+                    pl.element().struct.field("rating")
+                )  # devskim: ignore DS189424
                 .alias("rating"),
             ),
             target=pl.struct(
                 pl.col("target")
-                .list.eval(pl.element().struct.field("movie_id"))
+                .list.eval(
+                    pl.element().struct.field("movie_id")
+                )  # devskim: ignore DS189424
                 .alias("movie_id"),
                 pl.col("target")
-                .list.eval(pl.element().struct.field("rating"))
+                .list.eval(
+                    pl.element().struct.field("rating")
+                )  # devskim: ignore DS189424
                 .alias("rating"),
             ),
         )
