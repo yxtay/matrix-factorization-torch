@@ -291,4 +291,4 @@ def prepare_movielens(
 
 if __name__ == "__main__":
     download_unpack_data(overwrite=True)
-    prepare_movielens(DATA_DIR, overwrite=True).collect().head().glimpse()
+    prepare_movielens(DATA_DIR, overwrite=True).head().collect().glimpse()

@@ -350,7 +350,7 @@ class MatrixFactorizationLitModule(LightningModule):
         model = self.export_dynamo().module()
 
         export_options = torch.onnx.ExportOptions(dynamic_shapes=True)
-        onnx_program = torch.onnx.dynamo_export(  # nosec
+        onnx_program = torch.onnx.dynamo_export(
             model, *self.example_input_array, export_options=export_options
         )
 

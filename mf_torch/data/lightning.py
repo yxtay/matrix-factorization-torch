@@ -362,7 +362,7 @@ if __name__ == "__main__":
     ]
     for dataloader in dataloaders:
         batch = next(iter(dataloader))
-        rich.pretty.pprint(batch)
+        rich.print(batch)
         shapes = {
             key: value.shape
             for key, value in batch.items()
@@ -372,5 +372,5 @@ if __name__ == "__main__":
 
     dm.users_processor.get_index().search().to_polars().glimpse()
     dm.items_processor.get_index(
-        lambda hashes, _: torch.rand(hashes.size(0), 32)
+        lambda hashes, _: torch.rand(hashes.size(0), 32)  # devskim: ignore DS148264
     ).search().to_polars().glimpse()
