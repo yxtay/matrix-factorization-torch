@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
+from numpydantic import NDArray, Shape  # noqa: TC002
 from pydantic import BaseModel
-
-if TYPE_CHECKING:
-    from numpydantic import NDArray, Shape
 
 
 class Query(BaseModel):

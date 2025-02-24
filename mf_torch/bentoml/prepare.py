@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-from typing import TypeVar
-
-import torch
 from lightning import Trainer
-from pydantic import BaseModel
 
 from mf_torch.bentoml.schemas import ItemCandidate, UserQuery
 from mf_torch.data.lightning import MatrixFactorizationDataModule
@@ -17,27 +13,6 @@ from mf_torch.params import (
     MODEL_NAME,
     USERS_TABLE_NAME,
 )
-
-T = TypeVar("T", bound=BaseModel)
-
-
-def load_args(ckpt_path: str | None) -> dict:
-    if not ckpt_path:
-        return {"model": {}, "data": {}}
-
-    checkpoint = torch.load(
-        ckpt_path, weights_only=False, map_location=torch.device("cpu")
-    )
-    model_args = checkpoint["hyper_parameters"]
-    model_args = {
-        key: value for key, value in model_args.items() if not key.startswith("_")
-    }
-
-    data_args = checkpoint["datamodule_hyper_parameters"]
-    data_args = {
-        key: value for key, value in data_args.items() if not key.startswith("_")
-    }
-    return {"model": model_args, "data": data_args}
 
 
 def prepare_trainer(ckpt_path: str | None = None) -> Trainer:
