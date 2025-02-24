@@ -43,7 +43,7 @@ FEATURES_TYPE = dict[str, torch.Tensor]
 BATCH_TYPE = tuple[FEATURES_TYPE, FEATURES_TYPE, torch.Tensor]
 
 
-class FeatureProcessor(pydantic.BaseModel):
+class FeaturesProcessor(pydantic.BaseModel):
     data_dir: str = DATA_DIR
     idx_col: str
     feature_names: dict[str, str]
@@ -107,7 +107,7 @@ class FeatureProcessor(pydantic.BaseModel):
         )
 
 
-class UsersProcessor(FeatureProcessor):
+class UsersProcessor(FeaturesProcessor):
     idx_col: str = USER_IDX
     feature_names: dict[str, str] = USER_FEATURE_NAMES
     table_name: str = USERS_TABLE_NAME
@@ -138,7 +138,7 @@ class UsersProcessor(FeatureProcessor):
         return table
 
 
-class ItemsProcessor(FeatureProcessor):
+class ItemsProcessor(FeaturesProcessor):
     idx_col: str = ITEM_IDX
     feature_names: dict[str, str] = ITEM_FEATURE_NAMES
     table_name: str = ITEMS_TABLE_NAME
