@@ -4,6 +4,7 @@ import shutil
 from pathlib import Path
 
 import polars as pl
+import polars.selectors as cs
 from loguru import logger
 
 from mf_torch.params import DATA_DIR, MOVIELENS_1M_URL
@@ -164,36 +165,28 @@ def process_users(
         ratings.lazy()
         .group_by("user_id")
         .agg(
-            pl.len(),
-            pl.any("is_train").alias("is_train"),
-            pl.struct("movie_id", "rating").filter(pl.col("is_train")).alias("history"),
-            pl.struct("movie_id", "rating").filter(~pl.col("is_train")).alias("target"),
+            history=pl.struct("movie_id", "rating").filter(pl.col("is_train")),
+            target=pl.struct("movie_id", "rating").filter(~pl.col("is_train")),
+            len=pl.len(),
+            is_train=pl.any("is_train"),
         )
         .with_columns(
             p=((pl.col("len").rank("ordinal") - 1) / pl.count("len")),
             history=pl.struct(
-                pl.col("history")
-                .list.eval(  # devskim: ignore DS189424
+                movie_id=pl.col("history").list.eval(  # devskim: ignore DS189424
                     pl.element().struct.field("movie_id")
-                )
-                .alias("movie_id"),
-                pl.col("history")
-                .list.eval(  # devskim: ignore DS189424
+                ),
+                rating=pl.col("history").list.eval(  # devskim: ignore DS189424
                     pl.element().struct.field("rating")
-                )
-                .alias("rating"),
+                ),
             ),
             target=pl.struct(
-                pl.col("target")
-                .list.eval(  # devskim: ignore DS189424
+                movie_id=pl.col("target").list.eval(  # devskim: ignore DS189424
                     pl.element().struct.field("movie_id")
-                )
-                .alias("movie_id"),
-                pl.col("target")
-                .list.eval(  # devskim: ignore DS189424
+                ),
+                rating=pl.col("target").list.eval(  # devskim: ignore DS189424
                     pl.element().struct.field("rating")
-                )
-                .alias("rating"),
+                ),
             ),
         )
         .with_columns(is_val=pl.col("p") >= 1 - val_prop)
@@ -232,20 +225,16 @@ def process_movies(
     movies_processed = (
         movies.lazy()
         .with_columns(
-            pl.col("genres")
-            .str.split("|")
-            .cast(pl.List(pl.Categorical))
-            .alias("genres"),
+            genres=pl.col("genres").str.split("|").cast(pl.List(pl.Categorical)),
         )
         .with_row_index("movie_rn")
         .join(
-            ratings.lazy()
-            .group_by("movie_id")
-            .agg(pl.any("is_train").alias("is_train")),
+            ratings.lazy().group_by("movie_id").agg(pl.any("is_train")),
             on="movie_id",
             how="left",
             coalesce=True,
         )
+        .with_columns(is_val=True, is_test=True, is_predict=True)
         .collect()
     )
 
@@ -272,10 +261,11 @@ def process_ratings(
     ratings_processed = (
         ratings.lazy()
         .join(users.lazy().drop("is_train"), on="user_id")
-        .join(movies.lazy().drop("is_train"), on="movie_id")
+        .join(movies.lazy().drop(cs.starts_with("is_")), on="movie_id")
         .with_columns(
             is_val=~pl.col("is_train") & pl.col("is_val"),
             is_test=~pl.col("is_train") & ~pl.col("is_val"),
+            is_predict=True,
         )
         .collect()
     )
