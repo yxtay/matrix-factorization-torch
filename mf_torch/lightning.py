@@ -317,7 +317,7 @@ class MatrixFactorizationLitModule(LightningModule):
     def export_torchscript(
         self: Self, path: str | None = None
     ) -> torch.jit.ScriptModule:
-        script_module = torch.jit.script(self.model.eval())
+        script_module = torch.jit.script(self.model.eval())  # devskim: ignore DS189424
 
         if path is None:
             path = Path(self.trainer.log_dir) / SCRIPT_MODULE_PATH
