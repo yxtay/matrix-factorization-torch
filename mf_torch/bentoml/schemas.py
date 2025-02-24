@@ -10,9 +10,9 @@ if TYPE_CHECKING:
 
 class Query(BaseModel):
     feature_values: list[str]
-    feature_hashes: NDArray[Shape["*"], int]
-    feature_weights: NDArray[Shape["*"], float]
-    embedding: NDArray[Shape["*"], float] | None = None
+    feature_hashes: NDArray[Shape["*"], int]  # noqa: F722
+    feature_weights: NDArray[Shape["*"], float]  # noqa: F722
+    embedding: NDArray[Shape["*"], float] | None = None  # noqa: F722
 
 
 class ItemQuery(BaseModel):

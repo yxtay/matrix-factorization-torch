@@ -81,7 +81,11 @@ class FeatureProcessor(pydantic.BaseModel):
 
         from mf_torch.data.load import ParquetDictLoaderIterDataPipe
 
-        assert subset in {"train", "val", "test", "predict"}
+        valid_subset = {"train", "val", "test", "predict"}
+        if subset not in valid_subset:
+            msg = f"`{subset}` is not one of `{valid_subset}`"
+            raise ValueError(msg)
+
         filter_expr = ds.field(f"is_{subset}")
         return ParquetDictLoaderIterDataPipe(
             [self.data_path], filter_expr=filter_expr, batch_size=self.batch_size
@@ -344,10 +348,9 @@ class MatrixFactorizationDataModule(LightningDataModule):
 
 
 if __name__ == "__main__":
-    import rich
-    import tqdm
+    import rich.pretty
 
-    dm = MatrixFactorizationDataModule(num_workers=None)
+    dm = MatrixFactorizationDataModule()
     dm.prepare_data().head().collect().glimpse()
     dm.setup()
 
@@ -359,7 +362,7 @@ if __name__ == "__main__":
     ]
     for dataloader in dataloaders:
         batch = next(iter(dataloader))
-        rich.print(batch)
+        rich.pretty.pprint(batch)
         shapes = {
             key: value.shape
             for key, value in batch.items()
@@ -371,9 +374,3 @@ if __name__ == "__main__":
     dm.items_processor.get_index(
         lambda hashes, _: torch.rand(hashes.size(0), 32)
     ).search().to_polars().glimpse()
-
-    progress_bar = tqdm.tqdm(dm.train_dataloader())
-    for batch in progress_bar:
-        targets = batch["targets"]
-        sparsity = targets.values().numel() / targets.numel()
-        progress_bar.set_postfix({"sparsity": sparsity})

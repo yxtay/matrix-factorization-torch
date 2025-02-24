@@ -321,7 +321,7 @@ class MatrixFactorizationLitModule(LightningModule):
 
         if path is None:
             path = Path(self.trainer.log_dir) / SCRIPT_MODULE_PATH
-        torch.jit.save(script_module, path)
+        torch.jit.save(script_module, path)  # nosec
         return script_module
 
     def export_dynamo(
@@ -341,7 +341,7 @@ class MatrixFactorizationLitModule(LightningModule):
 
         if path is None:
             path = Path(self.trainer.log_dir) / EXPORTED_PROGRAM_PATH
-        torch.export.save(exported_program, path)
+        torch.export.save(exported_program, path)  # nosec
         return exported_program
 
     def export_dynamo_onnx(
@@ -350,7 +350,7 @@ class MatrixFactorizationLitModule(LightningModule):
         model = self.export_dynamo().module()
 
         export_options = torch.onnx.ExportOptions(dynamic_shapes=True)
-        onnx_program = torch.onnx.dynamo_export(
+        onnx_program = torch.onnx.dynamo_export(  # nosec
             model, *self.example_input_array, export_options=export_options
         )
 
