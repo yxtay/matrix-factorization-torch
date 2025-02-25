@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import pydantic
 import torch
 import torch.utils.data as torch_data
 from lightning import LightningDataModule
@@ -48,28 +49,18 @@ FEATURES_TYPE = dict[str, torch.Tensor]
 BATCH_TYPE = dict[str, FEATURES_TYPE | torch.Tensor]
 
 
-class FeaturesProcessor:
-    def __init__(
-        self: Self,
-        rn_col: str,
-        id_col: str,
-        feature_names: dict[str, str],
-        table_name: str,
-        batch_size: int = BATCH_SIZE,
-        num_hashes: int = NUM_HASHES,
-        num_embeddings: int = NUM_EMBEDDINGS,
-        data_dir: str = DATA_DIR,
-        lance_db_path: str = LANCE_DB_PATH,
-    ) -> None:
-        self.rn_col = rn_col
-        self.id_col = id_col
-        self.feature_names = feature_names
-        self.table_name = table_name
-        self.data_dir = data_dir
-        self.lance_db_path = lance_db_path
-        self.batch_size = batch_size
-        self.num_hashes = num_hashes
-        self.num_embeddings = num_embeddings
+class FeaturesProcessor(pydantic.BaseModel):
+    id_col: str
+    rn_col: str
+    feature_names: dict[str, str]
+    lance_table_name: str
+
+    batch_size: int = BATCH_SIZE
+    num_hashes: int = NUM_HASHES
+    num_embeddings: int = NUM_EMBEDDINGS
+
+    data_dir: str = DATA_DIR
+    lance_db_path: str = LANCE_DB_PATH
 
     def process(self: Self, example: dict[str, Any]) -> dict[str, Any]:
         features = select_fields(example, fields=list(self.feature_names))
@@ -134,7 +125,7 @@ class FeaturesProcessor:
 
     @property
     def index(self: Self) -> lancedb.table.Table:
-        return self.db.open_table(self.table_name)
+        return self.db.open_table(self.lance_table_name)
 
     def get_id(self: Self, id_val: int | None) -> dict[str, Any]:
         if id_val is None:
@@ -146,25 +137,10 @@ class FeaturesProcessor:
 
 
 class UsersProcessor(FeaturesProcessor):
-    def __init__(
-        self: Self,
-        rn_col: str = USER_RN_COL,
-        id_col: str = USER_ID_COL,
-        feature_names: dict[str, str] = USER_FEATURE_NAMES,
-        table_name: str = USERS_TABLE_NAME,
-        **kwargs: str | int,
-    ) -> None:
-        super().__init__(
-            rn_col=rn_col,
-            id_col=id_col,
-            feature_names=feature_names,
-            table_name=table_name,
-            **kwargs,
-        )
-
+    id_col: str = USER_ID_COL
     rn_col: str = USER_RN_COL
     feature_names: dict[str, str] = USER_FEATURE_NAMES
-    table_name: str = USERS_TABLE_NAME
+    lance_table_name: str = USERS_TABLE_NAME
 
     @property
     def data_path(self) -> str:
@@ -184,7 +160,9 @@ class UsersProcessor(FeaturesProcessor):
         ]
         pa_table = pq.read_table(self.data_path, columns=columns)
 
-        table = self.db.create_table(self.table_name, data=pa_table, mode="overwrite")
+        table = self.db.create_table(
+            self.lance_table_name, data=pa_table, mode="overwrite"
+        )
         table.compact_files()
         table.cleanup_old_versions(datetime.timedelta(days=1))
         return table
@@ -201,29 +179,15 @@ class UsersProcessor(FeaturesProcessor):
 
 
 class ItemsProcessor(FeaturesProcessor):
-    def __init__(
-        self: Self,
-        rn_col: str = ITEM_RN_COL,
-        id_col: str = ITEM_ID_COL,
-        feature_names: dict[str, str] = ITEM_FEATURE_NAMES,
-        table_name: str = ITEMS_TABLE_NAME,
-        num_partitions: int | None = None,
-        num_sub_vectors: int | None = None,
-        num_probes: int = 4,
-        refine_factor: int = 4,
-        **kwargs: str | int,
-    ) -> None:
-        super().__init__(
-            rn_col=rn_col,
-            id_col=id_col,
-            feature_names=feature_names,
-            table_name=table_name,
-            **kwargs,
-        )
-        self.num_partitions = num_partitions
-        self.num_sub_vectors = num_sub_vectors
-        self.num_probes = num_probes
-        self.refine_factor = refine_factor
+    id_col: str = ITEM_ID_COL
+    rn_col: str = ITEM_RN_COL
+    feature_names: dict[str, str] = ITEM_FEATURE_NAMES
+    lance_table_name: str = ITEMS_TABLE_NAME
+
+    num_partitions: int | None = None
+    num_sub_vectors: int | None = None
+    num_probes: int = 4
+    refine_factor: int = 4
 
     @property
     def data_path(self) -> str:
@@ -265,7 +229,7 @@ class ItemsProcessor(FeaturesProcessor):
         pa_table = pa.Table.from_pylist(list(dp), schema=schema)
 
         table = self.db.create_table(
-            self.table_name,
+            self.lance_table_name,
             data=pa_table,
             mode="overwrite",
         )
