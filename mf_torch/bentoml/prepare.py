@@ -27,7 +27,7 @@ def load_args(ckpt_path: str | None) -> dict:
     if not ckpt_path:
         return {"model": {}, "data": {}}
 
-    # nosemgrep
+    # nosemgrep: trailofbits.python.pickles-in-pytorch.pickles-in-pytorch
     checkpoint = torch.load(  # nosec
         ckpt_path, weights_only=True, map_location=torch.device("cpu")
     )

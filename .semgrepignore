@@ -1,1 +1,2 @@
+:include .gitinore
 **/*.lock
