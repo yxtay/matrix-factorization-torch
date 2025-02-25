@@ -50,16 +50,16 @@ BATCH_TYPE = dict[str, FEATURES_TYPE | torch.Tensor]
 
 class FeaturesProcessor:
     def __init__(
-        self,
+        self: Self,
         rn_col: str,
         id_col: str,
         feature_names: dict[str, str],
         table_name: str,
-        data_dir: str = DATA_DIR,
-        lance_db_path: str = LANCE_DB_PATH,
         batch_size: int = BATCH_SIZE,
         num_hashes: int = NUM_HASHES,
         num_embeddings: int = NUM_EMBEDDINGS,
+        data_dir: str = DATA_DIR,
+        lance_db_path: str = LANCE_DB_PATH,
     ) -> None:
         self.rn_col = rn_col
         self.id_col = id_col
@@ -147,7 +147,7 @@ class FeaturesProcessor:
 
 class UsersProcessor(FeaturesProcessor):
     def __init__(
-        self,
+        self: Self,
         rn_col: str = USER_RN_COL,
         id_col: str = USER_ID_COL,
         feature_names: dict[str, str] = USER_FEATURE_NAMES,
@@ -202,7 +202,7 @@ class UsersProcessor(FeaturesProcessor):
 
 class ItemsProcessor(FeaturesProcessor):
     def __init__(
-        self,
+        self: Self,
         rn_col: str = ITEM_RN_COL,
         id_col: str = ITEM_ID_COL,
         feature_names: dict[str, str] = ITEM_FEATURE_NAMES,
@@ -395,6 +395,7 @@ class MatrixFactorizationDataModule(LightningDataModule):
             batch_size=self.hparams.user_batch_size,
             num_hashes=self.hparams.num_hashes,
             num_embeddings=self.hparams.num_embeddings,
+            data_dir=self.hparams.data_dir,
         )
         self.items_processor = ItemsProcessor(
             batch_size=self.hparams.item_batch_size,
@@ -404,6 +405,7 @@ class MatrixFactorizationDataModule(LightningDataModule):
             num_sub_vectors=self.hparams.num_sub_vectors,
             num_probes=self.hparams.num_probes,
             refine_factor=self.hparams.refine_factor,
+            data_dir=self.hparams.data_dir,
         )
 
     def get_dataloader(
@@ -435,6 +437,7 @@ class MatrixFactorizationDataModule(LightningDataModule):
         train_data = MatrixFactorisationDataPipe(
             users_dataset=self.users_processor.get_train_data(),
             items_dataset=self.items_processor.get_train_data(),
+            data_dir=self.hparams.data_dir,
         ).shuffle(buffer_size=2**4)  # devskim: ignore DS148264
         return self.get_dataloader(train_data, shuffle=True)
 

@@ -13,7 +13,7 @@ def get_lightning_args(
 ) -> dict[str, bool | float | int | str]:
     num_embeddings = 2 ** config["log_num_embeddings"] + 1
     embedding_dim = 2 ** config["log_embedding_dim"]
-    # num_heads = 2 ** config["log_num_heads"]
+    num_heads = 2 ** config["log_num_heads"]
 
     hard_negatives_ratio = (
         config["hard_negatives_ratio"] if config["use_hard_negatives"] else None
@@ -23,9 +23,9 @@ def get_lightning_args(
         "num_embeddings": num_embeddings,
         "embedding_dim": embedding_dim,
         "train_loss": config["train_loss"],
-        # "embedder_type": config["embedder_type"],
-        # "num_heads": num_heads,
-        # "dropout": config["dropout"],
+        "embedder_type": config["embedder_type"],
+        "num_heads": num_heads,
+        "dropout": config["dropout"],
         "hard_negatives_ratio": hard_negatives_ratio,
         "sigma": config["sigma"],
         "margin": config["margin"],
@@ -50,10 +50,7 @@ def evaluation_function(
         for key, value in config.items()
     }
 
-    trainer_args = {
-        "limit_train_batches": config["limit_train_batches"],
-        "num_sanity_val_steps": 0,
-    }
+    trainer_args = {"max_epochs": config["max_epochs"]}
     args = {"fit": {"trainer": trainer_args, **get_lightning_args(config)}}
     cli = cli_main(args)
     return {
@@ -71,11 +68,25 @@ def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
         "AlignmentContrastiveLoss",
         "MutualInformationNeuralEstimationLoss",
     ]
-    config = {
-        "num_hashes": flaml.tune.randint(1, 5),
+    point_to_evaluate = {
+        "num_hashes": 2,
+        "log_num_embeddings": 16,
+        "log_embedding_dim": 5,
+        "embedder_type": "base",
+        "log_num_heads": 0,
+        "dropout": 0.0,
+        "train_loss": "PairwiseHingeLoss",
+        "use_hard_negatives": False,
+        "hard_negatives_ratio": 1.0,
+        "sigma": 1.0,
+        "margin": 1.0,
+        "learning_rate": 0.1,
+    }
+    config = point_to_evaluate | {
+        "num_hashes": flaml.tune.randint(2, 5),
         "log_num_embeddings": flaml.tune.randint(12, 21),
         "log_embedding_dim": flaml.tune.randint(5, 9),
-        # "embedder_type": flaml.tune.choice([None, "attention", "transformer"]),
+        # "embedder_type": flaml.tune.choice(["base", "attention", "transformer"]),
         # "log_num_heads": flaml.tune.randint(0, 3),
         # "dropout": flaml.tune.quniform(0.0, 0.5, 0.01),
         "train_loss": flaml.tune.choice(train_losses),
@@ -83,22 +94,21 @@ def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
         "hard_negatives_ratio": flaml.tune.quniform(0.5, 2.0, 0.01),
         "sigma": flaml.tune.lograndint(1, 1000),
         "margin": flaml.tune.quniform(-1.0, 1.0, 0.01),
-        "learning_rate": flaml.tune.qloguniform(0.001, 0.1, 0.001),
+        "learning_rate": flaml.tune.loguniform(0.001, 0.1),
     }
-    low_cost_partial_config = {}
-    point_to_evaluate = {
+    low_cost_partial_config = {
         "num_hashes": 2,
-        "log_num_embeddings": 16,
+        "log_num_embeddings": 12,
         "log_embedding_dim": 5,
-        # "embedder_type": None,
-        # "log_num_heads": 0,
+        "embedder_type": "base",
+        "log_num_heads": 0,
         # "dropout": 0.0,
-        "train_loss": "PairwiseHingeLoss",
-        "use_hard_negatives": False,
-        "hard_negatives_ratio": 1.0,
-        "sigma": 1.0,
-        "margin": 1.0,
-        "learning_rate": 0.1,
+        # "train_loss": "PairwiseHingeLoss",
+        "use_hard_negatives": True,
+        "hard_negatives_ratio": 0.5,
+        # "sigma": 1.0,
+        # "margin": 1.0,
+        # "learning_rate": 0.1,
     }
     return flaml.tune.run(
         evaluation_function,
@@ -109,9 +119,9 @@ def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
         points_to_evaluate=[point_to_evaluate],
         time_budget_s=60 * 60 * 1,
         num_samples=-1,
-        resource_attr="limit_train_batches",
-        min_resource=0.25,
-        max_resource=1.0,
+        resource_attr="max_epochs",
+        min_resource=1,
+        max_resource=32,
         reduction_factor=2,
     )
 

@@ -255,7 +255,7 @@ class MatrixFactorizationLitModule(LightningModule):
     def configure_model(self: Self) -> None:
         if self.model is None:
             self.model = self.get_model()
-            self.compile()
+            # self.compile()
         if self.loss_fns is None:
             self.loss_fns = self.get_loss_fns()
         if self.metrics is None:
