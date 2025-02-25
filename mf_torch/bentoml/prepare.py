@@ -27,7 +27,7 @@ def load_args(ckpt_path: str | None) -> dict:
     if not ckpt_path:
         return {"model": {}, "data": {}}
 
-    checkpoint = torch.load(  # nosec
+    checkpoint = torch.load(  # nosec # nosemgrep
         ckpt_path, weights_only=True, map_location=torch.device("cpu")
     )
     model_args = checkpoint["hyper_parameters"]
@@ -46,7 +46,7 @@ def prepare_trainer(ckpt_path: str | None = None) -> Trainer:
     from mf_torch.lightning import cli_main
 
     trainer_args = {"logger": False}
-    args = {"trainer": trainer_args, "ckpt_path": ckpt_path, **load_args(ckpt_path)}
+    args = {"trainer": trainer_args, "ckpt_path": ckpt_path}
     cli = cli_main({"validate": args})
     return cli.trainer
 
