@@ -482,4 +482,9 @@ if __name__ == "__main__":
         lambda hashes, _: torch.rand(hashes.size(0), 32)  # devskim: ignore DS148264
     ).search().to_polars().glimpse()
     rich.print(dm.items_processor.get_id(1))
-    rich.print(dm.items_processor.search(torch.rand(32).numpy(), top_k=5))
+    rich.print(
+        dm.items_processor.search(
+            torch.rand(32).numpy(),  # devskim: ignore DS148264
+            top_k=5,
+        )
+    )
