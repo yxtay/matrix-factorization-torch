@@ -41,20 +41,20 @@ class MatrixFactorizationLitModule(LightningModule):
     def __init__(
         self: Self,
         *,
-        num_embeddings: int = NUM_EMBEDDINGS,
-        embedding_dim: int = EMBEDDING_DIM,
-        train_loss: str = "PairwiseHingeLoss",
-        max_norm: float | None = None,
-        norm_type: float = 2.0,
-        embedder_type: str = "base",
-        num_heads: int = 1,
-        dropout: float = 0.0,
-        normalize: bool = True,
-        hard_negatives_ratio: float | None = None,
-        sigma: float = 1.0,
-        margin: float = 1.0,
-        learning_rate: float = 0.01,
-        top_k: int = TOP_K,
+        num_embeddings: int = NUM_EMBEDDINGS,  # noqa: ARG002
+        embedding_dim: int = EMBEDDING_DIM,  # noqa: ARG002
+        train_loss: str = "PairwiseHingeLoss",  # noqa: ARG002
+        max_norm: float | None = None,  # noqa: ARG002
+        norm_type: float = 2.0,  # noqa: ARG002
+        embedder_type: str = "base",  # noqa: ARG002
+        num_heads: int = 1,  # noqa: ARG002
+        dropout: float = 0.0,  # noqa: ARG002
+        normalize: bool = True,  # noqa: ARG002
+        hard_negatives_ratio: float | None = None,  # noqa: ARG002
+        sigma: float = 1.0,  # noqa: ARG002
+        margin: float = 1.0,  # noqa: ARG002
+        learning_rate: float = 0.01,  # noqa: ARG002
+        top_k: int = TOP_K,  # noqa: ARG002
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
@@ -190,7 +190,7 @@ class MatrixFactorizationLitModule(LightningModule):
                 metric.update(preds=preds, target=target > 0, indexes=indexes)
         return metrics
 
-    def training_step(self: Self, batch: BATCH_TYPE, batch_idx: int) -> torch.Tensor:
+    def training_step(self: Self, batch: BATCH_TYPE, _: int) -> torch.Tensor:
         losses = self.compute_losses(batch, step_name="train")
         self.log_dict(losses)
         return losses[f"train/{self.hparams.train_loss}"]
@@ -199,11 +199,11 @@ class MatrixFactorizationLitModule(LightningModule):
         metrics = self.update_metrics(batch, step_name="val")
         self.log_dict(metrics)
 
-    def test_step(self: Self, batch: FEATURES_TYPE, batch_idx: int) -> None:
+    def test_step(self: Self, batch: FEATURES_TYPE, _: int) -> None:  # noqa: PT019
         metrics = self.update_metrics(batch, step_name="test")
         self.log_dict(metrics)
 
-    def predict_step(self: Self, batch: FEATURES_TYPE, batch_idx_: int) -> pd.DataFrame:
+    def predict_step(self: Self, batch: FEATURES_TYPE, _: int) -> pd.DataFrame:
         return self.recommend(
             batch["feature_hashes"],
             batch["feature_weights"],
@@ -259,7 +259,7 @@ class MatrixFactorizationLitModule(LightningModule):
         if self.loss_fns is None:
             self.loss_fns = self.get_loss_fns()
         if self.metrics is None:
-            self.metrics = self.get_metrics(top_k=self.hparams.top_k)
+            self.metrics = self.get_metrics()
 
     def get_model(self: Self) -> torch.nn.Module:
         from functools import partial
@@ -319,10 +319,11 @@ class MatrixFactorizationLitModule(LightningModule):
         ]
         return torch.nn.ModuleList(loss_fns)
 
-    def get_metrics(self: Self, top_k: int = TOP_K) -> torch.nn.ModuleDict:
+    def get_metrics(self: Self) -> torch.nn.ModuleDict:
         import torchmetrics
         import torchmetrics.retrieval as tm_retrieval
 
+        top_k = self.hparams.top_k
         metrics = {
             step_name: torchmetrics.MetricCollection(
                 tm_retrieval.RetrievalNormalizedDCG(top_k=top_k),
