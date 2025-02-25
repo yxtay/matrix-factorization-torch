@@ -421,14 +421,11 @@ def time_now_isoformat() -> str:
     return datetime_now.isoformat(timespec="seconds")
 
 
-EXPERIMENT_NAME = time_now_isoformat()
-
-
 def cli_main(
     args: ArgsType = None,
     *,
     run: bool = True,
-    experiment_name: str | None = None,
+    experiment_name: str = time_now_isoformat(),
     run_name: str | None = None,
 ) -> LightningCLI:
     from jsonargparse import lazy_instance
@@ -436,7 +433,6 @@ def cli_main(
     from mf_torch.data.lightning import MatrixFactorizationDataModule
     from mf_torch.params import MLFLOW_DIR, TENSORBOARD_DIR
 
-    experiment_name = experiment_name or EXPERIMENT_NAME
     run_name = run_name or time_now_isoformat()
     tensorboard_logger = {
         "class_path": "TensorBoardLogger",

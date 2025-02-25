@@ -43,6 +43,8 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         item_embed: torch.Tensor,
         targets: torch.Tensor,
     ) -> torch.Tensor:
+        self.check_inputs(user_embed, item_embed, targets)
+
         indices = targets.indices()
         row_idx = indices[0, :]
         col_idx = torch.cat(
@@ -52,18 +54,25 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         user_embed = user_embed[row_idx, :]
         item_embed = item_embed[col_idx, :]
         targets = targets.values()
-
-        self._check_embeds(user_embed, item_embed)
         return self.loss(
             user_embed, item_embed, targets, user_idx=row_idx, item_idx=col_idx
         )
 
     @staticmethod
-    def _check_embeds(user_embed: torch.Tensor, item_embed: torch.Tensor) -> None:
-        assert user_embed.dim() == 2
-        assert item_embed.dim() == 2
-        assert user_embed.size(0) <= item_embed.size(0)
-        assert user_embed.size(1) == item_embed.size(1)
+    def check_inputs(
+        user_embed: torch.Tensor, item_embed: torch.Tensor, targets: torch.Tensor
+    ) -> None:
+        if user_embed.dim() != 2 or item_embed.dim() != 2 or targets.dim() != 2:
+            msg = f"inputs should have 2 dimensions: {user_embed.dim() = }, {item_embed.dim() = }, {targets.dim() = }"
+            raise ValueError(msg)
+
+        if user_embed.size(1) != item_embed.size(1):
+            msg = f"embedding dimensions should match: { user_embed.size(1) = }, { item_embed.size(1) = }"
+            raise ValueError(msg)
+
+        if (user_embed.size(0), item_embed.size(0)) != targets.size():
+            msg = f"embedding dimension 1 should match targets dimensions: {(user_embed.size(0), item_embed.size(0)) = }, {targets.size() = }"
+            raise ValueError(msg)
 
     @abc.abstractmethod
     def loss(
@@ -97,9 +106,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         return ~accidental_hits
 
     def hard_negative_mining(
-        self: Self,
-        losses: torch.Tensor,
-        negative_masks: torch.Tensor,
+        self: Self, losses: torch.Tensor, negative_masks: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
         if self.hard_negatives_ratio is None:
             return losses, negative_masks
@@ -135,10 +142,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         return weighted_mean(loss, targets.abs())
 
     def uniformity_loss(
-        self: Self,
-        embed: torch.Tensor,
-        *,
-        idx: torch.Tensor,
+        self: Self, embed: torch.Tensor, *, idx: torch.Tensor
     ) -> torch.Tensor:
         logits = -squared_distance(embed, embed)
         # shape: (batch_size, num_items)
