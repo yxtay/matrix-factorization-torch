@@ -464,7 +464,7 @@ def cli_main(
         "logger": [tensorboard_logger, mlflow_logger],
         "callbacks": [progress_bar],
         "max_epochs": 1,
-        "max_time": "00:01:00:00",
+        "max_time": "00:02:00:00",
         "num_sanity_val_steps": 0,
     }
     return LightningCLI(

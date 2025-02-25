@@ -456,7 +456,7 @@ if __name__ == "__main__":
 
     dm = MatrixFactorizationDataModule()
     dm.prepare_data().head().collect().glimpse()
-    dm.setup()
+    dm.setup("fit")
 
     dataloaders = [
         dm.users_processor.get_data(),
