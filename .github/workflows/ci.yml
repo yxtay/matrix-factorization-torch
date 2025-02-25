@@ -39,5 +39,5 @@ jobs:
           uv pip list
 
       - run: uv run python -m mf_torch.data.prepare
-
       - run: uv run python -m mf_torch.data.lightning
+      - run: uv run python -m mf_torch.lightning

@@ -45,9 +45,9 @@ def load_args(ckpt_path: str | None) -> dict:
 def prepare_trainer(ckpt_path: str | None = None) -> Trainer:
     from mf_torch.lightning import cli_main
 
-    trainer_args = {"fast_dev_run": True, "max_epochs": -1}
+    trainer_args = {"logger": False}
     args = {"trainer": trainer_args, "ckpt_path": ckpt_path, **load_args(ckpt_path)}
-    cli = cli_main({"fit": args})
+    cli = cli_main({"validate": args})
     return cli.trainer
 
 
