@@ -489,8 +489,8 @@ if __name__ == "__main__":
     rich.print(model.compute_losses(next(iter(datamodule.train_dataloader()))))
 
     trainer_args = {
-        # "fast_dev_run": True,
-        "max_epochs": -1,
+        "fast_dev_run": True,
+        # "max_epochs": -1,
         # "overfit_batches": 1,
     }
     model_args = {"train_loss": "MutualInformationNeuralEstimationLoss"}
