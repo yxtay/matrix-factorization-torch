@@ -429,6 +429,7 @@ class MatrixFactorizationDataModule(LightningDataModule):
             batch_size=None,
             shuffle=shuffle,
             num_workers=num_workers,
+            pin_memory=True,
             multiprocessing_context=multiprocessing_context,
             persistent_workers=num_workers > 0,
         )
