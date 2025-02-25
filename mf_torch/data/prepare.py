@@ -150,7 +150,7 @@ def ordered_split(
 def process_users(
     users: pl.LazyFrame,
     ratings: pl.LazyFrame,
-    val_prop: float = 0.1,
+    val_prop: float = 0.2,
     *,
     src_dir: str = DATA_DIR,
     overwrite: bool = False,

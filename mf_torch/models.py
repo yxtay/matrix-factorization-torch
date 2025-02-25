@@ -16,14 +16,17 @@ class MatrixFactorization(torch.nn.Module):
         self.embedder = embedder
         self.normalize = normalize
         self.sparse = self.embedder.sparse
+        self.weight = self.embedder.weight
 
     def embed(
         self: Self,
         feature_hashes: torch.Tensor,
-        feature_weights: torch.Tensor | None = None,
+        feature_weights: torch.Tensor,
     ) -> torch.Tensor:
         # input shape: (batch_size, num_features)
-        embed = self.embedder(feature_hashes, feature_weights)
+        embed = self.embedder(
+            feature_hashes.to(self.weight.device), feature_weights.to(self.weight)
+        )
         # shape: (batch_size, embed_dim)
         if self.normalize:
             embed = F.normalize(embed, dim=-1)
@@ -33,7 +36,7 @@ class MatrixFactorization(torch.nn.Module):
     def forward(
         self: Self,
         feature_hashes: torch.Tensor,
-        feature_weights: torch.Tensor | None = None,
+        feature_weights: torch.Tensor,
     ) -> torch.Tensor:
         return self.embed(feature_hashes, feature_weights)
 
@@ -41,8 +44,8 @@ class MatrixFactorization(torch.nn.Module):
         self: Self,
         user_feature_hashes: torch.Tensor,
         item_feature_hashes: torch.Tensor,
-        user_feature_weights: torch.Tensor | None = None,
-        item_feature_weights: torch.Tensor | None = None,
+        user_feature_weights: torch.Tensor,
+        item_feature_weights: torch.Tensor,
     ) -> torch.Tensor:
         user_embed = self(user_feature_hashes, user_feature_weights)
         # shape: (batch_size, embed_dim)
@@ -55,8 +58,8 @@ class MatrixFactorization(torch.nn.Module):
         self: Self,
         user_feature_hashes: torch.Tensor,
         item_feature_hashes: torch.Tensor,
-        user_feature_weights: torch.Tensor | None = None,
-        item_feature_weights: torch.Tensor | None = None,
+        user_feature_weights: torch.Tensor,
+        item_feature_weights: torch.Tensor,
     ) -> torch.Tensor:
         user_embed = self(user_feature_hashes, feature_weights=user_feature_weights)
         # shape: (batch_size, embed_dim)
@@ -86,9 +89,10 @@ class EmbeddingBag(torch.nn.Module):
             sparse=True,
         )
         self.sparse = self.embedder.sparse
+        self.weight = self.embedder.weight
 
     def forward(
-        self: Self, hashes: torch.Tensor, weights: torch.Tensor | None
+        self: Self, hashes: torch.Tensor, weights: torch.Tensor
     ) -> torch.Tensor:
         return self.embedder(hashes, per_sample_weights=weights)
 
@@ -119,11 +123,12 @@ class AttentionEmbeddingBag(torch.nn.Module):
             batch_first=True,
         )
         self.sparse = self.embedder.sparse
+        self.weight = self.embedder.weight
 
     def forward(
         self: Self,
         hashes: torch.Tensor,
-        _: torch.Tensor | None,
+        _: torch.Tensor,
         padding_idx: int = PADDING_IDX,
     ) -> torch.Tensor:
         mask = hashes != padding_idx
@@ -172,11 +177,12 @@ class TransformerEmbeddingBag(torch.nn.Module):
             batch_first=True,
         )
         self.sparse = self.embedder.sparse
+        self.weight = self.embedder.weight
 
     def forward(
         self: Self,
         hashes: torch.Tensor,
-        _: torch.Tensor | None,
+        _: torch.Tensor,
         padding_idx: int = PADDING_IDX,
     ) -> torch.Tensor:
         mask = hashes != padding_idx
