@@ -488,12 +488,13 @@ if __name__ == "__main__":
     rich.print(model.compute_losses(next(iter(datamodule.train_dataloader()))))
 
     trainer_args = {
-        "fast_dev_run": True,
-        # "max_epochs": -1,
+        # "fast_dev_run": True,
+        "max_epochs": -1,
         # "overfit_batches": 1,
     }
-    cli_main(args={"validate": {"trainer": trainer_args}})
-    cli_main(args={"fit": {"trainer": trainer_args}})
+    model_args = {"train_loss": "MutualInformationNeuralEstimationLoss"}
+    cli_main(args={"validate": {"trainer": trainer_args, "model": model_args}})
+    cli_main(args={"fit": {"trainer": trainer_args, "model": model_args}})
     # cli = cli_main(
     #     args={"fit": {"trainer": {"overfit_batches": 1, "num_sanity_val_steps": 0}}}
     # )

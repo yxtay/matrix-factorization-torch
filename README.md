@@ -10,30 +10,30 @@ Matrix Factorization Recommender Models in PyTorch with MovieLens
 
 ## References
 
-- Google Slides: [Collaborative Filtering with Implicit Feedback](google-slides)
-- [[2101.08769]](implicit-feedback) Item Recommendation from Implicit Feedback
-- [TensorFlow Recommenders Retrieval](tfrs-retrieval)
-- BPR: [[1205.2618]](bpr)
+- Google Slides: [Collaborative Filtering with Implicit Feedback][google-slides]
+- [[2101.08769]][implicit-feedback] Item Recommendation from Implicit Feedback
+- [TensorFlow Recommenders Retrieval][tfrs-retrieval]
+- BPR: [[1205.2618]][bpr]
   BPR: Bayesian Personalized Ranking from Implicit Feedback
-- CCL: [[2109.12613]](ccl)
+- CCL: [[2109.12613]][ccl]
   SimpleX: A Simple and Strong Baseline for Collaborative Filtering
-- SSM: [[2201.02327]](ssm)
+- SSM: [[2201.02327]][ssm]
   On the Effectiveness of Sampled Softmax Loss for Item Recommendation
-- DirectAU: [[2206.12811]]((direct-au))
+- DirectAU: [[2206.12811]][direct-au]
   Towards Representation Alignment and Uniformity in Collaborative Filtering
-- MAWU: [[2308.06091]](mawu)
+- MAWU: [[2308.06091]][mawu]
   Toward a Better Understanding of Loss Functions for Collaborative Filtering
-- InfoNCE+, MINE+: [[2312.08520]](mine+)
+- InfoNCE+, MINE+: [[2312.08520]][mine+]
   Revisiting Recommendation Loss Functions through Contrastive Learning
   (Technical Report)
 - LogQ correction:
-  [Sampling-Bias-Corrected Neural Modeling for Large Corpus Item Recommendations](logq)
-- MNS: [Mixed Negative Sampling for Learning Two-tower Neural Networks in Recommendations](mns)
-- Hashing Trick: [[0902.2206]](hashing-trick)
+  [Sampling-Bias-Corrected Neural Modeling for Large Corpus Item Recommendations][logq]
+- MNS: [Mixed Negative Sampling for Learning Two-tower Neural Networks in Recommendations][mns]
+- Hashing Trick: [[0902.2206]][hashing-trick]
   Feature Hashing for Large Scale Multitask Learning
-- Hash Embeddings: [[1709.03933]](hash-embeddings)
+- Hash Embeddings: [[1709.03933]][hash-embeddings]
   Hash Embeddings for Efficient Word Representations
-- Bloom embeddings: [Compact word vectors with Bloom embeddings](bloom-embeddings)
+- Bloom embeddings: [Compact word vectors with Bloom embeddings][bloom-embeddings]
 
 [google-slides]: https://docs.google.com/presentation/d/15nLFgmkSEJPXkhLiXExXDByV_lot7bdHAhtqX_qLp7w/
 [implicit-feedback]: https://arxiv.org/abs/2101.08769

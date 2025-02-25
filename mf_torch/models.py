@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Self
 
 import torch
-import torch.nn.functional as F
+import torch.nn.functional as F  # noqa: N812
 
 from mf_torch.params import EMBEDDING_DIM, NUM_EMBEDDINGS, PADDING_IDX
 
