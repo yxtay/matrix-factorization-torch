@@ -51,8 +51,8 @@ def evaluation_function(
     }
 
     trainer_args = {"max_epochs": config["max_epochs"]}
-    args = {"fit": {"trainer": trainer_args, **get_lightning_args(config)}}
-    cli = cli_main(args)
+    args = {"trainer": trainer_args, **get_lightning_args(config)}
+    cli = cli_main({"fit": args})
     return {
         key: cli.trainer.callback_metrics[key].item()
         for key in cli.model.metrics["val"]
@@ -117,7 +117,7 @@ def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
         config=config,
         low_cost_partial_config=low_cost_partial_config,
         points_to_evaluate=[point_to_evaluate],
-        time_budget_s=60 * 60 * 1,
+        time_budget_s=60 * 60 * 3,
         num_samples=-1,
         resource_attr="max_epochs",
         min_resource=1,

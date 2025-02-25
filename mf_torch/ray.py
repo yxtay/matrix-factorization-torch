@@ -106,6 +106,7 @@ def train_loop_per_worker(
     except SystemExit:
         for logger in trainer.loggers:
             logger.finalize()
+        raise
 
 
 def get_run_config() -> ray.train.RunConfig:
