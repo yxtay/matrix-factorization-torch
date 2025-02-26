@@ -41,3 +41,4 @@ jobs:
       - run: uv run python -m mf_torch.data.prepare
       - run: uv run python -m mf_torch.data.lightning
       - run: uv run python -m mf_torch.lightning
+      - run: uv run python -m mf_torch.bentoml.prepare

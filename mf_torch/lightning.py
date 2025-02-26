@@ -493,9 +493,8 @@ if __name__ == "__main__":
         # "max_epochs": -1,
         # "overfit_batches": 1,
     }
-    model_args = {"train_loss": "MutualInformationNeuralEstimationLoss"}
-    cli_main(args={"validate": {"trainer": trainer_args, "model": model_args}})
-    cli_main(args={"fit": {"trainer": trainer_args, "model": model_args}})
+    cli_main(args={"validate": {"trainer": trainer_args}})
+    cli_main(args={"fit": {"trainer": trainer_args}})
     # cli = cli_main(
     #     args={"fit": {"trainer": {"overfit_batches": 1, "num_sanity_val_steps": 0}}}
     # )

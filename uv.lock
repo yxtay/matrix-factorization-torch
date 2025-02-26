@@ -1383,7 +1383,6 @@ dependencies = [
     { name = "lightning" },
     { name = "loguru" },
     { name = "mlflow" },
-    { name = "numpydantic" },
     { name = "onnxruntime" },
     { name = "onnxscript" },
     { name = "pandas" },
@@ -1403,7 +1402,6 @@ requires-dist = [
     { name = "lightning", specifier = "~=2.5" },
     { name = "loguru", specifier = ">=0.7,<0.8" },
     { name = "mlflow", specifier = "~=2.19" },
-    { name = "numpydantic", specifier = "~=1.6" },
     { name = "onnxruntime", specifier = "~=1.20" },
     { name = "onnxscript", specifier = ">=0.2,<0.3" },
     { name = "pandas", specifier = "~=2.2" },
@@ -1707,20 +1705,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/f7/ec/fe2e91b2642b9d6544518388a441bcd65c904cea38d9ff998e2e8ebf808e/numpy-2.2.2-cp313-cp313t-macosx_14_0_x86_64.whl", hash = "sha256:7dca87ca328f5ea7dafc907c5ec100d187911f94825f8700caac0b3f4c384b49", size = 6671958 },
     { url = "https://files.pythonhosted.org/packages/95/03/242ae8d7b97f4e0e4ab8dd51231465fb23ed5e802680d629149722e3faf1/numpy-2.2.2-cp313-cp313t-win32.whl", hash = "sha256:0eec19f8af947a61e968d5429f0bd92fec46d92b0008d0a6685b40d6adf8a4f4", size = 6329134 },
     { url = "https://files.pythonhosted.org/packages/80/94/cd9e9b04012c015cb6320ab3bf43bc615e248dddfeb163728e800a5d96f0/numpy-2.2.2-cp313-cp313t-win_amd64.whl", hash = "sha256:97b974d3ba0fb4612b77ed35d7627490e8e3dff56ab41454d9e8b23448940576", size = 12696208 },
-]
-
-[[package]]
-name = "numpydantic"
-version = "1.6.7"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy", version = "1.26.4", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine != 'x86_64' and sys_platform == 'darwin') or (sys_platform != 'darwin' and sys_platform != 'win32')" },
-    { name = "numpy", version = "2.2.2", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'darwin') or sys_platform == 'win32'" },
-    { name = "pydantic" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/da/7f/39666a6ac32a7c4669097a9323b0eeb1fdcd3c38603a43b8dd597adb2408/numpydantic-1.6.7.tar.gz", hash = "sha256:59ca92116049ff308d9537d1747612b34b3efe259f4a1b8096cddd15eb82daf4", size = 77424 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/7c/ea/a9f6cba1af29ad38d9199291d2e4fe606728fb3be7b2a9a81bde54b9438d/numpydantic-1.6.7-py3-none-any.whl", hash = "sha256:0e263137c6fe693cbf24ee8f78200d1db0056c696d82a5e13fc4dcc67b0d734d", size = 85488 },
 ]
 
 [[package]]
