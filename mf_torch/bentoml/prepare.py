@@ -79,14 +79,14 @@ def save_model(trainer: Trainer) -> None:
 
 
 def test_bento(
-    svc: type[bentoml.Service], api_name: str, api_input: dict[str, Any]
+    service: type[bentoml.Service], api_name: str, api_input: dict[str, Any]
 ) -> dict[str, Any]:
     from starlette.testclient import TestClient
 
     # disable prometheus, which can cause duplicated metrics error with repeated runs
-    svc.config["metrics"] = {"enabled": False}
+    service.config["metrics"] = {"enabled": False}
 
-    asgi_app = svc.to_asgi()
+    asgi_app = service.to_asgi()
     with TestClient(asgi_app) as client:
         response = client.post(f"/{api_name}", json=api_input)
         response.raise_for_status()

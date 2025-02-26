@@ -7,15 +7,9 @@ python:
     - bentoml
     - lancedb
     - loguru
-    - numpydantic
     - pandas
     - torch
     - xxhash
-  lock_packages: false
 envs:
-  - name: UV_EXTRA_INDEX_URL
-    value: https://download.pytorch.org/whl/cpu
-  - name: UV_INDEX_STRATEGY
-    value: unsafe-best-match
   - name: UV_NO_CACHE
-    value: "1"
+    value: 1
