@@ -1,6 +1,6 @@
 version: 0.1 # the version of this config file.
 cli:
-  version: 1 # the version of trunk you will run in your repository
+  version: 1.22.10 # the version of trunk you will run in your repository
 lint:
   disabled:
     - black
