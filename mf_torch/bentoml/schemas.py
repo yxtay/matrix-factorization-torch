@@ -14,6 +14,7 @@ class Activity(pydantic.BaseModel):
 
 
 class UserQuery(pydantic.BaseModel):
+    user_rn: int | None = None
     user_id: int | None = None
     gender: str | None = None
     age: int | None = None
@@ -24,6 +25,7 @@ class UserQuery(pydantic.BaseModel):
 
 
 class ItemQuery(pydantic.BaseModel):
+    movie_rn: int | None = None
     movie_id: int | None = None
     title: str | None = None
     genres: list[str] | None = None

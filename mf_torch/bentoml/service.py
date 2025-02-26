@@ -84,7 +84,6 @@ class ItemsProcessor:
     @logger.catch(reraise=True)
     def process(self: Self, item: ItemQuery) -> Query:
         item_data = item.model_dump()
-        item_data["movie_rn"] = 0
         return Query.model_validate(self.items_processor.process(item_data))
 
 
@@ -118,7 +117,6 @@ class UsersProcessor:
     @logger.catch(reraise=True)
     def process(self: Self, user: UserQuery) -> Query:
         user_data = user.model_dump()
-        user_data["user_rn"] = 0
         return Query.model_validate(self.users_processor.process(user_data))
 
 
@@ -207,8 +205,11 @@ class Service:
         exclude_item_ids: list[int] | None = None,
         top_k: int = TOP_K,
     ) -> list[ItemCandidate]:
+        exclude_item_ids = exclude_item_ids or []
         if user.history:
-            exclude_item_ids = [*(exclude_item_ids or []), *user.history.movie_id]
+            exclude_item_ids += user.history.movie_id
+        if user.target:
+            exclude_item_ids += user.target.movie_id
 
         query = await self.process_user(user)
         return await self.recommend_with_query(

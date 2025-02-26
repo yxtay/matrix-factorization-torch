@@ -366,11 +366,10 @@ class MatrixFactorizationDataModule(LightningDataModule):
 
         from mf_torch.data.prepare import download_unpack_data, prepare_movielens
 
-        with FileLock(f"{self.hparams.data_dir}.lock"):
-            download_unpack_data(
-                MOVIELENS_1M_URL, self.hparams.data_dir, overwrite=overwrite
-            )
-            return prepare_movielens(self.hparams.data_dir, overwrite=overwrite)
+        data_dir = self.hparams.data_dir
+        with FileLock(f"{data_dir}.lock"):
+            download_unpack_data(MOVIELENS_1M_URL, data_dir, overwrite=overwrite)
+            return prepare_movielens(data_dir, overwrite=overwrite)
 
     def get_dataloader(
         self: Self,

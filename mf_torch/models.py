@@ -43,8 +43,8 @@ class MatrixFactorization(torch.nn.Module):
     def score(
         self: Self,
         user_feature_hashes: torch.Tensor,
-        item_feature_hashes: torch.Tensor,
         user_feature_weights: torch.Tensor,
+        item_feature_hashes: torch.Tensor,
         item_feature_weights: torch.Tensor,
     ) -> torch.Tensor:
         user_embed = self(user_feature_hashes, user_feature_weights)
@@ -57,16 +57,16 @@ class MatrixFactorization(torch.nn.Module):
     def score_full(
         self: Self,
         user_feature_hashes: torch.Tensor,
-        item_feature_hashes: torch.Tensor,
         user_feature_weights: torch.Tensor,
+        item_feature_hashes: torch.Tensor,
         item_feature_weights: torch.Tensor,
     ) -> torch.Tensor:
-        user_embed = self(user_feature_hashes, feature_weights=user_feature_weights)
+        user_embed = self(user_feature_hashes, user_feature_weights)
         # shape: (batch_size, embed_dim)
-        item_embed = self(item_feature_hashes, feature_weights=item_feature_weights)
+        item_embed = self(item_feature_hashes, item_feature_weights)
         # shape: (batch_size, embed_dim)
         # output shape: (batch_size, batch_size)
-        return torch.mm(user_embed, item_embed.T)
+        return torch.mm(user_embed, item_embed.t())
 
 
 class EmbeddingBag(torch.nn.Module):
@@ -125,13 +125,8 @@ class AttentionEmbeddingBag(torch.nn.Module):
         self.sparse = self.embedder.sparse
         self.weight = self.embedder.weight
 
-    def forward(
-        self: Self,
-        hashes: torch.Tensor,
-        _: torch.Tensor,
-        padding_idx: int = PADDING_IDX,
-    ) -> torch.Tensor:
-        mask = hashes != padding_idx
+    def forward(self: Self, hashes: torch.Tensor, _: torch.Tensor) -> torch.Tensor:
+        mask = hashes != self.embedder.padding_idx
         # shape: (batch_size, num_features)
         denominator = mask.sum(dim=-1, keepdim=True)
         # shape: (batch_size, 1)
@@ -179,13 +174,8 @@ class TransformerEmbeddingBag(torch.nn.Module):
         self.sparse = self.embedder.sparse
         self.weight = self.embedder.weight
 
-    def forward(
-        self: Self,
-        hashes: torch.Tensor,
-        _: torch.Tensor,
-        padding_idx: int = PADDING_IDX,
-    ) -> torch.Tensor:
-        mask = hashes != padding_idx
+    def forward(self: Self, hashes: torch.Tensor, _: torch.Tensor) -> torch.Tensor:
+        mask = hashes != self.embedder.padding_idx
         # shape: (batch_size, num_features)
         denominator = mask.sum(dim=-1, keepdim=True)
         # shape: (batch_size, 1)
