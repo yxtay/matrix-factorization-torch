@@ -148,30 +148,3 @@ class DeltaTableDictLoaderIterDataPipe(ParquetDictLoaderIterDataPipe):
         import deltalake
 
         return deltalake.DeltaTable(source).to_pyarrow_dataset()
-
-
-@torch_data.functional_datapipe("cycle")
-class CyclerIterDataPipe(torch_data.IterDataPipe[dict[str, Any]]):
-    def __init__(
-        self: Self,
-        source_datapipe: torch_data.IterDataPipe[dict[str, Any]],
-        count: int | None = None,
-    ) -> None:
-        super().__init__()
-        self.source_datapipe = source_datapipe
-        self.count = count
-        if count is not None and count < 0:
-            msg = f"requires count >= 0, but {count = }"
-            raise ValueError(msg)
-
-    def __len__(self: Self) -> int:
-        if self.count is None:
-            # use arbitrary large number so that valid length is shown for zip
-            return 2**31 - 1  # max 32-bit signed integer
-        return len(self.source_datapipe) * self.count
-
-    def __iter__(self: Self) -> Iterator[dict[str, Any]]:
-        i = 0
-        while self.count is None or i < self.count:
-            yield from self.source_datapipe
-            i += 1

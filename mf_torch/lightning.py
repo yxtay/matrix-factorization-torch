@@ -495,7 +495,3 @@ if __name__ == "__main__":
     }
     cli_main(args={"validate": {"trainer": trainer_args}})
     cli_main(args={"fit": {"trainer": trainer_args}})
-    # cli = cli_main(
-    #     args={"fit": {"trainer": {"overfit_batches": 1, "num_sanity_val_steps": 0}}}
-    # )
-    # cli.model.export_dynamo_onnx()

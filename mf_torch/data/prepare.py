@@ -4,7 +4,6 @@ import shutil
 from pathlib import Path
 
 import polars as pl
-import polars.selectors as cs
 from loguru import logger
 
 from mf_torch.params import DATA_DIR, MOVIELENS_1M_URL
@@ -252,6 +251,8 @@ def process_ratings(
     src_dir: str = DATA_DIR,
     overwrite: bool = False,
 ) -> pl.LazyFrame:
+    import polars.selectors as cs
+
     ratings_parquet = Path(src_dir, "ml-1m", "ratings.parquet")
     if ratings_parquet.exists() and not overwrite:
         ratings_processed = pl.scan_parquet(str(ratings_parquet))
