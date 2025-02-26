@@ -1,20 +1,20 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Self
 
 import bentoml
 import torch
 from loguru import logger
 
-from mf_torch.bentoml.prepare import embed_query, load_args
 from mf_torch.bentoml.schemas import ItemCandidate, ItemQuery, Query, UserQuery
 from mf_torch.params import (
-    CHECKPOINT_PATH,
     EXPORTED_PROGRAM_PATH,
-    ITEMS_TABLE_NAME,
     LANCE_DB_PATH,
     MODEL_NAME,
-    USERS_TABLE_NAME,
+    PROCESSORS_JSON,
+    TOP_K,
 )
 
 
@@ -25,47 +25,45 @@ class Embedder:
     @logger.catch(reraise=True)
     def __init__(self: Self) -> None:
         path = self.model_ref.path_of(EXPORTED_PROGRAM_PATH)
-        self.model = torch.export.load(path).module()
+        self.model = torch.export.load(path).module()  # nosec
         logger.info("model loaded: {}", path)
 
     @bentoml.api()
     @logger.catch(reraise=True)
     def embed(self: Self, query: Query) -> Query:
-        return embed_query(query=query, model=self.model)
+        with torch.inference_mode():
+            query.embedding = self.model(
+                query.feature_hashes.unsqueeze(0), query.feature_weights.unsqueeze(0)
+            ).squeeze(0)
+        return query
 
 
 @bentoml.service()
-class ItemIndex:
+class ItemsProcessor:
     model_ref = bentoml.models.BentoModel(MODEL_NAME)
 
     @logger.catch(reraise=True)
     def __init__(self: Self) -> None:
-        import lancedb
+        from mf_torch.data.lightning import ItemsProcessor
 
-        src_path = self.model_ref.path_of(LANCE_DB_PATH)
-        db = lancedb.connect(src_path)
-        self.items = db.open_table(ITEMS_TABLE_NAME)
-        self.users = db.open_table(USERS_TABLE_NAME)
-        logger.info("items index loaded: {}", src_path)
+        lance_db_path = self.model_ref.path_of(LANCE_DB_PATH)
+        processors_args = json.loads(
+            Path(self.model_ref.path_of(PROCESSORS_JSON)).read_text()
+        )
+        processors_args["items"].update({"lance_db_path": lance_db_path})
+        self.items_processor = ItemsProcessor.model_validate(processors_args["items"])
 
     @bentoml.api()
     @logger.catch(reraise=True)
     def search(
-        self: Self, query: Query, exclude_items: list[int]
+        self: Self, query: Query, exclude_item_ids: list[int], top_k: int = TOP_K
     ) -> list[ItemCandidate]:
         from pydantic import TypeAdapter
 
-        exclude_filter = ", ".join(f"{item}" for item in exclude_items)
-        exclude_filter = f"movie_id NOT IN ({exclude_filter})"
-        results_df = (
-            self.items.search(query.embedding)
-            .where(exclude_filter, prefilter=True)
-            .nprobes(20)
-            .refine_factor(5)
-            .limit(10)
-            .to_pandas()
-            .assign(score=lambda df: 1 - df["_distance"])
-            .drop(columns="_distance")
+        results_df = self.items_processor.search(
+            query.embedding.numpy(),
+            exclude_item_ids=exclude_item_ids,
+            top_k=top_k,
         )
         return TypeAdapter(list[ItemCandidate]).validate_python(
             results_df.itertuples(), from_attributes=True
@@ -73,38 +71,76 @@ class ItemIndex:
 
     @bentoml.api()
     @logger.catch(reraise=True)
-    def item_id(self: Self, item_id: int) -> ItemCandidate:
+    def get_id(self: Self, item_id: int) -> ItemQuery:
         from bentoml.exceptions import NotFound
 
-        result = self.items.search().where(f"movie_id = {item_id}").to_list()
+        result = self.items_processor.get_id(item_id)
         if len(result) == 0:
             msg = f"item not found: {item_id = }"
             raise NotFound(msg)
-        return ItemCandidate.model_validate(result[0])
+        return ItemQuery.model_validate(result)
 
     @bentoml.api()
     @logger.catch(reraise=True)
-    def user_id(self: Self, user_id: int) -> UserQuery:
+    def process(self: Self, item: ItemQuery) -> Query:
+        item_data = item.model_dump()
+        item_data["movie_rn"] = 0
+        return Query.model_validate(self.items_processor.process(item_data))
+
+
+@bentoml.service()
+class UsersProcessor:
+    model_ref = bentoml.models.BentoModel(MODEL_NAME)
+
+    @logger.catch(reraise=True)
+    def __init__(self: Self) -> None:
+        from mf_torch.data.lightning import UsersProcessor
+
+        lance_db_path = self.model_ref.path_of(LANCE_DB_PATH)
+        processors_args = json.loads(
+            Path(self.model_ref.path_of(PROCESSORS_JSON)).read_text()
+        )
+        processors_args["users"].update({"lance_db_path": lance_db_path})
+        self.users_processor = UsersProcessor.model_validate(processors_args["users"])
+
+    @bentoml.api()
+    @logger.catch(reraise=True)
+    def get_id(self: Self, user_id: int) -> UserQuery:
         from bentoml.exceptions import NotFound
 
-        result = self.users.search().where(f"user_id = {user_id}").to_list()
+        result = self.users_processor.get_id(user_id)
         if len(result) == 0:
             msg = f"user not found: {user_id = }"
             raise NotFound(msg)
-        return UserQuery.model_validate(result[0])
+        return UserQuery.model_validate(result)
+
+    @bentoml.api()
+    @logger.catch(reraise=True)
+    def process(self: Self, user: UserQuery) -> Query:
+        user_data = user.model_dump()
+        user_data["user_rn"] = 0
+        return Query.model_validate(self.users_processor.process(user_data))
 
 
 @bentoml.service()
 class Service:
     model_ref = bentoml.models.BentoModel(MODEL_NAME)
     embedder = bentoml.depends(Embedder)
-    item_index = bentoml.depends(ItemIndex)
+    items_processor = bentoml.depends(ItemsProcessor)
+    users_processor = bentoml.depends(UsersProcessor)
 
+    @bentoml.api()
     @logger.catch(reraise=True)
-    def __init__(self: Self) -> None:
-        args = load_args(self.model_ref.path_of(CHECKPOINT_PATH))
-        self.num_hashes = args["data"]["num_hashes"]
-        self.num_embeddings = args["data"]["num_embeddings"]
+    async def recommend_with_query(
+        self: Self,
+        query: Query,
+        exclude_item_ids: list[int] | None = None,
+        top_k: int = TOP_K,
+    ) -> list[ItemCandidate]:
+        query = await self.embed_query(query)
+        return await self.search_items(
+            query, exclude_item_ids=exclude_item_ids, top_k=top_k
+        )
 
     @bentoml.api()
     @logger.catch(reraise=True)
@@ -114,71 +150,93 @@ class Service:
     @bentoml.api()
     @logger.catch(reraise=True)
     async def search_items(
-        self: Self, query: Query, exclude_items: list[int] | None = None
+        self: Self,
+        query: Query,
+        exclude_item_ids: list[int] | None = None,
+        top_k: int = TOP_K,
     ) -> list[ItemCandidate]:
-        exclude_items = exclude_items or []
-        return await self.item_index.to_async.search(query, exclude_items=exclude_items)
-
-    @bentoml.api()
-    @logger.catch(reraise=True)
-    async def recommend_with_query(
-        self: Self, query: Query, exclude_items: list[int] | None = None
-    ) -> list[ItemCandidate]:
-        query = await self.embed_query(query)
-        return await self.search_items(query, exclude_items=exclude_items)
+        exclude_item_ids = exclude_item_ids or []
+        return await self.items_processor.to_async.search(
+            query, exclude_item_ids=exclude_item_ids, top_k=top_k
+        )
 
     @bentoml.api()
     @logger.catch(reraise=True)
     async def recommend_with_item(
-        self: Self, item: ItemQuery, exclude_items: list[int] | None = None
+        self: Self,
+        item: ItemQuery,
+        exclude_item_ids: list[int] | None = None,
+        top_k: int = TOP_K,
     ) -> list[ItemCandidate]:
         if item.movie_id:
-            exclude_items = [*(exclude_items or []), item.movie_id]
+            exclude_item_ids = [*(exclude_item_ids or []), item.movie_id]
 
-        query = item.to_query(
-            num_hashes=self.num_hashes, num_embeddings=self.num_embeddings
+        query = await self.process_item(item)
+        return await self.recommend_with_query(
+            query, exclude_item_ids=exclude_item_ids, top_k=top_k
         )
-        return await self.recommend_with_query(query, exclude_items=exclude_items)
+
+    @bentoml.api()
+    @logger.catch(reraise=True)
+    async def process_item(self: Self, item: ItemQuery) -> Query:
+        return await self.items_processor.to_async.process(item)
 
     @bentoml.api()
     @logger.catch(reraise=True)
     async def recommend_with_item_id(
-        self: Self, item_id: int, exclude_items: list[int] | None = None
+        self: Self,
+        item_id: int,
+        exclude_item_ids: list[int] | None = None,
+        top_k: int = TOP_K,
     ) -> list[ItemCandidate]:
         item = await self.item_id(item_id)
-        return await self.recommend_with_item(item, exclude_items=exclude_items)
+        return await self.recommend_with_item(
+            item, exclude_item_ids=exclude_item_ids, top_k=top_k
+        )
 
     @bentoml.api()
     @logger.catch(reraise=True)
-    async def item_id(self: Self, item_id: int) -> ItemCandidate:
-        return await self.item_index.to_async.item_id(item_id)
+    async def item_id(self: Self, item_id: int) -> ItemQuery:
+        return await self.items_processor.to_async.get_id(item_id)
 
     @bentoml.api()
     @logger.catch(reraise=True)
     async def recommend_with_user(
-        self: Self, user: UserQuery, exclude_items: list[int] | None = None
+        self: Self,
+        user: UserQuery,
+        exclude_item_ids: list[int] | None = None,
+        top_k: int = TOP_K,
     ) -> list[ItemCandidate]:
-        if user.movie_ids:
-            exclude_items = exclude_items or []
-            exclude_items = [*exclude_items, *user.movie_ids]
+        if user.history:
+            exclude_item_ids = [*(exclude_item_ids or []), *user.history.movie_id]
 
-        query = user.to_query(
-            num_hashes=self.num_hashes, num_embeddings=self.num_embeddings
+        query = await self.process_user(user)
+        return await self.recommend_with_query(
+            query, exclude_item_ids=exclude_item_ids, top_k=top_k
         )
-        return await self.recommend_with_query(query, exclude_items=exclude_items)
+
+    @bentoml.api()
+    @logger.catch(reraise=True)
+    async def process_user(self: Self, user: UserQuery) -> Query:
+        return await self.users_processor.to_async.process(user)
 
     @bentoml.api()
     @logger.catch(reraise=True)
     async def recommend_with_user_id(
-        self: Self, user_id: int, exclude_items: list[int] | None = None
+        self: Self,
+        user_id: int,
+        exclude_item_ids: list[int] | None = None,
+        top_k: int = TOP_K,
     ) -> list[ItemCandidate]:
         user = await self.user_id(user_id)
-        return await self.recommend_with_user(user, exclude_items=exclude_items)
+        return await self.recommend_with_user(
+            user, exclude_item_ids=exclude_item_ids, top_k=top_k
+        )
 
     @bentoml.api()
     @logger.catch(reraise=True)
     async def user_id(self: Self, user_id: int) -> UserQuery:
-        return await self.item_index.to_async.user_id(user_id)
+        return await self.users_processor.to_async.get_id(user_id)
 
     @bentoml.api()
     @logger.catch(reraise=True)

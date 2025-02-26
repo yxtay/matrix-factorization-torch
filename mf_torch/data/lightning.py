@@ -118,19 +118,19 @@ class FeaturesProcessor(pydantic.BaseModel):
         )
 
     @property
-    def db(self: Self) -> lancedb.DBConnection:
+    def lance_db(self: Self) -> lancedb.DBConnection:
         import lancedb
 
         return lancedb.connect(self.lance_db_path)
 
     @property
-    def index(self: Self) -> lancedb.table.Table:
-        return self.db.open_table(self.lance_table_name)
+    def lance_table(self: Self) -> lancedb.table.Table:
+        return self.lance_db.open_table(self.lance_table_name)
 
     def get_id(self: Self, id_val: int | None) -> dict[str, Any]:
         if id_val is None:
             return {}
-        result = self.index.search().where(f"{self.id_col} = {id_val}").to_list()
+        result = self.lance_table.search().where(f"{self.id_col} = {id_val}").to_list()
         if len(result) == 0:
             return {}
         return result[0]
@@ -160,7 +160,7 @@ class UsersProcessor(FeaturesProcessor):
         ]
         pa_table = pq.read_table(self.data_path, columns=columns)
 
-        table = self.db.create_table(
+        table = self.lance_db.create_table(
             self.lance_table_name, data=pa_table, mode="overwrite"
         )
         table.compact_files()
@@ -186,7 +186,7 @@ class ItemsProcessor(FeaturesProcessor):
 
     num_partitions: int | None = None
     num_sub_vectors: int | None = None
-    num_probes: int = 4
+    num_probes: int = 8
     refine_factor: int = 4
 
     @property
@@ -200,16 +200,17 @@ class ItemsProcessor(FeaturesProcessor):
         dp = (
             self.get_data("predict")
             .map(
-                lambda example: {
-                    **example,
-                    "embedding": model(
-                        example["feature_hashes"].unsqueeze(0),
-                        example["feature_weights"].unsqueeze(0),
-                    )
-                    .squeeze(0)
-                    .float()
-                    .numpy(force=True),
-                }
+                torch.inference_mode(
+                    lambda example: {
+                        **example,
+                        "embedding": model(
+                            example["feature_hashes"].unsqueeze(0),
+                            example["feature_weights"].unsqueeze(0),
+                        )
+                        .squeeze(0)
+                        .numpy(force=True),
+                    }
+                )
             )
             .map(functools.partial(select_fields, fields=fields))
         )
@@ -228,7 +229,7 @@ class ItemsProcessor(FeaturesProcessor):
         )
         pa_table = pa.Table.from_pylist(list(dp), schema=schema)
 
-        table = self.db.create_table(
+        table = self.lance_db.create_table(
             self.lance_table_name,
             data=pa_table,
             mode="overwrite",
@@ -249,7 +250,7 @@ class ItemsProcessor(FeaturesProcessor):
         exclude_item_ids: list[int] | None = None,
         top_k: int = TOP_K,
     ) -> pd.DataFrame:
-        if self.index is None:
+        if self.lance_table is None:
             msg = "`index` must be intialised first"
             raise ValueError(msg)
 
@@ -257,7 +258,7 @@ class ItemsProcessor(FeaturesProcessor):
         exclude_filter = ", ".join(f"{item}" for item in exclude_item_ids)
         exclude_filter = f"{self.id_col} NOT IN ({exclude_filter})"
         return (
-            self.index.search(embedding)
+            self.lance_table.search(embedding)
             .where(exclude_filter, prefilter=True)
             .nprobes(self.num_probes)
             .refine_factor(self.refine_factor)
@@ -338,10 +339,27 @@ class MatrixFactorizationDataModule(LightningDataModule):
         num_sub_vectors: int | None = None,
         num_probes: int = 8,
         refine_factor: int = 4,
-        num_workers: int | None = None,
+        num_workers: int | None = None,  # noqa: ARG002
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
+
+        self.users_processor = UsersProcessor(
+            batch_size=user_batch_size,
+            num_hashes=num_hashes,
+            num_embeddings=num_embeddings,
+            data_dir=data_dir,
+        )
+        self.items_processor = ItemsProcessor(
+            batch_size=item_batch_size,
+            num_hashes=num_hashes,
+            num_embeddings=num_embeddings,
+            num_partitions=num_partitions,
+            num_sub_vectors=num_sub_vectors,
+            num_probes=num_probes,
+            refine_factor=refine_factor,
+            data_dir=data_dir,
+        )
 
     def prepare_data(self: Self, *, overwrite: bool = False) -> pl.LazyFrame:
         from filelock import FileLock
@@ -353,24 +371,6 @@ class MatrixFactorizationDataModule(LightningDataModule):
                 MOVIELENS_1M_URL, self.hparams.data_dir, overwrite=overwrite
             )
             return prepare_movielens(self.hparams.data_dir, overwrite=overwrite)
-
-    def setup(self: Self, stage: str) -> None:
-        self.users_processor = UsersProcessor(
-            batch_size=self.hparams.user_batch_size,
-            num_hashes=self.hparams.num_hashes,
-            num_embeddings=self.hparams.num_embeddings,
-            data_dir=self.hparams.data_dir,
-        )
-        self.items_processor = ItemsProcessor(
-            batch_size=self.hparams.item_batch_size,
-            num_hashes=self.hparams.num_hashes,
-            num_embeddings=self.hparams.num_embeddings,
-            num_partitions=self.hparams.num_partitions,
-            num_sub_vectors=self.hparams.num_sub_vectors,
-            num_probes=self.hparams.num_probes,
-            refine_factor=self.hparams.refine_factor,
-            data_dir=self.hparams.data_dir,
-        )
 
     def get_dataloader(
         self: Self,
@@ -424,7 +424,6 @@ if __name__ == "__main__":
 
     dm = MatrixFactorizationDataModule()
     dm.prepare_data().head().collect().glimpse()
-    dm.setup("fit")
 
     dataloaders = [
         dm.users_processor.get_data(),
@@ -446,6 +445,7 @@ if __name__ == "__main__":
     rich.print(dm.users_processor.get_id(1))
     rich.print(dm.users_processor.get_activity(1, "history"))
     rich.print(dm.users_processor.get_activity(1, "target"))
+
     dm.items_processor.get_index(
         lambda hashes, _: torch.rand(hashes.size(0), 32)  # devskim: ignore DS148264
     ).search().to_polars().glimpse()

@@ -33,6 +33,7 @@ TOP_K = 20
 
 # serving
 CHECKPOINT_PATH = "checkpoint.ckpt"
+PROCESSORS_JSON = "processors.json"
 EXPORTED_PROGRAM_PATH = "exported_program.pt"
 ITEMS_TABLE_NAME = "movies"
 LANCE_DB_PATH = "lance_db"
