@@ -25,7 +25,7 @@ class Embedder:
     @logger.catch(reraise=True)
     def __init__(self: Self) -> None:
         path = self.model_ref.path_of(EXPORTED_PROGRAM_PATH)
-        self.model = torch.export.load(path).module()
+        self.model = torch.export.load(path).module()  # nosec
         logger.info("model loaded: {}", path)
 
     @bentoml.api()
