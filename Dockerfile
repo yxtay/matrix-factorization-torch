@@ -58,7 +58,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip list
 
 # set up project
-COPY mf_torch ./
+COPY mf_torch mf_torch
 
 USER ${USER}
-HEALTHCHECK CMD [ python, -c, import mf_torch.bentoml.prepare ]
+HEALTHCHECK CMD [ python, -c, import mf_torch.lightning ]
