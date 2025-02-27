@@ -1,0 +1,11 @@
+services:
+  app:
+    image: ghcr.io/yxtay/matrix-factorization-torch:main
+    build:
+      cache_from:
+        - ghcr.io/yxtay/matrix-factorization-torch:cache
+        - ghcr.io/yxtay/matrix-factorization-torch:main
+    cap_drop:
+      - all
+    security_opt:
+      - no-new-privileges:true
