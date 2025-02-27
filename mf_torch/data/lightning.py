@@ -4,7 +4,7 @@ import datetime
 import functools
 import math
 import os
-from pathlib import Path
+import pathlib
 from typing import TYPE_CHECKING
 
 import pydantic
@@ -44,9 +44,7 @@ if TYPE_CHECKING:
 
     T = TypeVar("T")
 
-
-FEATURES_TYPE = dict[str, torch.Tensor]
-BATCH_TYPE = dict[str, FEATURES_TYPE | torch.Tensor]
+BATCH_TYPE = dict[str, dict[str, torch.Tensor] | torch.Tensor]
 
 
 class FeaturesProcessor(pydantic.BaseModel):
@@ -83,8 +81,8 @@ class FeaturesProcessor(pydantic.BaseModel):
         }
 
     def get_data(
-        self: Self, subset: str = "train"
-    ) -> torch_data.IterDataPipe[FEATURES_TYPE]:
+        self: Self, subset: str
+    ) -> torch_data.IterDataPipe[dict[str, torch.Tensor]]:
         import pyarrow.dataset as ds
 
         from mf_torch.data.load import ParquetDictLoaderIterDataPipe
@@ -104,14 +102,19 @@ class FeaturesProcessor(pydantic.BaseModel):
             .map(self.process)
         )
 
-    def get_train_data(
-        self: Self,
-    ) -> torch_data.IterDataPipe[FEATURES_TYPE]:
+    def get_processed_data(
+        self: Self, subset: str
+    ) -> torch_data.IterDataPipe[dict[str, Any]]:
+        return self.get_data(subset).map(self.process)
+
+    def get_batch_data(
+        self: Self, subset: str
+    ) -> torch_data.IterDataPipe[dict[str, torch.Tensor]]:
         import torch.utils.data._utils.collate as torch_collate
 
         fields = ["idx", "feature_hashes", "feature_weights"]
         return (
-            self.get_data("train")
+            self.get_processed_data(subset)
             .map(functools.partial(select_fields, fields=fields))
             .batch(self.batch_size)
             .map(torch_collate.default_collate)
@@ -144,7 +147,7 @@ class UsersProcessor(FeaturesProcessor):
 
     @property
     def data_path(self) -> str:
-        return str(Path(self.data_dir, "ml-1m", "users.parquet"))
+        return str(pathlib.Path(self.data_dir, "ml-1m", "users.parquet"))
 
     def get_index(self: Self) -> lancedb.table.Table:
         import pyarrow.parquet as pq
@@ -191,7 +194,7 @@ class ItemsProcessor(FeaturesProcessor):
 
     @property
     def data_path(self) -> str:
-        return str(Path(self.data_dir, "ml-1m", "movies.parquet"))
+        return str(pathlib.Path(self.data_dir, "ml-1m", "movies.parquet"))
 
     def get_index(self: Self, model: torch.nn.Module) -> lancedb.table.Table:
         import pyarrow as pa
@@ -272,24 +275,29 @@ class ItemsProcessor(FeaturesProcessor):
 class MatrixFactorisationDataPipe(torch_data.IterDataPipe[BATCH_TYPE]):
     def __init__(
         self: Self,
-        users_dataset: torch_data.IterDataPipe[FEATURES_TYPE],
-        items_dataset: torch_data.IterDataPipe[FEATURES_TYPE],
+        users_dataset: torch_data.IterDataPipe[dict[str, torch.Tensor]],
+        items_dataset: torch_data.IterDataPipe[dict[str, torch.Tensor]],
         data_dir: str = DATA_DIR,
     ) -> None:
         super().__init__()
         self.users_dataset = users_dataset
         self.items_dataset = items_dataset
-        self.data_path = str(Path(data_dir, "ml-1m", "ratings.parquet"))
+        self.data_path = str(pathlib.Path(data_dir, "ml-1m", "ratings.parquet"))
         self.targets = self.get_targets()
 
-    def get_targets(self: Self) -> torch.Tensor:
+    def get_targets(self: Self, subset: str = "train") -> torch.Tensor:
         import polars as pl
         import scipy
+
+        valid_subset = {"train", "val", "test", "predict"}
+        if subset not in valid_subset:
+            msg = f"`{subset}` is not one of `{valid_subset}`"
+            raise ValueError(msg)
 
         columns = {TARGET_COL, USER_RN_COL, ITEM_RN_COL}
         ratings_df = (
             pl.scan_parquet(self.data_path)
-            .filter(pl.col("is_train"))
+            .filter(pl.col(f"is_{subset}"))
             .select(columns)
             .collect()
             .to_pandas()
@@ -302,9 +310,7 @@ class MatrixFactorisationDataPipe(torch_data.IterDataPipe[BATCH_TYPE]):
     def __len__(self: Self) -> int:
         return len(self.users_dataset) * len(self.items_dataset)
 
-    def __iter__(
-        self: Self,
-    ) -> Iterator[BATCH_TYPE]:
+    def __iter__(self: Self) -> Iterator[BATCH_TYPE]:
         for users_batch in iter(self.users_dataset):
             for items_batch in iter(self.items_dataset):
                 row_idx = users_batch["idx"].numpy(force=True)
@@ -399,22 +405,24 @@ class MatrixFactorizationDataModule(LightningDataModule):
 
     def train_dataloader(self: Self) -> torch_data.DataLoader[BATCH_TYPE]:
         train_data = MatrixFactorisationDataPipe(
-            users_dataset=self.users_processor.get_train_data(),
-            items_dataset=self.items_processor.get_train_data(),
+            users_dataset=self.users_processor.get_batch_data("train"),
+            items_dataset=self.items_processor.get_batch_data("train"),
             data_dir=self.hparams.data_dir,
         ).shuffle(buffer_size=2**4)  # devskim: ignore DS148264
         return self.get_dataloader(train_data, shuffle=True)
 
-    def val_dataloader(self: Self) -> torch_data.DataLoader[FEATURES_TYPE]:
-        val_data = self.users_processor.get_data("val")
+    def val_dataloader(self: Self) -> torch_data.DataLoader[dict[str, torch.Tensor]]:
+        val_data = self.users_processor.get_processed_data("val")
         return self.get_dataloader(val_data)
 
-    def test_dataloader(self: Self) -> torch_data.DataLoader[FEATURES_TYPE]:
-        test_data = self.users_processor.get_data("test")
+    def test_dataloader(self: Self) -> torch_data.DataLoader[dict[str, torch.Tensor]]:
+        test_data = self.users_processor.get_processed_data("test")
         return self.get_dataloader(test_data)
 
-    def predict_dataloader(self: Self) -> torch_data.DataLoader[FEATURES_TYPE]:
-        predict_data = self.users_processor.get_data("predict")
+    def predict_dataloader(
+        self: Self,
+    ) -> torch_data.DataLoader[dict[str, torch.Tensor]]:
+        predict_data = self.users_processor.get_processed_data("predict")
         return self.get_dataloader(predict_data)
 
 
@@ -425,8 +433,8 @@ if __name__ == "__main__":
     dm.prepare_data().head().collect().glimpse()
 
     dataloaders = [
-        dm.users_processor.get_data(),
-        dm.items_processor.get_data(),
+        dm.users_processor.get_batch_data("train"),
+        dm.items_processor.get_batch_data("train"),
         dm.train_dataloader(),
         dm.val_dataloader(),
     ]

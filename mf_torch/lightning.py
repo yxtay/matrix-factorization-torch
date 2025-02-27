@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
+import pathlib
 from typing import TYPE_CHECKING
 
 import lightning.pytorch.callbacks as lp_callbacks
@@ -10,6 +10,7 @@ from lightning import LightningModule
 from lightning.fabric.utilities.rank_zero import rank_zero_only
 from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
 
+from mf_torch.data.lightning import BATCH_TYPE
 from mf_torch.params import (
     EMBEDDING_DIM,
     EXPORTED_PROGRAM_PATH,
@@ -30,8 +31,6 @@ if TYPE_CHECKING:
     from mlflow import MlflowClient
 
     from mf_torch.data.lightning import (
-        BATCH_TYPE,
-        FEATURES_TYPE,
         ItemsProcessor,
         UsersProcessor,
     )
@@ -94,11 +93,11 @@ class MatrixFactorizationLitModule(LightningModule):
             msg = "`user_processor` and `item_processor` must be initialised first"
             raise ValueError(msg)
 
-        embed = (
-            self(feature_hashes.unsqueeze(0), feature_weights.unsqueeze(0))
-            .float()
-            .numpy(force=True)
-        )
+        with torch.inference_mode():
+            embed = self(
+                feature_hashes.unsqueeze(0), feature_weights.unsqueeze(0)
+            ).numpy(force=True)
+
         history = self.users_processor.get_activity(user_id, "history")
         exclude_item_ids = (exclude_item_ids or []) + list(history.keys())
 
@@ -117,7 +116,7 @@ class MatrixFactorizationLitModule(LightningModule):
         # shape: (batch_size)
 
         # user
-        users: FEATURES_TYPE = batch["users"]
+        users: dict[str, torch.Tensor] = batch["users"]
         user_feature_hashes = users["feature_hashes"]
         # shape: (batch_size, num_user_features)
         user_feature_weights = users["feature_weights"]
@@ -126,7 +125,7 @@ class MatrixFactorizationLitModule(LightningModule):
         # shape: (batch_size, embed_dim)
 
         # item
-        items: FEATURES_TYPE = batch["items"]
+        items: dict[str, torch.Tensor] = batch["items"]
         item_feature_hashes = items["feature_hashes"]
         # shape: (batch_size, num_item_features)
         item_feature_weights = items["feature_weights"]
@@ -135,11 +134,12 @@ class MatrixFactorizationLitModule(LightningModule):
         # shape: (batch_size, embed_dim)
 
         n_users, n_items = targets.size()
+        nnz = targets.values().numel()
         metrics = {
             "batch/users": n_users,
             "batch/items": n_items,
-            "batch/nnz": targets.values().numel(),
-            "batch/sparsity": targets.values().numel() / targets.numel(),
+            "batch/nnz": nnz,
+            "batch/sparsity": nnz / targets.numel(),
         }
         losses = {
             f"{step_name}/{loss_fn.__class__.__name__}": loss_fn(
@@ -150,7 +150,7 @@ class MatrixFactorizationLitModule(LightningModule):
         return losses | metrics
 
     def update_metrics(
-        self: Self, batch: FEATURES_TYPE, step_name: str = "train"
+        self: Self, example: dict[str, torch.Tensor], step_name: str = "train"
     ) -> torchmetrics.MetricCollection:
         import torchmetrics.retrieval as tm_retrieval
 
@@ -158,10 +158,10 @@ class MatrixFactorizationLitModule(LightningModule):
             msg = "`metrics` must be initialised first"
             raise ValueError(msg)
 
-        user_id = batch[USER_ID_COL]
+        user_id = example[USER_ID_COL]
         pred_scores = self.recommend(
-            batch["feature_hashes"],
-            batch["feature_weights"],
+            example["feature_hashes"],
+            example["feature_weights"],
             top_k=self.hparams.top_k,
             user_id=user_id,
         )
@@ -170,7 +170,7 @@ class MatrixFactorizationLitModule(LightningModule):
             zip(pred_scores["movie_id"], pred_scores["score"], strict=True)
         )
         target_scores = dict(
-            zip(batch["target"]["movie_id"], batch["target"]["rating"], strict=True)
+            zip(example["target"]["movie_id"], example["target"]["rating"], strict=True)
         )
 
         movie_ids = list(target_scores.keys() | pred_scores.keys())
@@ -195,15 +195,17 @@ class MatrixFactorizationLitModule(LightningModule):
         self.log_dict(losses)
         return losses[f"train/{self.hparams.train_loss}"]
 
-    def validation_step(self: Self, batch: FEATURES_TYPE, _: int) -> None:
+    def validation_step(self: Self, batch: dict[str, torch.Tensor], _: int) -> None:
         metrics = self.update_metrics(batch, step_name="val")
         self.log_dict(metrics)
 
-    def test_step(self: Self, batch: FEATURES_TYPE, _: int) -> None:  # noqa: PT019
+    def test_step(self: Self, batch: dict[str, torch.Tensor], _: int) -> None:  # noqa: PT019
         metrics = self.update_metrics(batch, step_name="test")
         self.log_dict(metrics)
 
-    def predict_step(self: Self, batch: FEATURES_TYPE, _: int) -> pd.DataFrame:
+    def predict_step(
+        self: Self, batch: dict[str, torch.Tensor], _: int
+    ) -> pd.DataFrame:
         return self.recommend(
             batch["feature_hashes"],
             batch["feature_weights"],
@@ -351,7 +353,7 @@ class MatrixFactorizationLitModule(LightningModule):
         script_module = torch.jit.script(self.model.eval())  # devskim: ignore DS189424
 
         if path is None:
-            path = Path(self.trainer.log_dir) / SCRIPT_MODULE_PATH
+            path = pathlib.Path(self.trainer.log_dir) / SCRIPT_MODULE_PATH
         torch.jit.save(script_module, path)  # nosec
         return script_module
 
@@ -371,7 +373,7 @@ class MatrixFactorizationLitModule(LightningModule):
         )
 
         if path is None:
-            path = Path(self.trainer.log_dir) / EXPORTED_PROGRAM_PATH
+            path = pathlib.Path(self.trainer.log_dir) / EXPORTED_PROGRAM_PATH
         torch.export.save(exported_program, path)  # nosec
         return exported_program
 
@@ -386,7 +388,7 @@ class MatrixFactorizationLitModule(LightningModule):
         )
 
         if path is None:
-            path = Path(self.trainer.log_dir) / "program.onnx"
+            path = pathlib.Path(self.trainer.log_dir) / "program.onnx"
         onnx_program.save(path)
         return onnx_program
 
@@ -401,7 +403,7 @@ class LoggerSaveConfigCallback(SaveConfigCallback):
         for logger in trainer.loggers:
             if isinstance(logger, lp_loggers.MLFlowLogger):
                 with tempfile.TemporaryDirectory() as path:
-                    config_path = Path(path) / self.config_filename
+                    config_path = pathlib.Path(path) / self.config_filename
                     self.parser.save(
                         self.config,
                         config_path,

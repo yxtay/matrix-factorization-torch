@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import pathlib
 import shutil
-from pathlib import Path
 
 import polars as pl
 from loguru import logger
@@ -15,11 +15,11 @@ from mf_torch.params import DATA_DIR, MOVIELENS_1M_URL
 
 def download_data(
     url: str = MOVIELENS_1M_URL, dest_dir: str = DATA_DIR, *, overwrite: bool = False
-) -> Path:
+) -> pathlib.Path:
     import requests
 
     # prepare destination
-    dest = Path(dest_dir) / Path(url).name
+    dest = pathlib.Path(dest_dir) / pathlib.Path(url).name
 
     # downlaod zip
     if not dest.exists() or overwrite:
@@ -33,8 +33,10 @@ def download_data(
     return dest
 
 
-def unpack_data(archive_file: str | Path, *, overwrite: bool = False) -> list[str]:
-    archive_file = Path(archive_file)
+def unpack_data(
+    archive_file: str | pathlib.Path, *, overwrite: bool = False
+) -> list[str]:
+    archive_file = pathlib.Path(archive_file)
     dest_dir = archive_file.parent / archive_file.stem
 
     if not dest_dir.exists() or overwrite:
@@ -60,7 +62,7 @@ def download_unpack_data(
 def load_ratings(src_dir: str = DATA_DIR) -> pl.LazyFrame:
     import pandas as pd
 
-    ratings_dat = Path(src_dir, "ml-1m", "ratings.dat")
+    ratings_dat = pathlib.Path(src_dir, "ml-1m", "ratings.dat")
     dtype = {
         "user_id": "int32",
         "movie_id": "int32",
@@ -82,7 +84,7 @@ def load_ratings(src_dir: str = DATA_DIR) -> pl.LazyFrame:
 def load_movies(src_dir: str = DATA_DIR) -> pl.LazyFrame:
     import pandas as pd
 
-    movies_dat = Path(src_dir, "ml-1m", "movies.dat")
+    movies_dat = pathlib.Path(src_dir, "ml-1m", "movies.dat")
     dtype = {"movie_id": "int32", "title": "category", "genres": "str"}
     movies = pd.read_csv(
         movies_dat,
@@ -101,7 +103,7 @@ def load_movies(src_dir: str = DATA_DIR) -> pl.LazyFrame:
 def load_users(src_dir: str = DATA_DIR) -> pl.LazyFrame:
     import pandas as pd
 
-    users_dat = Path(src_dir, "ml-1m", "users.dat")
+    users_dat = pathlib.Path(src_dir, "ml-1m", "users.dat")
     dtype = {
         "user_id": "int32",
         "gender": "category",
@@ -154,7 +156,7 @@ def process_users(
     src_dir: str = DATA_DIR,
     overwrite: bool = False,
 ) -> pl.LazyFrame:
-    users_parquet = Path(src_dir, "ml-1m", "users.parquet")
+    users_parquet = pathlib.Path(src_dir, "ml-1m", "users.parquet")
     if users_parquet.exists() and not overwrite:
         users_procesed = pl.scan_parquet(str(users_parquet))
         logger.info("users loaded: {}", users_parquet)
@@ -215,7 +217,7 @@ def process_movies(
     src_dir: str = DATA_DIR,
     overwrite: bool = False,
 ) -> pl.LazyFrame:
-    movies_parquet = Path(src_dir, "ml-1m", "movies.parquet")
+    movies_parquet = pathlib.Path(src_dir, "ml-1m", "movies.parquet")
     if movies_parquet.exists() and not overwrite:
         movies_processed = pl.scan_parquet(str(movies_parquet))
         logger.info("movies loaded: {}", movies_parquet)
@@ -253,7 +255,7 @@ def process_ratings(
 ) -> pl.LazyFrame:
     import polars.selectors as cs
 
-    ratings_parquet = Path(src_dir, "ml-1m", "ratings.parquet")
+    ratings_parquet = pathlib.Path(src_dir, "ml-1m", "ratings.parquet")
     if ratings_parquet.exists() and not overwrite:
         ratings_processed = pl.scan_parquet(str(ratings_parquet))
         logger.info("sparse loaded: {}", ratings_parquet)
