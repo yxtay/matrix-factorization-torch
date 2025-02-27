@@ -39,15 +39,12 @@ jobs:
           uv pip list
 
       - run: uv run python -m mf_torch.bentoml.prepare
-        continue-on-error: true
 
       - if: failure()
         run: uv run python -m mf_torch.lightning
-        continue-on-error: true
 
       - if: failure()
         run: uv run python -m mf_torch.data.lightning
-        continue-on-error: true
 
       - if: failure()
         run: uv run python -m mf_torch.data.prepare
