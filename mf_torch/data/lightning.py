@@ -43,7 +43,8 @@ if TYPE_CHECKING:
     import polars as pl
 
     T = TypeVar("T")
-    BATCH_TYPE = dict[str, dict[str, torch.Tensor] | torch.Tensor]
+
+BATCH_TYPE = dict[str, dict[str, torch.Tensor] | torch.Tensor]
 
 
 class FeaturesProcessor(pydantic.BaseModel):

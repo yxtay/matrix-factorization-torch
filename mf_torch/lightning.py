@@ -10,6 +10,7 @@ from lightning import LightningModule
 from lightning.fabric.utilities.rank_zero import rank_zero_only
 from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
 
+from mf_torch.data.lightning import BATCH_TYPE
 from mf_torch.params import (
     EMBEDDING_DIM,
     EXPORTED_PROGRAM_PATH,
@@ -29,7 +30,6 @@ if TYPE_CHECKING:
     from lightning.pytorch.cli import ArgsType
     from mlflow import MlflowClient
 
-    from mf_torch.data import BATCH_TYPE
     from mf_torch.data.lightning import (
         ItemsProcessor,
         UsersProcessor,
