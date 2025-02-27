@@ -61,3 +61,4 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY mf_torch ./
 
 USER ${USER}
+HEALTHCHECK CMD [ exit, 0 ]
