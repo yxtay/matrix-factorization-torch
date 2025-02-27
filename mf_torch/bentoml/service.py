@@ -1,20 +1,73 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from typing import Self
+import pathlib
+from typing import Annotated, Self
 
 import bentoml
+import pydantic
 import torch
+from bentoml.validators import DType
 from loguru import logger
 
-from mf_torch.bentoml.schemas import ItemCandidate, ItemQuery, Query, UserQuery
 from mf_torch.params import (
     EXPORTED_PROGRAM_PATH,
     LANCE_DB_PATH,
     MODEL_NAME,
     PROCESSORS_JSON,
     TOP_K,
+)
+
+
+class Activity(pydantic.BaseModel):
+    movie_id: list[int]
+    rating: list[int]
+
+
+class UserQuery(pydantic.BaseModel):
+    user_rn: int = 0
+    user_id: int | None = None
+    gender: str | None = None
+    age: int | None = None
+    occupation: int | None = None
+    zipcode: str | None = None
+    history: Activity | None = None
+    target: Activity | None = None
+
+
+class ItemQuery(pydantic.BaseModel):
+    movie_rn: int = 0
+    movie_id: int | None = None
+    title: str | None = None
+    genres: list[str] | None = None
+
+
+class Query(bentoml.IODescriptor):
+    feature_values: list[str]
+    feature_hashes: Annotated[torch.Tensor, DType("int64")]
+    feature_weights: Annotated[torch.Tensor, DType("float32")]
+    embedding: Annotated[torch.Tensor, DType("float32")] | None = None
+
+
+class ItemCandidate(pydantic.BaseModel):
+    movie_id: int
+    title: str
+    genres: list[str]
+    score: float
+
+
+EXAMPLE_ITEM = ItemQuery(
+    movie_id=1,
+    title="Toy Story (1995)",
+    genres=["Animation", "Children's", "Comedy"],
+)
+
+EXAMPLE_USER = UserQuery(
+    user_id=1,
+    gender="F",
+    age=1,
+    occupation=10,
+    zipcode="48067",
 )
 
 
@@ -48,7 +101,7 @@ class ItemsProcessor:
 
         lance_db_path = self.model_ref.path_of(LANCE_DB_PATH)
         processors_args = json.loads(
-            Path(self.model_ref.path_of(PROCESSORS_JSON)).read_text()
+            pathlib.Path(self.model_ref.path_of(PROCESSORS_JSON)).read_text()
         )
         processors_args["items"].update({"lance_db_path": lance_db_path})
         self.items_processor = ItemsProcessor.model_validate(processors_args["items"])
@@ -97,7 +150,7 @@ class UsersProcessor:
 
         lance_db_path = self.model_ref.path_of(LANCE_DB_PATH)
         processors_args = json.loads(
-            Path(self.model_ref.path_of(PROCESSORS_JSON)).read_text()
+            pathlib.Path(self.model_ref.path_of(PROCESSORS_JSON)).read_text()
         )
         processors_args["users"].update({"lance_db_path": lance_db_path})
         self.users_processor = UsersProcessor.model_validate(processors_args["users"])

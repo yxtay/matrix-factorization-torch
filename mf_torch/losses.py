@@ -58,9 +58,11 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
             user_embed, item_embed, targets, user_idx=row_idx, item_idx=col_idx
         )
 
-    @staticmethod
     def check_inputs(
-        user_embed: torch.Tensor, item_embed: torch.Tensor, targets: torch.Tensor
+        self: Self,
+        user_embed: torch.Tensor,
+        item_embed: torch.Tensor,
+        targets: torch.Tensor,
     ) -> None:
         if user_embed.dim() != 2 or item_embed.dim() != 2 or targets.dim() != 2:  # noqa: PLR2004
             msg = f"inputs should have 2 dimensions: {user_embed.dim() = }, {item_embed.dim() = }, {targets.dim() = }"

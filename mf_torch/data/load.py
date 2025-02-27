@@ -34,7 +34,7 @@ def collate_features(
     if isinstance(value, list):
         # list feature, potentially nested
         values, weights = zip(
-            *[collate_features(v, key, feature_names) for v in value], strict=False
+            *[collate_features(v, key, feature_names) for v in value], strict=True
         )
     elif isinstance(value, dict):
         # nested feature
@@ -44,7 +44,7 @@ def collate_features(
                 collate_features(v, key_fmt.format(feature_names[k]), feature_names)
                 for k, v in value.items()
             ],
-            strict=False,
+            strict=True,
         )
 
     num_values = sum(len(val) > 0 for val in values)

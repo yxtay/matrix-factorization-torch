@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
+import pathlib
 from typing import TYPE_CHECKING
 
 import ray.train
@@ -92,7 +92,7 @@ def train_loop_per_worker(
     if checkpoint := ray.train.get_checkpoint():
         checkpoint_name = ray_lightning.RayTrainReportCallback.CHECKPOINT_NAME
         with checkpoint.as_directory() as ckpt_dir:
-            ckpt_path = Path(ckpt_dir, checkpoint_name)
+            ckpt_path = pathlib.Path(ckpt_dir, checkpoint_name)
 
     config = {
         key: value.item() if isinstance(value, np.generic) else value
@@ -121,7 +121,7 @@ def get_run_config() -> ray.train.RunConfig:
         metric=METRIC["name"], mode=METRIC["mode"]
     )
     return ray.train.RunConfig(
-        storage_path=Path("ray_results").absolute(),
+        storage_path=pathlib.Path("ray_results").absolute(),
         checkpoint_config=checkpoint_config,
         stop=stopper,
     )
@@ -134,10 +134,10 @@ def get_ray_trainer() -> ray_torch.TorchTrainer:
 
     train_loop_config = {
         # tracking
-        "tensorboard_save_dir": str(Path(TENSORBOARD_DIR).absolute()),
-        "mlflow_save_dir": str(Path(MLFLOW_DIR).absolute()),
+        "tensorboard_save_dir": str(pathlib.Path(TENSORBOARD_DIR).absolute()),
+        "mlflow_save_dir": str(pathlib.Path(MLFLOW_DIR).absolute()),
         # datamodule
-        "data_dir": str(Path(DATA_DIR).absolute()),
+        "data_dir": str(pathlib.Path(DATA_DIR).absolute()),
         "num_hashes": 2,
         # model
         "log_num_embeddings": 16,

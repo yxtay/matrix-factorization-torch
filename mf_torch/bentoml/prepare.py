@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
+import pathlib
 import shutil
 import tempfile
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import torch
@@ -70,7 +70,7 @@ def save_model(trainer: Trainer) -> None:
             "users": model.users_processor.model_dump(),
             "items": model.items_processor.model_dump(),
         }
-        Path(model_ref.path_of(PROCESSORS_JSON)).write_text(
+        pathlib.Path(model_ref.path_of(PROCESSORS_JSON)).write_text(
             json.dumps(processors_args, indent=2)
         )
 
@@ -97,14 +97,14 @@ def test_queries() -> None:
     import pydantic
     import rich
 
-    from mf_torch.bentoml.schemas import (
+    from mf_torch.bentoml.service import (
         EXAMPLE_ITEM,
         EXAMPLE_USER,
         ItemCandidate,
         ItemQuery,
+        Service,
         UserQuery,
     )
-    from mf_torch.bentoml.service import Service
 
     example_item_data = test_bento(Service, "item_id", {"item_id": 1})
     example_item = ItemQuery.model_validate(example_item_data)
