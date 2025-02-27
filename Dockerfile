@@ -1,7 +1,7 @@
 ##
 # base
 ##
-FROM python:3.12-slim AS base
+FROM python:3.12-slim@sha256:aaa3f8cb64dd64e5f8cb6e58346bdcfa410a108324b0f28f1a7cc5964355b211 AS base
 LABEL maintainer="wyextay@gmail.com"
 
 # set up user
@@ -58,8 +58,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip list
 
 # set up project
-COPY mf_torch mf_torch
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-default-groups
+COPY mf_torch ./
 
 USER ${USER}
