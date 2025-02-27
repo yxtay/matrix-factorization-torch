@@ -61,4 +61,4 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY mf_torch ./
 
 USER ${USER}
-HEALTHCHECK CMD [ exit, 0 ]
+HEALTHCHECK CMD [ python, -c, import mf_torch.bentoml.prepare ]
