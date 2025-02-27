@@ -55,6 +55,8 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv venv --seed "${VIRTUAL_ENV}" && \
     uv sync --frozen --no-default-groups --no-install-project && \
+    chown -R "${USER}:${USER}" "${VIRTUAL_ENV}" && \
+    chown -R "${USER}:${USER}" "${APP_HOME}" && \
     uv pip list
 
 # set up project
