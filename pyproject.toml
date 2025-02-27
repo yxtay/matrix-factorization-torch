@@ -1,3 +1,7 @@
+[build-system]
+requires = ["poetry-core>=2.0,<3.0"]
+build-backend = "poetry.core.masonry.api"
+
 [project]
 name = "mf_torch"
 version = "0.1.0"

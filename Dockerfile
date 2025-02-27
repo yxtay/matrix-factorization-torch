@@ -61,6 +61,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # set up project
 COPY mf_torch mf_torch
+COPY README.md ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-default-groups
 
 USER ${USER}
 HEALTHCHECK CMD [ python, -c, import mf_torch.lightning ]

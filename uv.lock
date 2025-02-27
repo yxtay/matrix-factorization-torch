@@ -1375,7 +1375,7 @@ wheels = [
 [[package]]
 name = "mf-torch"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "bentoml" },
     { name = "flaml", extra = ["blendsearch"] },
