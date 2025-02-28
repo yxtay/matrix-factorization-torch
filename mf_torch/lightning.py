@@ -173,7 +173,7 @@ class MatrixFactorizationLitModule(LightningModule):
         )
 
         movie_ids = list(target_scores.keys() | pred_scores.keys())
-        preds = [
+        preds = [  # nosec
             pred_scores.get(movie_id, -random.random())  # devskim: ignore DS148264
             for movie_id in movie_ids
         ]
