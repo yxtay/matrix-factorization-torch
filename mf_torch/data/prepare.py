@@ -290,6 +290,12 @@ def prepare_movielens(
     return process_ratings(ratings, users, movies, src_dir=src_dir, overwrite=overwrite)
 
 
+def main(data_dir: str = DATA_DIR, *, overwrite: bool = True) -> None:
+    download_unpack_data(overwrite=overwrite)
+    prepare_movielens(data_dir, overwrite=overwrite).head().collect().glimpse()
+
+
 if __name__ == "__main__":
-    download_unpack_data(overwrite=True)
-    prepare_movielens(DATA_DIR, overwrite=True).head().collect().glimpse()
+    from jsonargparse import CLI
+
+    CLI(main, as_positional=False)

@@ -495,5 +495,4 @@ if __name__ == "__main__":
         # "max_epochs": -1,
         # "overfit_batches": 1,
     }
-    cli_main(args={"validate": {"trainer": trainer_args}})
     cli_main(args={"fit": {"trainer": trainer_args}})

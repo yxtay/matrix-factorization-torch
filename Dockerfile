@@ -63,4 +63,4 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-default-groups
 
 USER ${USER}
-HEALTHCHECK CMD [ python, -c, import mf_torch.lightning ]
+HEALTHCHECK CMD [ uv, run, lightning, fit, --print_config ]
