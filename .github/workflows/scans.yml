@@ -67,18 +67,18 @@ jobs:
           ref: ${{ github.head_ref && format('refs/heads/{0}', github.head_ref) || github.ref }}
           sha: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - if: ${{ failure() && steps.megalinter.outputs.has_updated_sources == 1 && github.event_name == 'pull_request' }}
-        name: commit changes
-        run: |
-          git config user.email "${GITHUB_ACTOR_ID}+${GITHUB_ACTOR}@users.noreply.github.com"
-          git config user.name "${GITHUB_ACTOR}"
-          git commit --all --message "${COMMIT_MESSAGE}"
-          git push origin "HEAD:refs/heads/${GITHUB_HEAD_REF}"
-        env:
-          COMMIT_MESSAGE: "fix: apply megalinter fixes"
-          # https://api.github.com/users/megalinter-bot
-          GITHUB_ACTOR: megalinter-bot
-          GITHUB_ACTOR_ID: 129584137
+    # - if: ${{ failure() && steps.megalinter.outputs.has_updated_sources == 1 && github.event_name == 'pull_request' }}
+    #   name: commit changes
+    #   run: |
+    #     git config user.email "${GITHUB_ACTOR_ID}+${GITHUB_ACTOR}@users.noreply.github.com"
+    #     git config user.name "${GITHUB_ACTOR}"
+    #     git commit --all --message "${COMMIT_MESSAGE}"
+    #     git push origin "HEAD:refs/heads/${GITHUB_HEAD_REF}"
+    #   env:
+    #     COMMIT_MESSAGE: "fix: apply megalinter fixes"
+    #     # https://api.github.com/users/megalinter-bot
+    #     GITHUB_ACTOR: megalinter-bot
+    #     GITHUB_ACTOR_ID: 129584137
 
   msdo:
     permissions:
@@ -161,3 +161,27 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - uses: trunk-io/trunk-action@4d5ecc89b2691705fd08c747c78652d2fc806a94 # v1
+
+      - name: trunk check --fix
+        if: ${{ failure() && github.event_name == 'pull_request' }}
+        run: |
+          git config user.email "${GITHUB_ACTOR_ID}+${GITHUB_ACTOR}@users.noreply.github.com"
+          git config user.name "${GITHUB_ACTOR}"
+          git fetch origin "${GITHUB_HEAD_REF}" --depth 1
+          git switch "${GITHUB_HEAD_REF}"
+
+          git fetch origin "${DEFAULT_BRANCH}" --depth 1
+          upstream=$(git rev-parse "${DEFAULT_BRANCH}")
+          "${TRUNK_PATH}" check --ci --upstream "${upstream}" --fix
+
+          if [[ -n "$(git diff --name-only)" ]]; then
+            git commit --all --message "${COMMIT_MESSAGE}"
+            git push origin HEAD:refs/heads/"${GITHUB_HEAD_REF}"
+          fi
+        env:
+          COMMIT_MESSAGE: "fix: trunk check --fix"
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          # https://api.github.com/users/trunk-io
+          GITHUB_ACTOR: trunk-io
+          GITHUB_ACTOR_ID: 74779146
+          GITHUB_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
