@@ -44,8 +44,6 @@ class MatrixFactorizationLitModule(LightningModule):
         num_embeddings: int = NUM_EMBEDDINGS,  # noqa: ARG002
         embedding_dim: int = EMBEDDING_DIM,  # noqa: ARG002
         train_loss: str = "PairwiseHingeLoss",  # noqa: ARG002
-        max_norm: float | None = None,  # noqa: ARG002
-        norm_type: float = 2.0,  # noqa: ARG002
         embedder_type: str = "base",  # noqa: ARG002
         num_heads: int = 1,  # noqa: ARG002
         dropout: float = 0.0,  # noqa: ARG002
@@ -292,8 +290,6 @@ class MatrixFactorizationLitModule(LightningModule):
         embedder = embedder_class(
             num_embeddings=self.hparams.num_embeddings,
             embedding_dim=self.hparams.embedding_dim,
-            max_norm=self.hparams.get("max_norm"),
-            norm_type=self.hparams.norm_type,
         )
         return mf_models.MatrixFactorization(
             embedder=embedder, normalize=self.hparams.normalize
