@@ -46,7 +46,7 @@ def evaluation_function(
     from mf_torch.lightning import cli_main
 
     config = {
-        key: value.tolist() if isinstance(value, np.generic) else value
+        key: value.item() if isinstance(value, np.generic) else value
         for key, value in config.items()
     }
 
@@ -54,7 +54,7 @@ def evaluation_function(
     args = {"trainer": trainer_args, **get_lightning_args(config)}
     cli = cli_main({"fit": args})
     return {
-        key: cli.trainer.callback_metrics[key].tolist()
+        key: cli.trainer.callback_metrics[key].item()
         for key in cli.model.metrics["val"]
     }
 

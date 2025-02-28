@@ -27,6 +27,12 @@ dependencies = [
   "xxhash~=3.4",
 ]
 
+[project.scripts]
+data = "mf_torch.data.prepare:main"
+lightning = "mf_torch.lightning:cli_main"
+flaml = "mf_torch.flaml:flaml_tune"
+bentoml = "mf_torch.bentoml.prepare:main"
+
 [tool.ruff]
 fix = true
 src = [".", "src", "tests"]
