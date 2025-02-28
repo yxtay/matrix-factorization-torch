@@ -131,7 +131,7 @@ def test_queries() -> None:
     rich.print(user_recs)
 
 
-def main(ckpt_path: str | None) -> None:
+def main(ckpt_path: str | None = None) -> None:
     trainer = prepare_trainer(ckpt_path)
     save_model(trainer=trainer)
     test_queries()
