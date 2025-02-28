@@ -173,8 +173,11 @@ class MatrixFactorizationLitModule(LightningModule):
         )
 
         movie_ids = list(target_scores.keys() | pred_scores.keys())
-        preds = [  # nosec
-            pred_scores.get(movie_id, -random.random())  # devskim: ignore DS148264
+        preds = [
+            pred_scores.get(
+                movie_id,
+                -random.random(),  # devskim: ignore DS148264 # nosec
+            )
             for movie_id in movie_ids
         ]
         preds = torch.as_tensor(preds)
