@@ -334,7 +334,7 @@ class MatrixFactorisationDataPipe(torch_data.IterDataPipe[BATCH_TYPE]):
 
 
 class MatrixFactorizationDataModule(LightningDataModule):
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self: Self,
         data_dir: str = DATA_DIR,
         user_batch_size: int = BATCH_SIZE,
