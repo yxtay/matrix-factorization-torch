@@ -35,6 +35,7 @@ TOP_K = 20
 CHECKPOINT_PATH = "checkpoint.ckpt"
 PROCESSORS_JSON = "processors.json"
 EXPORTED_PROGRAM_PATH = "exported_program.pt"
+ONNX_PROGRAM_PATH = "program.onnx"
 ITEMS_TABLE_NAME = "movies"
 LANCE_DB_PATH = "lance_db"
 MODEL_NAME = "mf_torch"

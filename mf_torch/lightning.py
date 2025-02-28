@@ -17,6 +17,7 @@ from mf_torch.params import (
     EXPORTED_PROGRAM_PATH,
     METRIC,
     NUM_EMBEDDINGS,
+    ONNX_PROGRAM_PATH,
     SCRIPT_MODULE_PATH,
     TOP_K,
     USER_ID_COL,
@@ -383,20 +384,20 @@ class MatrixFactorizationLitModule(LightningModule):
         torch.export.save(exported_program, path)  # nosec
         return exported_program
 
-    def export_dynamo_onnx(
-        self: Self, path: str | None = None
-    ) -> torch.onnx.ONNXProgram:
-        model = self.export_dynamo().module()
-
-        export_options = torch.onnx.ExportOptions(dynamic_shapes=True)
-        onnx_program = torch.onnx.dynamo_export(
-            model, *self.example_input_array, export_options=export_options
-        )
-
+    def export_onnx(self: Self, path: str | None = None) -> torch.onnx.ONNXProgram:
         if path is None:
-            path = pathlib.Path(self.trainer.log_dir) / "program.onnx"
-        onnx_program.save(path)
-        return onnx_program
+            path = pathlib.Path(self.trainer.log_dir) / ONNX_PROGRAM_PATH
+
+        dynamo_path = pathlib.Path(path).parent / EXPORTED_PROGRAM_PATH
+        exported_program = self.export_dynamo(dynamo_path)
+        return torch.onnx.export(
+            exported_program,
+            self.example_input_array,
+            path,
+            dynamo=True,
+            optimize=True,
+            verify=True,
+        )
 
 
 class LoggerSaveConfigCallback(SaveConfigCallback):
