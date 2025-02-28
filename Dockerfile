@@ -34,8 +34,6 @@ EOF
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    rm -f /etc/apt/apt.conf.d/docker-clean && \
-    echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache && \
     apt-get update && \
     apt-get install --yes --no-install-recommends \
         build-essential=12.9 \
@@ -62,8 +60,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # set up project
 COPY mf_torch mf_torch
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-default-groups && \
-    uv cache prune --ci
+    uv sync --frozen --no-default-groups
 
 USER ${USER}
 HEALTHCHECK CMD [ python, -c, import mf_torch.lightning ]
