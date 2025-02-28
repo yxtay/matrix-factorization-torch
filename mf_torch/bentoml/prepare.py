@@ -7,7 +7,6 @@ import tempfile
 from typing import TYPE_CHECKING, Any
 
 import torch
-from lightning import Trainer
 
 from mf_torch.params import (
     CHECKPOINT_PATH,
