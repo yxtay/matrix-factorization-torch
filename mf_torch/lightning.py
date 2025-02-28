@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from lightning.pytorch.cli import ArgsType
     from mlflow import MlflowClient
 
+    import mf_torch.models as mf_models
     from mf_torch.data.lightning import (
         ItemsProcessor,
         UsersProcessor,
@@ -56,9 +57,9 @@ class MatrixFactorizationLitModule(LightningModule):
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
-        self.model = None
-        self.loss_fns = None
-        self.metrics = None
+        self.model: mf_models.MatrixFactorization | None = None
+        self.loss_fns: torch.nn.ModuleList | None = None
+        self.metrics: torch.nn.ModuleDict | None = None
         self.users_processor: UsersProcessor | None = None
         self.items_processor: ItemsProcessor | None = None
 
@@ -243,10 +244,15 @@ class MatrixFactorizationLitModule(LightningModule):
         self.on_validation_start()
 
     def configure_optimizers(self: Self) -> torch.optim.Optimizer:
-        optimizer_class = (
-            torch.optim.SparseAdam if self.model.sparse else torch.optim.AdamW
-        )
-        return optimizer_class(self.parameters(), lr=self.hparams.learning_rate)
+        if self.model is None:
+            msg = "`model` must be initialised first"
+            raise ValueError(msg)
+
+        if self.model.sparse:
+            return torch.optim.SparseAdam(
+                self.parameters(), lr=self.hparams.learning_rate
+            )
+        return torch.optim.AdamW(self.parameters(), lr=self.hparams.learning_rate)
 
     def configure_callbacks(self: Self) -> list[Callback]:
         checkpoint = lp_callbacks.ModelCheckpoint(
@@ -267,22 +273,25 @@ class MatrixFactorizationLitModule(LightningModule):
             self.metrics = self.get_metrics()
 
     def get_model(self: Self) -> torch.nn.Module:
-        from functools import partial
-
         import mf_torch.models as mf_models
 
         match self.hparams.embedder_type:
             case "base":
-                embedder_class = mf_models.EmbeddingBag
+                embedder = mf_models.EmbeddingBag(
+                    num_embeddings=self.hparams.num_embeddings,
+                    embedding_dim=self.hparams.embedding_dim,
+                )
             case "attention":
-                embedder_class = partial(
-                    mf_models.AttentionEmbeddingBag,
+                embedder = mf_models.AttentionEmbeddingBag(
+                    num_embeddings=self.hparams.num_embeddings,
+                    embedding_dim=self.hparams.embedding_dim,
                     num_heads=self.hparams.num_heads,
                     dropout=self.hparams.dropout,
                 )
             case "transformer":
-                embedder_class = partial(
-                    mf_models.TransformerEmbeddingBag,
+                embedder = mf_models.TransformerEmbeddingBag(
+                    num_embeddings=self.hparams.num_embeddings,
+                    embedding_dim=self.hparams.embedding_dim,
                     num_heads=self.hparams.num_heads,
                     dropout=self.hparams.dropout,
                 )
@@ -290,10 +299,6 @@ class MatrixFactorizationLitModule(LightningModule):
                 msg = f"{self.hparams.embedder_type = }"
                 raise NotImplementedError(msg)
 
-        embedder = embedder_class(
-            num_embeddings=self.hparams.num_embeddings,
-            embedding_dim=self.hparams.embedding_dim,
-        )
         return mf_models.MatrixFactorization(
             embedder=embedder, normalize=self.hparams.normalize
         )
