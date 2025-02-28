@@ -154,7 +154,7 @@ jobs:
   trunk:
     permissions:
       checks: write
-      contents: read
+      contents: write
 
     runs-on: ubuntu-latest
     steps:
