@@ -1,0 +1,13 @@
+services:
+  app:
+    image: ghcr.io/yxtay/matrix-factorization-torch:main
+    build:
+      cache_from:
+        - ghcr.io/yxtay/matrix-factorization-torch:cache
+        - ghcr.io/yxtay/matrix-factorization-torch:main
+    healthcheck:
+      test: [CMD, python, -c, import mf_torch.lightning]
+    cap_drop:
+      - all
+    security_opt:
+      - no-new-privileges:true
