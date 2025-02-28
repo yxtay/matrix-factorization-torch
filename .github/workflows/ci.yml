@@ -109,14 +109,14 @@ jobs:
         with:
           images: ${{ env.GHCR_IMAGE_NAME }}
 
-      - if: ${{ github.event_name != 'pull_request' }}
+      - if: ${{ github.event_name == 'push' || github.ref_name == github.event.repository.default_branch }}
         uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ github.token }}
 
-      - if: ${{ github.event_name != 'pull_request' }}
+      - if: ${{ github.event_name == 'push' || github.ref_name == github.event.repository.default_branch }}
         uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6
         with:
           cache-from: |
@@ -125,4 +125,4 @@ jobs:
           tags: ${{ steps.docker_metadata.outputs.tags }}
           labels: ${{ steps.docker_metadata.outputs.labels }}
           annotations: ${{ steps.docker_metadata.outputs.annotations }}
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name == 'push' || github.ref_name == github.event.repository.default_branch }}
