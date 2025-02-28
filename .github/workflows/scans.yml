@@ -33,7 +33,7 @@ jobs:
 
   megalinter:
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
       security-events: write
       statuses: write
@@ -67,18 +67,18 @@ jobs:
           ref: ${{ github.head_ref && format('refs/heads/{0}', github.head_ref) || github.ref }}
           sha: ${{ github.event.pull_request.head.sha || github.sha }}
 
-    # - if: ${{ failure() && steps.megalinter.outputs.has_updated_sources == 1 && github.event_name == 'pull_request' }}
-    #   name: commit changes
-    #   run: |
-    #     git config user.email "${GITHUB_ACTOR_ID}+${GITHUB_ACTOR}@users.noreply.github.com"
-    #     git config user.name "${GITHUB_ACTOR}"
-    #     git commit --all --message "${COMMIT_MESSAGE}"
-    #     git push origin "HEAD:refs/heads/${GITHUB_HEAD_REF}"
-    #   env:
-    #     COMMIT_MESSAGE: "fix: apply megalinter fixes"
-    #     # https://api.github.com/users/megalinter-bot
-    #     GITHUB_ACTOR: megalinter-bot
-    #     GITHUB_ACTOR_ID: 129584137
+      - if: ${{ failure() && steps.megalinter.outputs.has_updated_sources == 1 && github.event_name == 'pull_request' }}
+        name: commit changes
+        run: |
+          git config user.email "${GITHUB_ACTOR_ID}+${GITHUB_ACTOR}@users.noreply.github.com"
+          git config user.name "${GITHUB_ACTOR}"
+          git commit --all --message "${COMMIT_MESSAGE}"
+          git push origin "HEAD:refs/heads/${GITHUB_HEAD_REF}"
+        env:
+          COMMIT_MESSAGE: "fix: apply megalinter fixes"
+          # https://api.github.com/users/megalinter-bot
+          GITHUB_ACTOR: megalinter-bot
+          GITHUB_ACTOR_ID: 129584137
 
   msdo:
     permissions:
