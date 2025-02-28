@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pathlib
+import random
 from typing import TYPE_CHECKING
 
 import lightning.pytorch.callbacks as lp_callbacks
@@ -37,7 +38,7 @@ if TYPE_CHECKING:
 
 
 class MatrixFactorizationLitModule(LightningModule):
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self: Self,
         *,
         num_embeddings: int = NUM_EMBEDDINGS,  # noqa: ARG002
@@ -174,12 +175,13 @@ class MatrixFactorizationLitModule(LightningModule):
         )
 
         movie_ids = list(target_scores.keys() | pred_scores.keys())
-        preds = torch.as_tensor(
-            [pred_scores.get(movie_id, 0) for movie_id in movie_ids]
-        )
-        target = torch.as_tensor(
-            [target_scores.get(movie_id, 0) for movie_id in movie_ids]
-        )
+        preds = [
+            pred_scores.get(movie_id, -random.random())  # devskim: ignore DS148264
+            for movie_id in movie_ids
+        ]
+        preds = torch.as_tensor(preds)
+        target = [target_scores.get(movie_id, 0) for movie_id in movie_ids]
+        target = torch.as_tensor(target)
         indexes = torch.ones_like(preds, dtype=torch.long) * user_id
 
         metrics: torchmetrics.MetricCollection = self.metrics[step_name]
@@ -396,7 +398,10 @@ class MatrixFactorizationLitModule(LightningModule):
 class LoggerSaveConfigCallback(SaveConfigCallback):
     @rank_zero_only
     def save_config(
-        self, trainer: Trainer, pl_module: LightningModule, stage: str
+        self,
+        trainer: Trainer,
+        pl_module: LightningModule,  # noqa: ARG002
+        stage: str,  # noqa: ARG002
     ) -> None:
         import tempfile
 

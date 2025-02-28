@@ -75,16 +75,12 @@ class EmbeddingBag(torch.nn.Module):
         *,
         num_embeddings: int = NUM_EMBEDDINGS,
         embedding_dim: int = EMBEDDING_DIM,
-        max_norm: float | None = None,
-        norm_type: float = 2.0,
     ) -> None:
         super().__init__()
         self.embedder = torch.nn.EmbeddingBag(
             num_embeddings=num_embeddings,
             embedding_dim=embedding_dim,
             padding_idx=PADDING_IDX,
-            max_norm=max_norm,
-            norm_type=norm_type,
             mode="sum",
             sparse=True,
         )
@@ -103,8 +99,6 @@ class AttentionEmbeddingBag(torch.nn.Module):
         *,
         num_embeddings: int = NUM_EMBEDDINGS,
         embedding_dim: int = EMBEDDING_DIM,
-        max_norm: float | None = None,
-        norm_type: float = 2.0,
         num_heads: int = 1,
         dropout: float = 0.0,
     ) -> None:
@@ -113,8 +107,6 @@ class AttentionEmbeddingBag(torch.nn.Module):
             num_embeddings=num_embeddings,
             embedding_dim=embedding_dim,
             padding_idx=PADDING_IDX,
-            max_norm=max_norm,
-            norm_type=norm_type,
         )
         self.encoder = torch.nn.MultiheadAttention(
             embed_dim=embedding_dim,
@@ -151,8 +143,6 @@ class TransformerEmbeddingBag(torch.nn.Module):
         *,
         num_embeddings: int = NUM_EMBEDDINGS,
         embedding_dim: int = EMBEDDING_DIM,
-        max_norm: float | None = None,
-        norm_type: float = 2.0,
         num_heads: int = 1,
         dropout: float = 0.0,
     ) -> None:
@@ -161,8 +151,6 @@ class TransformerEmbeddingBag(torch.nn.Module):
             num_embeddings=num_embeddings,
             embedding_dim=embedding_dim,
             padding_idx=PADDING_IDX,
-            max_norm=max_norm,
-            norm_type=norm_type,
         )
         self.encoder = torch.nn.TransformerEncoderLayer(
             d_model=embedding_dim,
