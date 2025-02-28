@@ -33,7 +33,7 @@ jobs:
 
   megalinter:
     permissions:
-      contents: write
+      contents: read
       pull-requests: write
       security-events: write
       statuses: write
