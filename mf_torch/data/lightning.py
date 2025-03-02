@@ -12,7 +12,12 @@ import torch
 import torch.utils.data as torch_data
 from lightning import LightningDataModule
 
-from mf_torch.data.load import collate_features, hash_features, select_fields
+from mf_torch.data.load import (
+    collate_features,
+    embed_example,
+    hash_features,
+    select_fields,
+)
 from mf_torch.params import (
     BATCH_SIZE,
     DATA_DIR,
@@ -206,26 +211,14 @@ class ItemsProcessor(FeaturesProcessor):
         fields = ["movie_id", "title", "genres", "embedding"]
         dp = (
             self.get_processed_data(subset)
-            .map(
-                torch.inference_mode(
-                    lambda example: {
-                        **example,
-                        "embedding": model(
-                            example["feature_hashes"].unsqueeze(0),
-                            example["feature_weights"].unsqueeze(0),
-                        )
-                        .squeeze(0)
-                        .numpy(force=True),
-                    }
-                )
-            )
+            .map(functools.partial(torch.inference_mode(embed_example), model=model))
             .map(functools.partial(select_fields, fields=fields))
             .batch(self.batch_size)
         )
 
         batch = next(iter(dp))
-        example = batch[0]
         num_items = len(dp) * len(batch)
+        example = batch[0]
         (embedding_dim,) = example["embedding"].shape
 
         # rule of thumb: nlist ~= 4 * sqrt(n_vectors)
