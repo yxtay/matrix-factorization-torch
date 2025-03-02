@@ -79,12 +79,9 @@ def select_fields(example: dict[str, Any], *, fields: list[str]) -> dict[str, An
 def embed_example(example: dict[str, Any], *, model: torch.nn.Module) -> dict[str, Any]:
     return {
         **example,
-        "embedding": model(
-            example["feature_hashes"].unsqueeze(0),
-            example["feature_weights"].unsqueeze(0),
-        )
-        .squeeze(0)
-        .numpy(force=True),
+        "embedding": model(example["feature_hashes"], example["feature_weights"]).numpy(
+            force=True
+        ),
     }
 
 
