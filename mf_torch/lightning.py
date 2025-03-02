@@ -260,7 +260,7 @@ class MatrixFactorizationLitModule(LightningModule):
             monitor=METRIC["name"], mode=METRIC["mode"]
         )
         early_stop = lp_callbacks.EarlyStopping(
-            monitor=METRIC["name"], mode=METRIC["mode"]
+            monitor=METRIC["name"], mode=METRIC["mode"], min_delta=0.001
         )
         return [checkpoint, early_stop]
 

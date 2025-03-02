@@ -149,7 +149,8 @@ class UsersProcessor(FeaturesProcessor):
     def data_path(self) -> str:
         return str(pathlib.Path(self.data_dir, "ml-1m", "users.parquet"))
 
-    def get_index(self: Self) -> lancedb.table.Table:
+    def get_index(self: Self, subset: str = "predict") -> lancedb.table.Table:
+        import pyarrow.dataset as ds
         import pyarrow.parquet as pq
 
         columns = [
@@ -161,7 +162,8 @@ class UsersProcessor(FeaturesProcessor):
             "history",
             "target",
         ]
-        pa_table = pq.read_table(self.data_path, columns=columns)
+        filters = ds.field(f"is_{subset}")
+        pa_table = pq.read_table(self.data_path, columns=columns, filters=filters)
 
         table = self.lance_db.create_table(
             self.lance_table_name, data=pa_table, mode="overwrite"
@@ -196,12 +198,14 @@ class ItemsProcessor(FeaturesProcessor):
     def data_path(self) -> str:
         return str(pathlib.Path(self.data_dir, "ml-1m", "movies.parquet"))
 
-    def get_index(self: Self, model: torch.nn.Module) -> lancedb.table.Table:
+    def get_index(
+        self: Self, model: torch.nn.Module, subset: str = "predict"
+    ) -> lancedb.table.Table:
         import pyarrow as pa
 
         fields = ["movie_id", "title", "genres", "embedding"]
         dp = (
-            self.get_data("predict")
+            self.get_processed_data(subset)
             .map(
                 torch.inference_mode(
                     lambda example: {
@@ -216,25 +220,28 @@ class ItemsProcessor(FeaturesProcessor):
                 )
             )
             .map(functools.partial(select_fields, fields=fields))
+            .batch(self.batch_size)
         )
 
-        example = next(iter(dp))
-        num_items = len(dp)
+        batch = next(iter(dp))
+        example = batch[0]
+        num_items = len(dp) * len(batch)
         (embedding_dim,) = example["embedding"].shape
+
         # rule of thumb: nlist ~= 4 * sqrt(n_vectors)
         num_partitions = self.num_partitions or 2 ** int(math.log2(num_items) / 2)
         num_sub_vectors = self.num_sub_vectors or embedding_dim // 8
 
-        schema = pa.RecordBatch.from_pylist([example]).schema
+        schema = pa.RecordBatch.from_pylist(batch).schema
         schema = schema.set(
             schema.get_field_index("embedding"),
             pa.field("embedding", pa.list_(pa.float32(), embedding_dim)),
         )
-        pa_table = pa.Table.from_pylist(list(dp), schema=schema)
 
         table = self.lance_db.create_table(
             self.lance_table_name,
-            data=pa_table,
+            data=iter(dp.map(pa.RecordBatch.from_pylist)),
+            schema=schema,
             mode="overwrite",
         )
         table.create_index(

@@ -49,10 +49,13 @@ ignore = [
   "ISC001", # single-line-implicit-string-concatenation, conflicts with ruff formatter
 ]
 
-[tool.ruff.lint.pydocstyle]
-convention = "pep257"
-
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = [
   "S101", # assert
 ]
+
+[tool.ruff.lint.pycodestyle]
+ignore-overlong-task-comments = true
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
