@@ -72,8 +72,20 @@ def hash_features(
     return hashes, weights
 
 
-def select_fields(row: dict[str, Any], *, fields: list[str]) -> dict[str, Any]:
-    return {key: row[key] for key in fields}
+def select_fields(example: dict[str, Any], *, fields: list[str]) -> dict[str, Any]:
+    return {key: example[key] for key in fields}
+
+
+def embed_example(example: dict[str, Any], *, model: torch.nn.Module) -> dict[str, Any]:
+    return {
+        **example,
+        "embedding": model(
+            example["feature_hashes"].unsqueeze(0),
+            example["feature_weights"].unsqueeze(0),
+        )
+        .squeeze(0)
+        .numpy(force=True),
+    }
 
 
 def pad_jagged_tensors(
