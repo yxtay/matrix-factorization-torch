@@ -102,7 +102,7 @@ class FeaturesProcessor(pydantic.BaseModel):
             ParquetDictLoaderIterDataPipe(
                 [self.data_path], filter_expr=filter_expr, batch_size=self.batch_size
             )
-            .shuffle(buffer_size=self.batch_size)  # devskim: ignore DS148264
+            .shuffle()  # devskim: ignore DS148264
             .sharding_filter()
             .map(self.process)
         )
@@ -242,6 +242,7 @@ class ItemsProcessor(FeaturesProcessor):
             num_partitions=num_partitions,
             num_sub_vectors=num_sub_vectors,
             vector_column_name="embedding",
+            index_type="IVF_HNSW_PQ",
         )
         table.compact_files()
         table.cleanup_old_versions(datetime.timedelta(days=1))

@@ -65,15 +65,24 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         targets: torch.Tensor,
     ) -> None:
         if user_embed.dim() != 2 or item_embed.dim() != 2 or targets.dim() != 2:  # noqa: PLR2004
-            msg = f"inputs should have 2 dimensions: {user_embed.dim() = }, {item_embed.dim() = }, {targets.dim() = }"
+            msg = (
+                "inputs should have 2 dimensions: "
+                "{user_embed.dim() = }, {item_embed.dim() = }, {targets.dim() = }"
+            )
             raise ValueError(msg)
 
         if user_embed.size(1) != item_embed.size(1):
-            msg = f"embedding dimensions should match: { user_embed.size(1) = }, { item_embed.size(1) = }"
+            msg = (
+                "embeddings dimension 1 should match: "
+                "{ user_embed.size(1) = }, { item_embed.size(1) = }"
+            )
             raise ValueError(msg)
 
         if (user_embed.size(0), item_embed.size(0)) != targets.size():
-            msg = f"embedding dimension 1 should match targets dimensions: {(user_embed.size(0), item_embed.size(0)) = }, {targets.size() = }"
+            msg = (
+                "embeddings dimension 0 should match targets dimensions: "
+                "{(user_embed.size(0), item_embed.size(0)) = }, {targets.size() = }"
+            )
             raise ValueError(msg)
 
     @abc.abstractmethod

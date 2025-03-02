@@ -54,7 +54,6 @@ class MatrixFactorization(torch.nn.Module):
 
         if is_single:
             embed = embed.squeeze(0)
-
         return embed
 
     def score(
