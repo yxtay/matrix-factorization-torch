@@ -46,6 +46,9 @@ def load_args(ckpt_path: str | None) -> dict[str, Any]:
 def prepare_trainer(ckpt_path: str | None = None) -> Trainer:
     from mf_torch.lightning import cli_main
 
+    if ckpt_path is None:
+        return cli_main({"fit": {"trainer": {"fast_dev_run": True}}}).trainer
+
     with tempfile.TemporaryDirectory() as tmp:
         trainer_args = {
             "logger": False,
@@ -53,8 +56,7 @@ def prepare_trainer(ckpt_path: str | None = None) -> Trainer:
             "default_root_dir": tmp,
         }
         args = {"trainer": trainer_args, "ckpt_path": ckpt_path, **load_args(ckpt_path)}
-        cli = cli_main({"validate": args})
-    return cli.trainer
+    return cli_main({"validate": args}).trainer
 
 
 def save_model(trainer: Trainer) -> None:

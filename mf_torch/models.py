@@ -38,7 +38,24 @@ class MatrixFactorization(torch.nn.Module):
         feature_hashes: torch.Tensor,
         feature_weights: torch.Tensor,
     ) -> torch.Tensor:
-        return self.embed(feature_hashes, feature_weights)
+        if feature_hashes.size() != feature_weights.size():
+            msg = (
+                "feature_hashes and feature_weights must be the same size: "
+                f"{feature_hashes.size() = } != {feature_weights.size() = }"
+            )
+            raise ValueError(msg)
+
+        is_single = feature_hashes.dim() == 1
+        if is_single:
+            feature_hashes = feature_hashes.unsqueeze(0)
+            feature_weights = feature_weights.unsqueeze(0)
+
+        embed = self.embed(feature_hashes, feature_weights)
+
+        if is_single:
+            embed = embed.squeeze(0)
+
+        return embed
 
     def score(
         self: Self,
