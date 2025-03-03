@@ -44,7 +44,7 @@ class ItemQuery(pydantic.BaseModel):
 
 class Query(bentoml.IODescriptor):
     feature_values: list[str]
-    feature_hashes: Annotated[torch.Tensor, DType("int64")]
+    feature_hashes: Annotated[torch.Tensor, DType("int32")]
     feature_weights: Annotated[torch.Tensor, DType("float32")]
     embedding: Annotated[torch.Tensor, DType("float32")] | None = None
 
