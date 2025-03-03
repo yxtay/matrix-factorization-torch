@@ -296,16 +296,16 @@ class MatrixFactorisationDataPipe(torch_data.IterDataPipe[BATCH_TYPE]):
             raise ValueError(msg)
 
         columns = {TARGET_COL, USER_RN_COL, ITEM_RN_COL}
-        ratings_df = (
+        targets_df = (
             pl.scan_parquet(self.data_path)
             .filter(pl.col(f"is_{subset}"))
             .select(columns)
             .collect()
             .to_pandas()
         )
-        values = ratings_df[TARGET_COL]
-        rows = ratings_df[USER_RN_COL]
-        cols = ratings_df[ITEM_RN_COL]
+        values = targets_df[TARGET_COL]
+        rows = targets_df[USER_RN_COL]
+        cols = targets_df[ITEM_RN_COL]
         return scipy.sparse.coo_array((values, (rows, cols))).tocsr()
 
     def __len__(self: Self) -> int:

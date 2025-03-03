@@ -67,9 +67,9 @@ def hash_features(
         for val in values
         for seed in range(num_hashes)
     ]
-    hashes = torch.as_tensor(hashes, dtype=torch.int64) % (num_embeddings - 1) + 1
+    hashes = torch.as_tensor(hashes) % (num_embeddings - 1) + 1
     weights = weights.repeat_interleave(num_hashes) / num_hashes
-    return hashes, weights
+    return hashes.to(torch.int), weights
 
 
 def select_fields(example: dict[str, Any], *, fields: list[str]) -> dict[str, Any]:
