@@ -19,12 +19,13 @@ dependencies = [
   "mlflow~=2.19",
   "pandas~=2.2",
   "polars[pandas]~=1.19",
+  "tensorboard~=2.18",
   "torch~=2.5",
   "xxhash~=3.4",
 ]
 
 [dependency-groups]
-dev = ["onnxruntime~=1.20", "onnxscript>=0.2.0", "tensorboard~=2.18"]
+dev = ["onnxruntime~=1.20", "onnxscript>=0.2.0"]
 
 [project.optional-dependencies]
 ray = ["ray[data,train,tune]~=2.42"]

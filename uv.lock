@@ -1385,6 +1385,7 @@ dependencies = [
     { name = "mlflow" },
     { name = "pandas" },
     { name = "polars", extra = ["pandas"] },
+    { name = "tensorboard" },
     { name = "torch" },
     { name = "xxhash" },
 ]
@@ -1398,7 +1399,6 @@ ray = [
 dev = [
     { name = "onnxruntime" },
     { name = "onnxscript" },
-    { name = "tensorboard" },
 ]
 
 [package.metadata]
@@ -1413,6 +1413,7 @@ requires-dist = [
     { name = "pandas", specifier = "~=2.2" },
     { name = "polars", extras = ["pandas"], specifier = "~=1.19" },
     { name = "ray", extras = ["data", "train", "tune"], marker = "extra == 'ray'", specifier = "~=2.42" },
+    { name = "tensorboard", specifier = "~=2.18" },
     { name = "torch", specifier = "~=2.5" },
     { name = "xxhash", specifier = "~=3.4" },
 ]
@@ -1421,7 +1422,6 @@ requires-dist = [
 dev = [
     { name = "onnxruntime", specifier = "~=1.20" },
     { name = "onnxscript", specifier = ">=0.2.0" },
-    { name = "tensorboard", specifier = "~=2.18" },
 ]
 
 [[package]]
