@@ -505,4 +505,6 @@ if __name__ == "__main__":
         # "max_epochs": -1,
         # "overfit_batches": 1,
     }
-    cli_main(args={"fit": {"trainer": trainer_args}})
+    cli = cli_main(args={"fit": {"trainer": trainer_args}})
+    cli.trainer.validate(cli.model, datamodule=cli.datamodule)
+    cli.trainer.test(cli.model, datamodule=cli.datamodule)
