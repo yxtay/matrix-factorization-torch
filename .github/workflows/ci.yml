@@ -38,16 +38,16 @@ jobs:
           uv sync --frozen
           uv pip list
 
-      - run: uv run python -m mf_torch.bentoml.prepare
+      - run: uv run --no-sync bentoml
 
       - if: failure()
-        run: uv run python -m mf_torch.lightning
+        run: uv run --no-sync python -m mf_torch.lightning
 
       - if: failure()
-        run: uv run python -m mf_torch.data.lightning
+        run: uv run --no-sync python -m mf_torch.data.lightning
 
       - if: failure()
-        run: uv run python -m mf_torch.data.prepare
+        run: uv run --no-sync data
 
   docker:
     permissions:

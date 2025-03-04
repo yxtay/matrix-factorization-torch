@@ -1,5 +1,4 @@
 version = 1
-revision = 1
 requires-python = ">=3.11, <4"
 resolution-markers = [
     "python_full_version >= '3.13' and platform_machine == 'x86_64' and sys_platform == 'darwin'",
@@ -1384,14 +1383,22 @@ dependencies = [
     { name = "lightning" },
     { name = "loguru" },
     { name = "mlflow" },
-    { name = "onnxruntime" },
-    { name = "onnxscript" },
     { name = "pandas" },
     { name = "polars", extra = ["pandas"] },
-    { name = "ray", extra = ["data", "train", "tune"] },
-    { name = "tensorboard" },
     { name = "torch" },
     { name = "xxhash" },
+]
+
+[package.optional-dependencies]
+ray = [
+    { name = "ray", extra = ["data", "train", "tune"] },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "onnxruntime" },
+    { name = "onnxscript" },
+    { name = "tensorboard" },
 ]
 
 [package.metadata]
@@ -1403,14 +1410,18 @@ requires-dist = [
     { name = "lightning", specifier = "~=2.5" },
     { name = "loguru", specifier = ">=0.7,<0.8" },
     { name = "mlflow", specifier = "~=2.19" },
-    { name = "onnxruntime", specifier = "~=1.20" },
-    { name = "onnxscript", specifier = ">=0.2,<0.3" },
     { name = "pandas", specifier = "~=2.2" },
     { name = "polars", extras = ["pandas"], specifier = "~=1.19" },
-    { name = "ray", extras = ["data", "train", "tune"], specifier = "~=2.40" },
-    { name = "tensorboard", specifier = "~=2.17" },
+    { name = "ray", extras = ["data", "train", "tune"], marker = "extra == 'ray'", specifier = "~=2.42" },
     { name = "torch", specifier = "~=2.5" },
     { name = "xxhash", specifier = "~=3.4" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "onnxruntime", specifier = "~=1.20" },
+    { name = "onnxscript", specifier = ">=0.2.0" },
+    { name = "tensorboard", specifier = "~=2.18" },
 ]
 
 [[package]]
