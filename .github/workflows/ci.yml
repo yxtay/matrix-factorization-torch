@@ -95,9 +95,9 @@ jobs:
             ${{ env.GHCR_IMAGE_NAME }}:cache
           load: true
 
-      - run: docker run --rm ${{ steps.build.outputs.imageid }} uv run lightning fit --print_config
+      - run: docker run --rm ${{ steps.build.outputs.imageid }} uv run --no-sync lightning fit --print_config
 
-      - run: docker run --rm ${{ steps.build.outputs.imageid }} python -m mf_torch.bentoml.prepare
+      - run: docker run --rm ${{ steps.build.outputs.imageid }} uv run --no-sync bentoml
 
       - if: failure()
         run: docker run --rm ${{ steps.build.outputs.imageid }} python -m mf_torch.lightning
@@ -106,7 +106,7 @@ jobs:
         run: docker run --rm ${{ steps.build.outputs.imageid }} python -m mf_torch.data.lightning
 
       - if: failure()
-        run: docker run --rm ${{ steps.build.outputs.imageid }} python -m mf_torch.data.prepare
+        run: docker run --rm ${{ steps.build.outputs.imageid }}uv run --no-sync data
 
       - id: docker_metadata
         uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5
