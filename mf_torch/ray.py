@@ -103,6 +103,7 @@ def train_loop_per_worker(
     trainer: Trainer = ray_lightning.prepare_trainer(cli.trainer)
     try:
         trainer.fit(cli.model, datamodule=cli.datamodule, ckpt_path=ckpt_path)
+        trainer.test(cli.model, datamodule=cli.datamodule)
     except SystemExit:
         for logger in trainer.loggers:
             logger.finalize()
