@@ -35,7 +35,7 @@ jobs:
 
       - run: |
           uv lock --check
-          uv sync --frozen
+          uv sync --frozen --no-default-groups
           uv pip list
 
       - run: uv run --no-sync lightning fit --print_config
