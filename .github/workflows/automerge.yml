@@ -28,7 +28,7 @@ jobs:
 
       - name: automerge
         if: ${{ !contains(steps.metadata.outputs.update-type, 'major' ) }}
-        run: gh pr merge --auto --squash "${PR_NUMBER}"
+        run: gh pr merge "${PR_NUMBER}" --auto --squash
         env:
           GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
