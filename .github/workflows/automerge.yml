@@ -30,9 +30,9 @@ jobs:
         if: ${{ !contains(steps.metadata.outputs.update-type, 'major' ) }}
         run: gh pr merge --auto --squash "${PR_NUMBER}"
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
           GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
 
   pre-commit-ci:
     permissions:
@@ -47,7 +47,7 @@ jobs:
           gh pr edit "${PR_NUMBER}" --title "ci: ${PR_TITLE}"
           gh pr merge "${PR_NUMBER}" --auto --squash
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
           GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
