@@ -95,7 +95,7 @@ def train_loop_per_worker(
             ckpt_path = pathlib.Path(ckpt_dir, checkpoint_name)
 
     config = {
-        key: value.item() if isinstance(value, np.generic) else value
+        key: value.tolist() if isinstance(value, np.generic) else value
         for key, value in config.items()
     }
 
