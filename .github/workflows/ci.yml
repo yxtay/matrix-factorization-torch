@@ -38,6 +38,8 @@ jobs:
           uv sync --frozen
           uv pip list
 
+      - run: uv run --no-sync lightning fit --print_config
+
       - run: uv run --no-sync bentoml
 
       - if: failure()
@@ -92,6 +94,8 @@ jobs:
           cache-from: |
             ${{ env.GHCR_IMAGE_NAME }}:cache
           load: true
+
+      - run: docker run --rm ${{ steps.build.outputs.imageid }} uv run lightning fit --print_config
 
       - run: docker run --rm ${{ steps.build.outputs.imageid }} python -m mf_torch.bentoml.prepare
 
