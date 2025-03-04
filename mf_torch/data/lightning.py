@@ -173,6 +173,7 @@ class UsersProcessor(FeaturesProcessor):
         table = self.lance_db.create_table(
             self.lance_table_name, data=pa_table, mode="overwrite"
         )
+        table.create_scalar_index(self.id_col)
         table.compact_files()
         table.cleanup_old_versions(datetime.timedelta(days=1))
         return table
@@ -237,6 +238,7 @@ class ItemsProcessor(FeaturesProcessor):
             schema=schema,
             mode="overwrite",
         )
+        table.create_scalar_index(self.id_col)
         table.create_index(
             metric="cosine",
             num_partitions=num_partitions,
