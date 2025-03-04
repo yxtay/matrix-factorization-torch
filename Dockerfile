@@ -48,7 +48,7 @@ ARG PIP_DISABLE_PIP_VERSION_CHECK=1 \
     UV_NO_CACHE=1
 
 # set up python
-COPY --from=ghcr.io/astral-sh/uv:latest@sha256:8257f3d17fd04794feaf89d83b4ccca3b2eaa5501de9399fa53929843c0a5b55 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:latest@sha256:0d686193e6d06a262184e4367d00276e24a524357080868c1732c2718f75d4d9 /uv /uvx /bin/
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv venv --seed "${VIRTUAL_ENV}" && \
