@@ -38,19 +38,19 @@ jobs:
           uv sync --frozen --no-default-groups
           uv pip list
 
-      - if: failure()
+      - if: ${{ success() || failure() }}
         run: uv run --no-sync lightning fit --print_config
 
-      - if: failure()
+      - if: ${{ success() || failure() }}
         run: uv run --no-sync bentoml
 
-      - if: failure()
+      - if: ${{ failure() }}
         run: uv run --no-sync python -m mf_torch.lightning
 
-      - if: failure()
+      - if: ${{ failure() }}
         run: uv run --no-sync python -m mf_torch.data.lightning
 
-      - if: failure()
+      - if: ${{ failure() }}
         run: uv run --no-sync data
 
   docker:
@@ -97,19 +97,19 @@ jobs:
             ${{ env.GHCR_IMAGE_NAME }}:cache
           load: true
 
-      - if: failure()
+      - if: ${{ success() || failure() }}
         run: docker run --rm ${{ steps.build.outputs.imageid }} uv run --no-sync lightning fit --print_config
 
-      - if: failure()
+      - if: ${{ success() || failure() }}
         run: docker run --rm ${{ steps.build.outputs.imageid }} uv run --no-sync bentoml
 
-      - if: failure()
+      - if: ${{ failure() }}
         run: docker run --rm ${{ steps.build.outputs.imageid }} python -m mf_torch.lightning
 
-      - if: failure()
+      - if: ${{ failure() }}
         run: docker run --rm ${{ steps.build.outputs.imageid }} python -m mf_torch.data.lightning
 
-      - if: failure()
+      - if: ${{ failure() }}
         run: docker run --rm ${{ steps.build.outputs.imageid }}uv run --no-sync data
 
       - id: docker_metadata
