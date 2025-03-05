@@ -13,5 +13,5 @@ python:
 envs:
   - name: UV_NO_CACHE
     value: 1
-  - name: UV_INDEX_URL
+  - name: UV_INDEX
     value: https://download.pytorch.org/whl/cpu
