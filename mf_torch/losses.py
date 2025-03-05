@@ -70,21 +70,21 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         if users_embed.dim() != 2 or items_embed.dim() != 2 or targets.dim() != 2:  # noqa: PLR2004
             msg = (
                 "inputs should have 2 dimensions: "
-                "{users_embed.dim() = }, {items_embed.dim() = }, {targets.dim() = }"
+                f"{users_embed.dim() = }, {items_embed.dim() = }, {targets.dim() = }"
             )
             raise ValueError(msg)
 
         if users_embed.size(1) != items_embed.size(1):
             msg = (
                 "embeddings dimension 1 should match: "
-                "{ users_embed.size(1) = }, { items_embed.size(1) = }"
+                f"{ users_embed.size(1) = }, { items_embed.size(1) = }"
             )
             raise ValueError(msg)
 
         if (users_embed.size(0), items_embed.size(0)) != targets.size():
             msg = (
                 "embeddings dimension 0 should match targets dimensions: "
-                "{(users_embed.size(0), items_embed.size(0)) = }, {targets.size() = }"
+                f"{(users_embed.size(0), items_embed.size(0)) = }, {targets.size() = }"
             )
             raise ValueError(msg)
 

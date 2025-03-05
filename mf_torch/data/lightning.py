@@ -380,6 +380,23 @@ class MatrixFactorizationDataModule(LightningDataModule):
             download_unpack_data(MOVIELENS_1M_URL, data_dir, overwrite=overwrite)
             return prepare_movielens(data_dir, overwrite=overwrite)
 
+    def setup(self: Self, stage: str) -> None:
+        if stage == "fit":
+            self.train_data = MatrixFactorisationDataPipe(
+                users_dataset=self.users_processor.get_batch_data("train"),
+                items_dataset=self.items_processor.get_batch_data("train"),
+                data_dir=self.hparams.data_dir,
+            ).shuffle(buffer_size=2**4)  # devskim: ignore DS148264
+
+        if stage in {"fit", "validate"}:
+            self.val_data = self.users_processor.get_processed_data("val")
+
+        if stage == "test":
+            self.test_data = self.users_processor.get_processed_data("test")
+
+        if stage == "predict":
+            self.predict_data = self.users_processor.get_processed_data("predict")
+
     def get_dataloader(
         self: Self,
         dataset: torch_data.Dataset[T],
@@ -407,26 +424,18 @@ class MatrixFactorizationDataModule(LightningDataModule):
         )
 
     def train_dataloader(self: Self) -> torch_data.DataLoader[BATCH_TYPE]:
-        train_data = MatrixFactorisationDataPipe(
-            users_dataset=self.users_processor.get_batch_data("train"),
-            items_dataset=self.items_processor.get_batch_data("train"),
-            data_dir=self.hparams.data_dir,
-        ).shuffle(buffer_size=2**4)  # devskim: ignore DS148264
-        return self.get_dataloader(train_data, shuffle=True)
+        return self.get_dataloader(self.train_data, shuffle=True)
 
     def val_dataloader(self: Self) -> torch_data.DataLoader[dict[str, torch.Tensor]]:
-        val_data = self.users_processor.get_processed_data("val")
-        return self.get_dataloader(val_data)
+        return self.get_dataloader(self.val_data)
 
     def test_dataloader(self: Self) -> torch_data.DataLoader[dict[str, torch.Tensor]]:
-        test_data = self.users_processor.get_processed_data("test")
-        return self.get_dataloader(test_data)
+        return self.get_dataloader(self.test_data)
 
     def predict_dataloader(
         self: Self,
     ) -> torch_data.DataLoader[dict[str, torch.Tensor]]:
-        predict_data = self.users_processor.get_processed_data("predict")
-        return self.get_dataloader(predict_data)
+        return self.get_dataloader(self.predict_data)
 
 
 if __name__ == "__main__":
@@ -434,6 +443,7 @@ if __name__ == "__main__":
 
     dm = MatrixFactorizationDataModule()
     dm.prepare_data().head().collect().glimpse()
+    dm.setup("fit")
 
     dataloaders = [
         dm.users_processor.get_batch_data("train"),
@@ -457,7 +467,7 @@ if __name__ == "__main__":
     rich.print(dm.users_processor.get_activity(1, "target"))
 
     dm.items_processor.get_index(
-        lambda hashes, _: torch.rand(hashes.size(0), 32)  # devskim: ignore DS148264
+        lambda hashes, _: torch.rand(32)  # devskim: ignore DS148264
     ).search().to_polars().glimpse()
     rich.print(dm.items_processor.get_id(1))
     rich.print(
