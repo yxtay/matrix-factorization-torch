@@ -114,25 +114,25 @@ class MatrixFactorizationLitModule(LightningModule):
             raise ValueError(msg)
 
         targets: torch.Tensor = batch["targets"]
-        # shape: (batch_size)
+        # shape: (num_users, num_items)
 
         # user
         users: dict[str, torch.Tensor] = batch["users"]
-        user_feature_hashes = users["feature_hashes"]
-        # shape: (batch_size, num_user_features)
-        user_feature_weights = users["feature_weights"]
-        # shape: (batch_size, num_user_features)
-        user_embed = self(user_feature_hashes, user_feature_weights)
-        # shape: (batch_size, embed_dim)
+        users_feature_hashes = users["feature_hashes"]
+        # shape: (num_users, num_user_features)
+        users_feature_weights = users["feature_weights"]
+        # shape: (num_users, num_user_features)
+        users_embed = self(users_feature_hashes, users_feature_weights)
+        # shape: (num_users, embed_dim)
 
         # item
         items: dict[str, torch.Tensor] = batch["items"]
-        item_feature_hashes = items["feature_hashes"]
-        # shape: (batch_size, num_item_features)
-        item_feature_weights = items["feature_weights"]
-        # shape: (batch_size, num_item_features)
-        item_embed = self(item_feature_hashes, item_feature_weights)
-        # shape: (batch_size, embed_dim)
+        items_feature_hashes = items["feature_hashes"]
+        # shape: (num_items, num_item_features)
+        items_feature_weights = items["feature_weights"]
+        # shape: (num_items, num_item_features)
+        items_embed = self(items_feature_hashes, items_feature_weights)
+        # shape: (num_items, embed_dim)
 
         n_users, n_items = targets.size()
         nnz = targets.values().numel()
@@ -144,7 +144,7 @@ class MatrixFactorizationLitModule(LightningModule):
         }
         losses = {
             f"{step_name}/{loss_fn.__class__.__name__}": loss_fn(
-                user_embed=user_embed, item_embed=item_embed, targets=targets
+                users_embed=users_embed, items_embed=items_embed, targets=targets
             )
             for loss_fn in self.loss_fns
         }
@@ -167,23 +167,26 @@ class MatrixFactorizationLitModule(LightningModule):
             user_id=user_id,
         )
 
+        item_id_col = self.trainer.datamodule.items_processor.id_col
         pred_scores = dict(
-            zip(pred_scores["movie_id"], pred_scores["score"], strict=True)
+            zip(pred_scores[item_id_col], pred_scores["score"], strict=True)
         )
         target_scores = dict(
-            zip(example["target"]["movie_id"], example["target"]["rating"], strict=True)
+            zip(
+                example["target"][item_id_col], example["target"]["rating"], strict=True
+            )
         )
 
-        movie_ids = list(target_scores.keys() | pred_scores.keys())
+        item_ids = list(target_scores.keys() | pred_scores.keys())
         preds = [
             pred_scores.get(
-                movie_id,
+                item_id,
                 -random.random(),  # devskim: ignore DS148264 # nosec
             )
-            for movie_id in movie_ids
+            for item_id in item_ids
         ]
         preds = torch.as_tensor(preds)
-        target = [target_scores.get(movie_id, 0) for movie_id in movie_ids]
+        target = [target_scores.get(item_id, 0) for item_id in item_ids]
         target = torch.as_tensor(target)
         indexes = torch.ones_like(preds, dtype=torch.long) * user_id
 
