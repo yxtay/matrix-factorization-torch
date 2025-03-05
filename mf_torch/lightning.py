@@ -20,7 +20,6 @@ from mf_torch.params import (
     ONNX_PROGRAM_PATH,
     SCRIPT_MODULE_PATH,
     TOP_K,
-    USER_ID_COL,
 )
 
 if TYPE_CHECKING:
@@ -142,12 +141,12 @@ class MatrixFactorizationLitModule(LightningModule):
             "batch/nnz": nnz,
             "batch/sparsity": nnz / targets.numel(),
         }
-        losses = {
-            f"{step_name}/{loss_fn.__class__.__name__}": loss_fn(
+        losses = {}
+        for loss_fn in self.loss_fns:
+            key = f"{step_name}/{loss_fn.__class__.__name__}"
+            losses[key] = loss_fn(
                 users_embed=users_embed, items_embed=items_embed, targets=targets
             )
-            for loss_fn in self.loss_fns
-        }
         return losses | metrics
 
     def update_metrics(
@@ -159,15 +158,8 @@ class MatrixFactorizationLitModule(LightningModule):
             msg = "`metrics` must be initialised first"
             raise ValueError(msg)
 
-        user_id = example[USER_ID_COL]
-        pred_scores = self.recommend(
-            example["feature_hashes"],
-            example["feature_weights"],
-            top_k=self.hparams.top_k,
-            user_id=user_id,
-        )
-
         item_id_col = self.trainer.datamodule.items_processor.id_col
+        pred_scores = self.predict_step(example, 0)
         pred_scores = dict(
             zip(pred_scores[item_id_col], pred_scores["score"], strict=True)
         )
@@ -188,7 +180,7 @@ class MatrixFactorizationLitModule(LightningModule):
         preds = torch.as_tensor(preds)
         target = [target_scores.get(item_id, 0) for item_id in item_ids]
         target = torch.as_tensor(target)
-        indexes = torch.ones_like(preds, dtype=torch.long) * user_id
+        indexes = torch.ones_like(preds, dtype=torch.long) * example["idx"]
 
         metrics: torchmetrics.MetricCollection = self.metrics[step_name]
         for metric in metrics.values():
@@ -214,11 +206,12 @@ class MatrixFactorizationLitModule(LightningModule):
     def predict_step(
         self: Self, batch: dict[str, torch.Tensor], _: int
     ) -> pd.DataFrame:
+        user_id_col = self.trainer.datamodule.users_processor.id_col
         return self.recommend(
             batch["feature_hashes"],
             batch["feature_weights"],
             top_k=self.hparams.top_k,
-            user_id=batch[USER_ID_COL],
+            user_id=batch[user_id_col],
         )
 
     def on_train_start(self: Self) -> None:
@@ -508,6 +501,7 @@ if __name__ == "__main__":
         # "max_epochs": -1,
         # "overfit_batches": 1,
     }
-    cli = cli_main(args={"fit": {"trainer": trainer_args}})
+    cli = cli_main(args={"trainer": trainer_args}, run=False)
+    cli.trainer.fit(cli.model, datamodule=cli.datamodule)
     cli.trainer.validate(cli.model, datamodule=cli.datamodule)
     cli.trainer.test(cli.model, datamodule=cli.datamodule)

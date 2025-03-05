@@ -36,6 +36,14 @@ lightning = "mf_torch.lightning:cli_main"
 flaml = "mf_torch.flaml:flaml_tune"
 bentoml = "mf_torch.bentoml.prepare:main"
 
+[tool.uv.sources]
+torch = [{ index = "torch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "torch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
 [tool.ruff]
 fix = true
 src = [".", "src", "tests"]
