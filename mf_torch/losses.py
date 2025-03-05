@@ -39,57 +39,60 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
 
     def forward(
         self: Self,
-        user_embed: torch.Tensor,
-        item_embed: torch.Tensor,
+        users_embed: torch.Tensor,
+        items_embed: torch.Tensor,
         targets: torch.Tensor,
     ) -> torch.Tensor:
-        self.check_inputs(user_embed, item_embed, targets)
+        # targets shape: (num_users, num_items)
+        self.check_inputs(users_embed, items_embed, targets)
 
-        indices = targets.indices()
-        row_idx = indices[0, :]
-        col_idx = torch.cat(
-            [indices[1, :], torch.arange(item_embed.size(0)).to(indices)]
-        )
+        row_idx, col_idx = targets.indices()
+        # shape: (2, num_targets)
+        col_idx = torch.cat([col_idx, torch.arange(items_embed.size(0)).to(col_idx)])
+        # shape: (num_targets + num_items,)
 
-        user_embed = user_embed[row_idx, :]
-        item_embed = item_embed[col_idx, :]
+        users_embed = users_embed[row_idx, :]
+        # shape: (num_targets, embed_size)
+        items_embed = items_embed[col_idx, :]
+        # shape: (num_targets + num_items, embed_size)
         targets = targets.values()
+        # shape: (num_targets,)
         return self.loss(
-            user_embed, item_embed, targets, user_idx=row_idx, item_idx=col_idx
+            users_embed, items_embed, targets, user_idx=row_idx, item_idx=col_idx
         )
 
     def check_inputs(
         self: Self,
-        user_embed: torch.Tensor,
-        item_embed: torch.Tensor,
+        users_embed: torch.Tensor,
+        items_embed: torch.Tensor,
         targets: torch.Tensor,
     ) -> None:
-        if user_embed.dim() != 2 or item_embed.dim() != 2 or targets.dim() != 2:  # noqa: PLR2004
+        if users_embed.dim() != 2 or items_embed.dim() != 2 or targets.dim() != 2:  # noqa: PLR2004
             msg = (
                 "inputs should have 2 dimensions: "
-                "{user_embed.dim() = }, {item_embed.dim() = }, {targets.dim() = }"
+                "{users_embed.dim() = }, {items_embed.dim() = }, {targets.dim() = }"
             )
             raise ValueError(msg)
 
-        if user_embed.size(1) != item_embed.size(1):
+        if users_embed.size(1) != items_embed.size(1):
             msg = (
                 "embeddings dimension 1 should match: "
-                "{ user_embed.size(1) = }, { item_embed.size(1) = }"
+                "{ users_embed.size(1) = }, { items_embed.size(1) = }"
             )
             raise ValueError(msg)
 
-        if (user_embed.size(0), item_embed.size(0)) != targets.size():
+        if (users_embed.size(0), items_embed.size(0)) != targets.size():
             msg = (
                 "embeddings dimension 0 should match targets dimensions: "
-                "{(user_embed.size(0), item_embed.size(0)) = }, {targets.size() = }"
+                "{(users_embed.size(0), items_embed.size(0)) = }, {targets.size() = }"
             )
             raise ValueError(msg)
 
     @abc.abstractmethod
     def loss(
         self: Self,
-        user_embed: torch.Tensor,
-        item_embed: torch.Tensor,
+        users_embed: torch.Tensor,
+        items_embed: torch.Tensor,
         targets: torch.Tensor,
         *,
         user_idx: torch.Tensor,
@@ -140,13 +143,13 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
 
     def alignment_loss(
         self: Self,
-        user_embed: torch.Tensor,
-        item_embed: torch.Tensor,
+        users_embed: torch.Tensor,
+        items_embed: torch.Tensor,
         targets: torch.Tensor,
     ) -> torch.Tensor:
-        batch_size = user_embed.size(0)
+        batch_size = users_embed.size(0)
         loss = (
-            squared_distance(user_embed, item_embed[:batch_size]).diag()
+            squared_distance(users_embed, items_embed[:batch_size]).diag()
             * targets.sign()
         )
         # shape: (batch_size)
@@ -172,14 +175,14 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
 
     def contrastive_loss(
         self: Self,
-        user_embed: torch.Tensor,
-        item_embed: torch.Tensor,
+        users_embed: torch.Tensor,
+        items_embed: torch.Tensor,
         targets: torch.Tensor,
         *,
         user_idx: torch.Tensor,
         item_idx: torch.Tensor,
     ) -> torch.Tensor:
-        logits = -squared_distance(user_embed, item_embed)
+        logits = -squared_distance(users_embed, items_embed)
         # shape: (batch_size, num_items)
         losses = (self.margin - logits * self.sigma).relu()
         # shape: (batch_size, num_items)
@@ -195,14 +198,14 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
 
     def infonce_loss(
         self: Self,
-        user_embed: torch.Tensor,
-        item_embed: torch.Tensor,
+        users_embed: torch.Tensor,
+        items_embed: torch.Tensor,
         targets: torch.Tensor,
         *,
         user_idx: torch.Tensor,
         item_idx: torch.Tensor,
     ) -> torch.Tensor:
-        logits = -squared_distance(user_embed, item_embed)
+        logits = -squared_distance(users_embed, items_embed)
         # shape: (batch_size, num_items)
         losses = logits * targets.sign()[:, None] * self.sigma
         # shape: (batch_size, num_items)
@@ -224,14 +227,14 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
 
     def mine_loss(
         self: Self,
-        user_embed: torch.Tensor,
-        item_embed: torch.Tensor,
+        users_embed: torch.Tensor,
+        items_embed: torch.Tensor,
         targets: torch.Tensor,
         *,
         user_idx: torch.Tensor,
         item_idx: torch.Tensor,
     ) -> torch.Tensor:
-        logits = -squared_distance(user_embed, item_embed)
+        logits = -squared_distance(users_embed, items_embed)
         # shape: (batch_size, num_items)
         losses = logits * targets.sign()[:, None] * self.sigma
         # shape: (batch_size, num_items)
@@ -253,75 +256,75 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
 class AlignmentLoss(EmbeddingLoss):
     def loss(
         self: Self,
-        user_embed: torch.Tensor,
-        item_embed: torch.Tensor,
+        users_embed: torch.Tensor,
+        items_embed: torch.Tensor,
         targets: torch.Tensor,
         *,
         user_idx: torch.Tensor,  # noqa: ARG002
         item_idx: torch.Tensor,  # noqa: ARG002
     ) -> torch.Tensor:
-        return self.alignment_loss(user_embed, item_embed, targets)
+        return self.alignment_loss(users_embed, items_embed, targets)
 
 
 class UniformityLoss(EmbeddingLoss):
     def loss(
         self: Self,
-        user_embed: torch.Tensor,
-        item_embed: torch.Tensor,
+        users_embed: torch.Tensor,
+        items_embed: torch.Tensor,
         targets: torch.Tensor,  # noqa: ARG002
         *,
         user_idx: torch.Tensor,
         item_idx: torch.Tensor,
     ) -> torch.Tensor:
-        item_uniformity_loss = self.uniformity_loss(item_embed, idx=item_idx)
-        user_uniformity_loss = self.uniformity_loss(user_embed, idx=user_idx)
+        item_uniformity_loss = self.uniformity_loss(items_embed, idx=item_idx)
+        user_uniformity_loss = self.uniformity_loss(users_embed, idx=user_idx)
         return (item_uniformity_loss + user_uniformity_loss) / 2
 
 
 class AlignmentUniformityLoss(EmbeddingLoss):
     def loss(
         self: Self,
-        user_embed: torch.Tensor,
-        item_embed: torch.Tensor,
+        users_embed: torch.Tensor,
+        items_embed: torch.Tensor,
         targets: torch.Tensor,
         *,
         user_idx: torch.Tensor,
         item_idx: torch.Tensor,
     ) -> torch.Tensor:
-        alingment_loss = self.alignment_loss(user_embed, item_embed, targets)
-        item_uniformity_loss = self.uniformity_loss(item_embed, idx=item_idx)
-        user_uniformity_loss = self.uniformity_loss(user_embed, idx=user_idx)
+        alingment_loss = self.alignment_loss(users_embed, items_embed, targets)
+        item_uniformity_loss = self.uniformity_loss(items_embed, idx=item_idx)
+        user_uniformity_loss = self.uniformity_loss(users_embed, idx=user_idx)
         return alingment_loss + (item_uniformity_loss + user_uniformity_loss) / 2
 
 
 class ContrastiveLoss(EmbeddingLoss):
     def loss(
         self: Self,
-        user_embed: torch.Tensor,
-        item_embed: torch.Tensor,
+        users_embed: torch.Tensor,
+        items_embed: torch.Tensor,
         targets: torch.Tensor,
         *,
         user_idx: torch.Tensor,
         item_idx: torch.Tensor,
     ) -> torch.Tensor:
         return self.contrastive_loss(
-            user_embed, item_embed, targets, user_idx=user_idx, item_idx=item_idx
+            users_embed, items_embed, targets, user_idx=user_idx, item_idx=item_idx
         )
 
 
 class AlignmentContrastiveLoss(EmbeddingLoss):
     def loss(
         self: Self,
-        user_embed: torch.Tensor,
-        item_embed: torch.Tensor,
+        users_embed: torch.Tensor,
+        items_embed: torch.Tensor,
         targets: torch.Tensor,
         *,
         user_idx: torch.Tensor,
         item_idx: torch.Tensor,
     ) -> torch.Tensor:
-        alignment_loss = self.alignment_loss(user_embed, item_embed, targets)
+        alignment_loss = self.alignment_loss(users_embed, items_embed, targets)
         contrastive_loss = self.contrastive_loss(
-            user_embed, item_embed, targets, user_idx=user_idx, item_idx=item_idx
+            users_embed, items_embed, targets, user_idx=user_idx, item_idx=item_idx
         )
         return alignment_loss + contrastive_loss
 
@@ -329,44 +332,44 @@ class AlignmentContrastiveLoss(EmbeddingLoss):
 class InfomationNoiseContrastiveEstimationLoss(EmbeddingLoss):
     def loss(
         self: Self,
-        user_embed: torch.Tensor,
-        item_embed: torch.Tensor,
+        users_embed: torch.Tensor,
+        items_embed: torch.Tensor,
         targets: torch.Tensor,
         *,
         user_idx: torch.Tensor,
         item_idx: torch.Tensor,
     ) -> torch.Tensor:
         return self.infonce_loss(
-            user_embed, item_embed, targets, user_idx=user_idx, item_idx=item_idx
+            users_embed, items_embed, targets, user_idx=user_idx, item_idx=item_idx
         )
 
 
 class MutualInformationNeuralEstimationLoss(EmbeddingLoss):
     def loss(
         self: Self,
-        user_embed: torch.Tensor,
-        item_embed: torch.Tensor,
+        users_embed: torch.Tensor,
+        items_embed: torch.Tensor,
         targets: torch.Tensor,
         *,
         user_idx: torch.Tensor,
         item_idx: torch.Tensor,
     ) -> torch.Tensor:
         return self.mine_loss(
-            user_embed, item_embed, targets, user_idx=user_idx, item_idx=item_idx
+            users_embed, items_embed, targets, user_idx=user_idx, item_idx=item_idx
         )
 
 
 class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
     def loss(
         self: Self,
-        user_embed: torch.Tensor,
-        item_embed: torch.Tensor,
+        users_embed: torch.Tensor,
+        items_embed: torch.Tensor,
         targets: torch.Tensor,
         *,
         user_idx: torch.Tensor,
         item_idx: torch.Tensor,
     ) -> torch.Tensor:
-        logits = -squared_distance(user_embed, item_embed) * targets.sign()[:, None]
+        logits = -squared_distance(users_embed, items_embed) * targets.sign()[:, None]
         # shape: (batch_size, num_items)
         logits_diff = logits.diag()[:, None] - logits
         # shape: (batch_size, num_items)

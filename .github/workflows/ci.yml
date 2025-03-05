@@ -38,9 +38,11 @@ jobs:
           uv sync --frozen --no-default-groups
           uv pip list
 
-      - run: uv run --no-sync lightning fit --print_config
+      - if: failure()
+        run: uv run --no-sync lightning fit --print_config
 
-      - run: uv run --no-sync bentoml
+      - if: failure()
+        run: uv run --no-sync bentoml
 
       - if: failure()
         run: uv run --no-sync python -m mf_torch.lightning
@@ -95,9 +97,11 @@ jobs:
             ${{ env.GHCR_IMAGE_NAME }}:cache
           load: true
 
-      - run: docker run --rm ${{ steps.build.outputs.imageid }} uv run --no-sync lightning fit --print_config
+      - if: failure()
+        run: docker run --rm ${{ steps.build.outputs.imageid }} uv run --no-sync lightning fit --print_config
 
-      - run: docker run --rm ${{ steps.build.outputs.imageid }} uv run --no-sync bentoml
+      - if: failure()
+        run: docker run --rm ${{ steps.build.outputs.imageid }} uv run --no-sync bentoml
 
       - if: failure()
         run: docker run --rm ${{ steps.build.outputs.imageid }} python -m mf_torch.lightning
