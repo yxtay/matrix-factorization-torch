@@ -5,6 +5,7 @@
     ":automergeDigest",
     ":automergeMinor",
     ":enableVulnerabilityAlerts",
+    ":maintainLockFilesWeekly",
     ":separateMultipleMajorReleases",
     "group:allNonMajor",
     "group:allDigest",
