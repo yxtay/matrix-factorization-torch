@@ -1,2 +1,2 @@
-scanner:
+scan:
   skip-files: ["*.lock"]
