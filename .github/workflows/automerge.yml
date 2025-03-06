@@ -12,7 +12,7 @@ concurrency:
 jobs:
   dependabot:
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
 
     if: ${{ github.actor == 'dependabot[bot]' }}
@@ -36,7 +36,7 @@ jobs:
 
   pre-commit-ci:
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
 
     if: ${{ github.actor == 'pre-commit-ci' }}
