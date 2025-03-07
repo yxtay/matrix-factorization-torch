@@ -52,6 +52,8 @@ class MatrixFactorizationLitModule(LightningModule):
         hard_negatives_ratio: float | None = None,  # noqa: ARG002
         sigma: float = 1.0,  # noqa: ARG002
         margin: float = 1.0,  # noqa: ARG002
+        reg_l1: float = 0.0001,  # noqa: ARG002
+        reg_l2: float = 0.01,  # noqa: ARG002
         learning_rate: float = 0.01,  # noqa: ARG002
         top_k: int = TOP_K,  # noqa: ARG002
     ) -> None:
@@ -85,6 +87,7 @@ class MatrixFactorizationLitModule(LightningModule):
         self: Self,
         feature_hashes: torch.Tensor,
         feature_weights: torch.Tensor,
+        *,
         top_k: int = TOP_K,
         user_id: int | None = None,
         exclude_item_ids: list[int] | None = None,
@@ -193,7 +196,9 @@ class MatrixFactorizationLitModule(LightningModule):
     def training_step(self: Self, batch: BATCH_TYPE, _: int) -> torch.Tensor:
         losses = self.compute_losses(batch, step_name="train")
         self.log_dict(losses)
-        return losses[f"train/{self.hparams.train_loss}"]
+        train_loss = losses[f"train/{self.hparams.train_loss}"]
+        reg_loss = losses["train/RegularizationLoss"]
+        return train_loss + reg_loss
 
     def validation_step(self: Self, batch: dict[str, torch.Tensor], _: int) -> None:
         metrics = self.update_metrics(batch, step_name="val")
@@ -315,12 +320,18 @@ class MatrixFactorizationLitModule(LightningModule):
             mf_losses.PairwiseLogisticLoss,
         ]
         loss_fns = [
-            loss_class(
-                hard_negatives_ratio=self.hparams.get("hard_negatives_ratio"),
-                sigma=self.hparams.sigma,
-                margin=self.hparams.margin,
-            )
-            for loss_class in loss_classes
+            mf_losses.RegularizationLoss(
+                reg_l1=self.hparams.reg_l1,
+                reg_l2=self.hparams.reg_l2,
+            ),
+            *(
+                loss_class(
+                    hard_negatives_ratio=self.hparams.get("hard_negatives_ratio"),
+                    sigma=self.hparams.sigma,
+                    margin=self.hparams.margin,
+                )
+                for loss_class in loss_classes
+            ),
         ]
         return torch.nn.ModuleList(loss_fns)
 

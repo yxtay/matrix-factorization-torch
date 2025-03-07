@@ -24,6 +24,32 @@ def weighted_mean(
     return (values * sample_weights / denominator).sum(dim=dim, keepdim=keepdim)
 
 
+class RegularizationLoss(torch.nn.Module):
+    def __init__(
+        self: Self,
+        *,
+        reg_l1: float = 0.0001,
+        reg_l2: float = 0.01,
+    ) -> None:
+        super().__init__()
+        self.reg_l1 = reg_l1
+        self.reg_l2 = reg_l2
+
+    def forward(
+        self: Self,
+        users_embed: torch.Tensor,
+        items_embed: torch.Tensor,
+        targets: torch.Tensor,
+    ) -> torch.Tensor:
+        l1_loss = self.reg_l1 * (users_embed.abs().mean() + items_embed.abs().mean())
+        l2_loss = (
+            self.reg_l2
+            * (users_embed.square().mean() + items_embed.square().mean())
+            / 2
+        )
+        return l1_loss + l2_loss
+
+
 class EmbeddingLoss(torch.nn.Module, abc.ABC):
     def __init__(
         self: Self,

@@ -11,6 +11,10 @@ python:
     - torch
     - xxhash
 envs:
+  - name: PIP_NO_CACHE_DIR
+    value: 0
+  - name: PIP_NO_COMPILE
+    value: 0
   - name: UV_NO_CACHE
     value: 1
   - name: UV_INDEX
