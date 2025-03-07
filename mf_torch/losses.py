@@ -41,11 +41,9 @@ class RegularizationLoss(torch.nn.Module):
         items_embed: torch.Tensor,
         targets: torch.Tensor,
     ) -> torch.Tensor:
-        l1_loss = self.reg_l1 * (users_embed.abs().mean() + items_embed.abs().mean())
+        l1_loss = self.reg_l1 * (users_embed.abs().sum() + items_embed.abs().sum())
         l2_loss = (
-            self.reg_l2
-            * (users_embed.square().mean() + items_embed.square().mean())
-            / 2
+            self.reg_l2 * (users_embed.square().sum() + items_embed.square().sum()) / 2
         )
         return l1_loss + l2_loss
 
@@ -179,7 +177,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
             * targets.sign()
         )
         # shape: (batch_size)
-        return weighted_mean(loss, targets.abs())
+        return (loss * targets.abs()).sum()
 
     def uniformity_loss(
         self: Self, embed: torch.Tensor, *, idx: torch.Tensor
@@ -195,9 +193,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
             losses.reshape(1, -1), negative_masks.reshape(1, -1)
         )
         # shape: (1, num_hard_negatives | batch_size * num_items)
-        denominator = negative_masks.sum() + 1e-10
-        # shape: scalar
-        return (losses + negative_masks.log() - denominator.log()).logsumexp(dim=-1)
+        return (losses + negative_masks.log()).logsumexp(dim=-1)
 
     def contrastive_loss(
         self: Self,
@@ -220,7 +216,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         # shape: (batch_size, num_hard_negatives | num_items)
         loss = weighted_mean(losses, negative_masks, dim=-1)
         # shape: (batch_size)
-        return weighted_mean(loss, targets.abs())
+        return (loss * targets.abs()).sum()
 
     def infonce_loss(
         self: Self,
@@ -249,7 +245,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
             logits, torch.zeros(logits.size(0), dtype=torch.long), reduction="none"
         )
         # shape: (batch_size)
-        return weighted_mean(loss, targets.abs())
+        return (loss * targets.abs()).sum()
 
     def mine_loss(
         self: Self,
@@ -276,7 +272,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         # shape: (batch_size)
         loss = -pos_loss + negative_score
         # shape: (batch_size)
-        return weighted_mean(loss, targets.abs())
+        return (loss * targets.abs()).sum()
 
 
 class AlignmentLoss(EmbeddingLoss):
@@ -409,7 +405,7 @@ class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
         # shape: (batch_size, num_hard_negatives | num_items)
         loss = weighted_mean(losses, negative_masks, dim=-1)
         # shape: (batch_size)
-        return weighted_mean(loss, targets.abs())
+        return (loss * targets.abs()).sum()
 
     @abc.abstractmethod
     def score_loss_fn(self: Self, score: torch.Tensor) -> torch.Tensor: ...
