@@ -29,6 +29,8 @@ def get_lightning_args(
         "hard_negatives_ratio": hard_negatives_ratio,
         "sigma": config["sigma"],
         "margin": config["margin"],
+        "reg_l1": config["reg_l1"],
+        "reg_l2": config["reg_l2"],
         "learning_rate": config["learning_rate"],
     }
     data_args = {
@@ -80,6 +82,8 @@ def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
         "hard_negatives_ratio": 1.0,
         "sigma": 1.0,
         "margin": 1.0,
+        "reg_l1": 0.0001,
+        "reg_l2": 0.01,
         "learning_rate": 0.1,
     }
     config = point_to_evaluate | {
@@ -94,6 +98,8 @@ def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
         # "hard_negatives_ratio": flaml.tune.quniform(0.5, 2.0, 0.01),
         "sigma": flaml.tune.lograndint(1, 1000),
         "margin": flaml.tune.quniform(-1.0, 1.0, 0.01),
+        "reg_l1": flaml.tune.loguniform(0.0001, 0.1),
+        "reg_l2": flaml.tune.loguniform(0.0001, 0.1),
         "learning_rate": flaml.tune.loguniform(0.001, 0.1),
     }
     low_cost_partial_config = {
@@ -108,6 +114,8 @@ def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
         # "hard_negatives_ratio": 0.5,
         # "sigma": 1.0,
         # "margin": 1.0,
+        # "reg_l1": 0.0001,
+        # "reg_l2": 0.01,
         # "learning_rate": 0.1,
     }
     return flaml.tune.run(
@@ -117,8 +125,8 @@ def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
         config=config,
         low_cost_partial_config=low_cost_partial_config,
         points_to_evaluate=[point_to_evaluate],
-        time_budget_s=60 * 60 * 18,
-        num_samples=1,
+        time_budget_s=60 * 60 * 24,
+        num_samples=-1,
         resource_attr="max_epochs",
         min_resource=1,
         max_resource=32,
