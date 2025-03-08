@@ -102,6 +102,11 @@ class EmbeddingBag(torch.nn.Module):
         )
         self.sparse = self.embedder.sparse
         self.weight = self.embedder.weight
+        self.reset_parameters()
+
+    def reset_parameters(self: Self) -> Self:
+        torch.nn.init.kaiming_uniform_(self.weight)
+        return self
 
     def forward(
         self: Self, hashes: torch.Tensor, weights: torch.Tensor
@@ -132,6 +137,11 @@ class AttentionEmbeddingBag(torch.nn.Module):
         )
         self.sparse = self.embedder.sparse
         self.weight = self.embedder.weight
+        self.reset_parameters()
+
+    def reset_parameters(self: Self) -> Self:
+        torch.nn.init.kaiming_uniform_(self.weight)
+        return self
 
     def forward(self: Self, hashes: torch.Tensor, _: torch.Tensor) -> torch.Tensor:
         mask = hashes != self.embedder.padding_idx
@@ -177,6 +187,11 @@ class TransformerEmbeddingBag(torch.nn.Module):
         )
         self.sparse = self.embedder.sparse
         self.weight = self.embedder.weight
+        self.reset_parameters()
+
+    def reset_parameters(self: Self) -> Self:
+        torch.nn.init.kaiming_uniform_(self.weight)
+        return self
 
     def forward(self: Self, hashes: torch.Tensor, _: torch.Tensor) -> torch.Tensor:
         mask = hashes != self.embedder.padding_idx
