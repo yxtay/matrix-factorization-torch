@@ -93,7 +93,8 @@ class EmbeddingBag(torch.nn.Module):
         embedding_dim: int = EMBEDDING_DIM,
     ) -> None:
         super().__init__()
-        self.embedder = torch.nn.EmbeddingBag(
+        self.embedder = torch.nn.utils.skip_init(
+            torch.nn.EmbeddingBag,
             num_embeddings=num_embeddings,
             embedding_dim=embedding_dim,
             padding_idx=PADDING_IDX,
@@ -105,7 +106,10 @@ class EmbeddingBag(torch.nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self: Self) -> Self:
-        torch.nn.init.kaiming_uniform_(self.weight)
+        with torch.no_grad():
+            self.embedder.weight = torch.nn.Parameter(
+                torch.nn.init.kaiming_uniform_(self.weight) / 2**0.5
+            )
         return self
 
     def forward(
@@ -124,7 +128,8 @@ class AttentionEmbeddingBag(torch.nn.Module):
         dropout: float = 0.0,
     ) -> None:
         super().__init__()
-        self.embedder = torch.nn.Embedding(
+        self.embedder = torch.nn.utils.skip_init(
+            torch.nn.Embedding,
             num_embeddings=num_embeddings,
             embedding_dim=embedding_dim,
             padding_idx=PADDING_IDX,
@@ -140,7 +145,10 @@ class AttentionEmbeddingBag(torch.nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self: Self) -> Self:
-        torch.nn.init.kaiming_uniform_(self.weight)
+        with torch.no_grad():
+            self.embedder.weight = torch.nn.Parameter(
+                torch.nn.init.kaiming_uniform_(self.weight) / 2**0.5
+            )
         return self
 
     def forward(self: Self, hashes: torch.Tensor, _: torch.Tensor) -> torch.Tensor:
@@ -173,7 +181,8 @@ class TransformerEmbeddingBag(torch.nn.Module):
         dropout: float = 0.0,
     ) -> None:
         super().__init__()
-        self.embedder = torch.nn.Embedding(
+        self.embedder = torch.nn.utils.skip_init(
+            torch.nn.Embedding,
             num_embeddings=num_embeddings,
             embedding_dim=embedding_dim,
             padding_idx=PADDING_IDX,
@@ -190,7 +199,10 @@ class TransformerEmbeddingBag(torch.nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self: Self) -> Self:
-        torch.nn.init.kaiming_uniform_(self.weight)
+        with torch.no_grad():
+            self.embedder.weight = torch.nn.Parameter(
+                torch.nn.init.kaiming_uniform_(self.weight) / 2**0.5
+            )
         return self
 
     def forward(self: Self, hashes: torch.Tensor, _: torch.Tensor) -> torch.Tensor:
