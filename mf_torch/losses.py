@@ -41,11 +41,9 @@ class RegularizationLoss(torch.nn.Module):
         items_embed: torch.Tensor,
         targets: torch.Tensor,
     ) -> torch.Tensor:
-        l1_loss = self.reg_l1 * (users_embed.abs().sum() + items_embed.abs().sum())
-        l2_loss = (
-            self.reg_l2 * (users_embed.square().sum() + items_embed.square().sum()) / 2
-        )
-        return l1_loss + l2_loss
+        l1_loss = users_embed.abs().sum() + items_embed.abs().sum()
+        l2_loss = (users_embed.square().sum() + items_embed.square().sum()) / 2
+        return self.reg_l1 * l1_loss + self.reg_l2 * l2_loss
 
 
 class EmbeddingLoss(torch.nn.Module, abc.ABC):

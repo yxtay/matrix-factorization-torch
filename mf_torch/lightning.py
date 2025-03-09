@@ -48,13 +48,13 @@ class MatrixFactorizationLitModule(LightningModule):
         embedder_type: str = "base",  # noqa: ARG002
         num_heads: int = 1,  # noqa: ARG002
         dropout: float = 0.0,  # noqa: ARG002
-        normalize: bool = True,  # noqa: ARG002
+        normalize: bool = False,  # noqa: ARG002
         hard_negatives_ratio: float | None = None,  # noqa: ARG002
         sigma: float = 1.0,  # noqa: ARG002
         margin: float = 1.0,  # noqa: ARG002
         reg_l1: float = 0.0001,  # noqa: ARG002
         reg_l2: float = 0.01,  # noqa: ARG002
-        learning_rate: float = 0.01,  # noqa: ARG002
+        learning_rate: float = 0.001,  # noqa: ARG002
         top_k: int = TOP_K,  # noqa: ARG002
     ) -> None:
         super().__init__()
