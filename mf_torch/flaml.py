@@ -78,7 +78,7 @@ def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
         "embedder_type": "base",
         "log_num_heads": 0,
         "dropout": 0.0,
-        "normalize": True,
+        "normalize": False,
         "train_loss": "PairwiseHingeLoss",
         "use_hard_negatives": False,
         "hard_negatives_ratio": 1.0,
@@ -86,7 +86,7 @@ def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
         "margin": 1.0,
         "reg_l1": 0.0001,
         "reg_l2": 0.01,
-        "learning_rate": 0.1,
+        "learning_rate": 0.001,
     }
     config = point_to_evaluate | {
         "num_hashes": flaml.tune.randint(2, 5),
@@ -103,7 +103,7 @@ def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
         "margin": flaml.tune.quniform(-1.0, 1.0, 0.01),
         "reg_l1": flaml.tune.loguniform(0.0001, 0.1),
         "reg_l2": flaml.tune.loguniform(0.0001, 0.1),
-        "learning_rate": flaml.tune.loguniform(0.001, 0.1),
+        "learning_rate": flaml.tune.loguniform(0.0001, 0.01),
     }
     low_cost_partial_config = {
         "num_hashes": 2,
