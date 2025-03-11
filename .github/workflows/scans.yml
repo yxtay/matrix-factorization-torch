@@ -147,7 +147,7 @@ jobs:
         with:
           fetch-depth: 3
 
-      - uses: trufflesecurity/trufflehog@ca270a7e14a3542229c2cadf1d408ecac1455815 # v3
+      - uses: trufflesecurity/trufflehog@c1f2e912239240108482d79ea01ab25d90b27ac7 # v3
         with:
           extra_args: --results=verified,unknown
 
