@@ -39,7 +39,7 @@ jobs:
       contents: write
       pull-requests: write
 
-    if: ${{ github.actor == 'pre-commit-ci' }}
+    if: ${{ github.event.pull_request.user.login == 'pre-commit-ci[bot]' }}
     runs-on: ubuntu-latest
     steps:
       - name: automerge
