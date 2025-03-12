@@ -18,6 +18,7 @@ from mf_torch.params import (
     NUM_EMBEDDINGS,
     ONNX_PROGRAM_PATH,
     SCRIPT_MODULE_PATH,
+    TARGET_COL,
     TOP_K,
 )
 
@@ -165,10 +166,9 @@ class MatrixFactorizationLitModule(LightningModule):
         pred_scores = dict(
             zip(pred_scores[item_id_col], pred_scores["score"], strict=True)
         )
+        target_scores = example["target"]
         target_scores = dict(
-            zip(
-                example["target"][item_id_col], example["target"]["rating"], strict=True
-            )
+            zip(target_scores[item_id_col], target_scores[TARGET_COL], strict=True)
         )
 
         item_ids = list(target_scores.keys() | pred_scores.keys())
