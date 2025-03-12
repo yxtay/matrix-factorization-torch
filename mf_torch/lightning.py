@@ -172,7 +172,7 @@ class MatrixFactorizationLitModule(LightningModule):
         )
 
         item_ids = list(target_scores.keys() | pred_scores.keys())
-        rand_scores = torch.rand(len(item_ids))  # devskim: ignore DS148264
+        rand_scores = torch.rand(len(item_ids)).tolist()  # devskim: ignore DS148264
         preds = [
             pred_scores.get(item_id, -rand_scores[i])
             for i, item_id in enumerate(item_ids)
