@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pathlib
-import random
 from typing import TYPE_CHECKING
 
 import lightning.pytorch.callbacks as lp_callbacks
@@ -19,6 +18,7 @@ from mf_torch.params import (
     NUM_EMBEDDINGS,
     ONNX_PROGRAM_PATH,
     SCRIPT_MODULE_PATH,
+    TARGET_COL,
     TOP_K,
 )
 
@@ -166,19 +166,16 @@ class MatrixFactorizationLitModule(LightningModule):
         pred_scores = dict(
             zip(pred_scores[item_id_col], pred_scores["score"], strict=True)
         )
+        target_scores = example["target"]
         target_scores = dict(
-            zip(
-                example["target"][item_id_col], example["target"]["rating"], strict=True
-            )
+            zip(target_scores[item_id_col], target_scores[TARGET_COL], strict=True)
         )
 
         item_ids = list(target_scores.keys() | pred_scores.keys())
+        rand_scores = torch.rand(len(item_ids)).tolist()  # devskim: ignore DS148264
         preds = [
-            pred_scores.get(
-                item_id,
-                -random.random(),  # devskim: ignore DS148264 # nosec
-            )
-            for item_id in item_ids
+            pred_scores.get(item_id, -rand_scores[i])
+            for i, item_id in enumerate(item_ids)
         ]
         preds = torch.as_tensor(preds)
         target = [target_scores.get(item_id, 0) for item_id in item_ids]

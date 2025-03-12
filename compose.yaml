@@ -6,7 +6,7 @@ services:
         - ghcr.io/yxtay/matrix-factorization-torch:cache
         - ghcr.io/yxtay/matrix-factorization-torch:main
     healthcheck:
-      test: [CMD, uv, run, lightning, fit, --print_config]
+      test: [CMD, uv, run, --no-sync, lightning, fit, --print_config]
     cap_drop:
       - all
     security_opt:

@@ -63,4 +63,4 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-default-groups
 
 USER ${USER}
-HEALTHCHECK CMD [ uv, run, lightning, fit, --print_config ]
+HEALTHCHECK CMD [ uv, run, --no-sync, lightning, fit, --print_config ]
