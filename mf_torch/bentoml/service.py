@@ -85,9 +85,7 @@ class Embedder:
     @logger.catch(reraise=True)
     def embed(self: Self, query: Query) -> Query:
         with torch.inference_mode():
-            query.embedding = self.model(
-                query.feature_hashes.unsqueeze(0), query.feature_weights.unsqueeze(0)
-            ).squeeze(0)
+            query.embedding = self.model(query.feature_hashes, query.feature_weights)
         return query
 
 
