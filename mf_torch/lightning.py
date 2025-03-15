@@ -230,6 +230,10 @@ class MatrixFactorizationLitModule(LightningModule):
             if isinstance(logger, lp_loggers.TensorBoardLogger):
                 logger.log_hyperparams(params=params, metrics=metrics)
 
+            if isinstance(logger, lp_loggers.MLFlowLogger):
+                # reset mlflow run status to "RUNNING"
+                logger.experiment.update_run(logger.run_id, status="RUNNING")
+
     def on_validation_start(self: Self) -> None:
         self.users_processor = self.trainer.datamodule.users_processor
         self.users_processor.get_index()

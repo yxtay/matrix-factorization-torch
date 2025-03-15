@@ -5,17 +5,17 @@ FROM python:3.13-slim@sha256:f3614d98f38b0525d670f287b0474385952e28eb43016655dd0
 LABEL maintainer="wyextay@gmail.com"
 
 # set up user
-ARG USER=user
-ARG UID=1000
+ARG USER=user \
+    UID=1000
 RUN useradd --create-home --shell /bin/false --uid ${UID} ${USER}
 
 # set up environment
 ARG APP_HOME=/work/app
 ARG VIRTUAL_ENV=${APP_HOME}/.venv
-ENV PYTHONFAULTHANDLER=1 \
+ENV PATH=${VIRTUAL_ENV}/bin:${PATH} \
+    PYTHONFAULTHANDLER=1 \
     PYTHONUNBUFFERED=1 \
-    VIRTUAL_ENV=${VIRTUAL_ENV} \
-    PATH=${VIRTUAL_ENV}/bin:${PATH}
+    VIRTUAL_ENV=${VIRTUAL_ENV}
 
 WORKDIR ${APP_HOME}
 
