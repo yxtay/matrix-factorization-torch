@@ -97,9 +97,7 @@ class MatrixFactorizationLitModule(LightningModule):
             raise ValueError(msg)
 
         with torch.inference_mode():
-            embed = self(
-                feature_hashes.unsqueeze(0), feature_weights.unsqueeze(0)
-            ).numpy(force=True)
+            embed = self(feature_hashes, feature_weights).numpy(force=True)
 
         history = self.users_processor.get_activity(user_id, "history")
         exclude_item_ids = (exclude_item_ids or []) + list(history.keys())
@@ -229,6 +227,10 @@ class MatrixFactorizationLitModule(LightningModule):
         for logger in self.loggers:
             if isinstance(logger, lp_loggers.TensorBoardLogger):
                 logger.log_hyperparams(params=params, metrics=metrics)
+
+            if isinstance(logger, lp_loggers.MLFlowLogger):
+                # reset mlflow run status to "RUNNING"
+                logger.experiment.update_run(logger.run_id, status="RUNNING")
 
     def on_validation_start(self: Self) -> None:
         self.users_processor = self.trainer.datamodule.users_processor
