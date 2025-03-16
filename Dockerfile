@@ -5,8 +5,8 @@ FROM python:3.13-slim@sha256:f3614d98f38b0525d670f287b0474385952e28eb43016655dd0
 LABEL maintainer="wyextay@gmail.com"
 
 # set up user
-ARG USER=user \
-    UID=1000
+ARG USER=user
+ARG UID=1000
 RUN useradd --create-home --shell /bin/false --uid ${UID} ${USER}
 
 # set up environment
@@ -40,12 +40,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         curl=7.88.1-10+deb12u8 \
     && rm -rf /var/lib/apt/lists/*
 
-ARG PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_NO_CACHE_DIR=0 \
-    PIP_NO_COMPILE=0 \
-    PIP_NO_INPUT=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    UV_NO_CACHE=1
+ARG PIP_DISABLE_PIP_VERSION_CHECK=1
+ARG PIP_NO_CACHE_DIR=0
+ARG PIP_NO_COMPILE=0
+ARG PIP_NO_INPUT=1
+ARG PYTHONDONTWRITEBYTECODE=1
+ARG UV_NO_CACHE=1
 
 # set up python
 COPY --from=ghcr.io/astral-sh/uv:latest@sha256:031ddbc79275e351a43cbb66f64d8cd314cc78c3878898f4ab4f147b092e8e2d /uv /uvx /bin/
