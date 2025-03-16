@@ -40,10 +40,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         curl=7.88.1-10+deb12u8 \
     && rm -rf /var/lib/apt/lists/*
 
-ARG PIP_DISABLE_PIP_VERSION_CHECK=1
-ARG PIP_NO_CACHE_DIR=0
-ARG PIP_NO_COMPILE=0
-ARG PIP_NO_INPUT=1
 ARG PYTHONDONTWRITEBYTECODE=1
 ARG UV_NO_CACHE=1
 
