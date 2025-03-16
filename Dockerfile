@@ -12,10 +12,10 @@ RUN useradd --create-home --shell /bin/false --uid ${UID} ${USER}
 # set up environment
 ARG APP_HOME=/work/app
 ARG VIRTUAL_ENV=${APP_HOME}/.venv
-ENV PYTHONFAULTHANDLER=1 \
+ENV PATH=${VIRTUAL_ENV}/bin:${PATH} \
+    PYTHONFAULTHANDLER=1 \
     PYTHONUNBUFFERED=1 \
-    VIRTUAL_ENV=${VIRTUAL_ENV} \
-    PATH=${VIRTUAL_ENV}/bin:${PATH}
+    VIRTUAL_ENV=${VIRTUAL_ENV}
 
 WORKDIR ${APP_HOME}
 
@@ -40,12 +40,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         curl=7.88.1-10+deb12u8 \
     && rm -rf /var/lib/apt/lists/*
 
-ARG PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_NO_CACHE_DIR=0 \
-    PIP_NO_COMPILE=0 \
-    PIP_NO_INPUT=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    UV_NO_CACHE=1
+ARG PYTHONDONTWRITEBYTECODE=1
+ARG UV_NO_CACHE=1
 
 # set up python
 COPY --from=ghcr.io/astral-sh/uv:latest@sha256:031ddbc79275e351a43cbb66f64d8cd314cc78c3878898f4ab4f147b092e8e2d /uv /uvx /bin/
