@@ -98,19 +98,29 @@ jobs:
           load: true
 
       - if: ${{ success() || failure() }}
-        run: docker run --rm ${{ steps.build.outputs.imageid }} uv run --no-sync lightning fit --print_config
+        run: docker run --rm "${IMAGE_ID}" uv run --no-sync lightning fit --print_config
+        env:
+          IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
       - if: ${{ success() || failure() }}
-        run: docker run --rm ${{ steps.build.outputs.imageid }} uv run --no-sync bentoml
+        run: docker run --rm "${IMAGE_ID}" uv run --no-sync bentoml
+        env:
+          IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
       - if: ${{ failure() }}
-        run: docker run --rm ${{ steps.build.outputs.imageid }} python -m mf_torch.lightning
+        run: docker run --rm "${IMAGE_ID}" python -m mf_torch.lightning
+        env:
+          IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
       - if: ${{ failure() }}
-        run: docker run --rm ${{ steps.build.outputs.imageid }} python -m mf_torch.data.lightning
+        run: docker run --rm "${IMAGE_ID}" python -m mf_torch.data.lightning
+        env:
+          IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
       - if: ${{ failure() }}
-        run: docker run --rm ${{ steps.build.outputs.imageid }}uv run --no-sync data
+        run: docker run --rm "${IMAGE_ID}" uv run --no-sync data
+        env:
+          IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
       - id: docker_metadata
         uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5
