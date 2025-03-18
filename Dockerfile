@@ -1,7 +1,7 @@
 ##
 # base
 ##
-FROM python:3.13-slim@sha256:43ff25c50c7a3f7065200f9e962ac2944eeb0694594cf8f0c4362867301af370 AS base
+FROM python:3.13-slim@sha256:8f3aba466a471c0ab903dbd7cb979abd4bda370b04789d25440cc90372b50e04 AS base
 LABEL maintainer="wyextay@gmail.com"
 
 # set up user
