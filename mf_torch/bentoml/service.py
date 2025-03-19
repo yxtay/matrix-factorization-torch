@@ -83,11 +83,11 @@ class Embedder:
 
     @bentoml.api()
     @logger.catch(reraise=True)
+    @torch.inference_mode()
     def embed(self: Self, query: Query) -> Query:
-        with torch.inference_mode():
-            query.embedding = self.model(
-                query.feature_hashes.unsqueeze(0), query.feature_weights.unsqueeze(0)
-            ).squeeze(0)
+        query.embedding = self.model(
+            query.feature_hashes.unsqueeze(0), query.feature_weights.unsqueeze(0)
+        ).squeeze(0)
         return query
 
 

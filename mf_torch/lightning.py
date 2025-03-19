@@ -83,6 +83,7 @@ class MatrixFactorizationLitModule(LightningModule):
             feature_hashes=feature_hashes, feature_weights=feature_weights
         )
 
+    @torch.inference_mode()
     def recommend(
         self: Self,
         feature_hashes: torch.Tensor,
@@ -96,12 +97,10 @@ class MatrixFactorizationLitModule(LightningModule):
             msg = "`user_processor` and `item_processor` must be initialised first"
             raise ValueError(msg)
 
-        with torch.inference_mode():
-            embed = self(feature_hashes, feature_weights).numpy(force=True)
-
         history = self.users_processor.get_activity(user_id, "history")
         exclude_item_ids = (exclude_item_ids or []) + list(history.keys())
 
+        embed = self(feature_hashes, feature_weights).numpy(force=True)
         return self.items_processor.search(
             embed, exclude_item_ids=exclude_item_ids, top_k=top_k
         ).drop(columns="embedding")
