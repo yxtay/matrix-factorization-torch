@@ -182,11 +182,7 @@ class UsersProcessor(FeaturesProcessor):
         self: Self, id_val: int | None, activity_name: str
     ) -> dict[int, int]:
         activity = self.get_id(id_val).get(activity_name, {})
-        return dict(
-            zip(
-                activity.get(ITEM_ID_COL, []), activity.get(TARGET_COL, []), strict=True
-            )
-        )
+        return {item[ITEM_ID_COL]: item[TARGET_COL] for item in activity}
 
 
 class ItemsProcessor(FeaturesProcessor):

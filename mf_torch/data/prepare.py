@@ -193,30 +193,6 @@ def process_users(
             history=pl.col("history").list.sort(),
             target=pl.col("target").list.sort(),
         )
-        .with_columns(
-            history=pl.struct(
-                movie_id=pl.col("history").list.eval(  # devskim: ignore DS189424
-                    pl.element().struct.field("movie_id")
-                ),
-                rating=pl.col("history").list.eval(  # devskim: ignore DS189424
-                    pl.element().struct.field("rating")
-                ),
-                datetime=pl.col("history").list.eval(  # devskim: ignore DS189424
-                    pl.element().struct.field("datetime")
-                ),
-            ),
-            target=pl.struct(
-                movie_id=pl.col("target").list.eval(  # devskim: ignore DS189424
-                    pl.element().struct.field("movie_id")
-                ),
-                rating=pl.col("target").list.eval(  # devskim: ignore DS189424
-                    pl.element().struct.field("rating")
-                ),
-                datetime=pl.col("target").list.eval(  # devskim: ignore DS189424
-                    pl.element().struct.field("datetime")
-                ),
-            ),
-        )
     )
     users_procesed = (
         users.lazy()

@@ -39,7 +39,7 @@ class RegularizationLoss(torch.nn.Module):
         self: Self,
         users_embed: torch.Tensor,
         items_embed: torch.Tensor,
-        targets: torch.Tensor,
+        targets: torch.Tensor,  # noqa: ARG002
     ) -> torch.Tensor:
         l1_loss = users_embed.abs().sum() + items_embed.abs().sum()
         l2_loss = (users_embed.square().sum() + items_embed.square().sum()) / 2
