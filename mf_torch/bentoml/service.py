@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import datetime  # noqa: TC003
 import json
 import pathlib
-from typing import TYPE_CHECKING, Annotated, Self
+from typing import Annotated, Self
 
 import bentoml
 import pydantic
@@ -17,9 +18,6 @@ from mf_torch.params import (
     PROCESSORS_JSON,
     TOP_K,
 )
-
-if TYPE_CHECKING:
-    import datetime
 
 
 class Activity(pydantic.BaseModel):
