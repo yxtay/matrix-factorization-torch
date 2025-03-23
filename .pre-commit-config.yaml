@@ -87,3 +87,6 @@ repos:
     rev: v0.16.0
     hooks:
       - id: yamlfmt
+
+ci:
+  autoupdate_commit_msg: "ci: pre-commit autoupdate"
