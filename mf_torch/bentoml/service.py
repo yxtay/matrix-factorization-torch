@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime  # noqa: TC003
 import json
 import pathlib
 from typing import Annotated, Self
@@ -20,8 +21,9 @@ from mf_torch.params import (
 
 
 class Activity(pydantic.BaseModel):
-    movie_id: list[int]
-    rating: list[int]
+    datetime: datetime.datetime
+    movie_id: int
+    rating: int
 
 
 class UserQuery(pydantic.BaseModel):
@@ -31,8 +33,8 @@ class UserQuery(pydantic.BaseModel):
     age: int | None = None
     occupation: int | None = None
     zipcode: str | None = None
-    history: Activity | None = None
-    target: Activity | None = None
+    history: list[Activity] | None = None
+    target: list[Activity] | None = None
 
 
 class ItemQuery(pydantic.BaseModel):
@@ -260,9 +262,9 @@ class Service:
     ) -> list[ItemCandidate]:
         exclude_item_ids = exclude_item_ids or []
         if user.history:
-            exclude_item_ids += user.history.movie_id
+            exclude_item_ids += [item.movie_id for item in user.history]
         if user.target:
-            exclude_item_ids += user.target.movie_id
+            exclude_item_ids += [item.movie_id for item in user.target]
 
         query = await self.process_user(user)
         return await self.recommend_with_query(

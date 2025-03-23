@@ -101,8 +101,8 @@ def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
         # "hard_negatives_ratio": flaml.tune.quniform(0.5, 2.0, 0.01),
         "sigma": flaml.tune.lograndint(1, 1000),
         "margin": flaml.tune.quniform(-1.0, 1.0, 0.01),
-        "reg_l1": flaml.tune.loguniform(0.0001, 0.1),
-        "reg_l2": flaml.tune.loguniform(0.0001, 0.1),
+        "reg_l1": flaml.tune.loguniform(0.0001, 0.01),
+        "reg_l2": flaml.tune.loguniform(0.001, 0.1),
         "learning_rate": flaml.tune.loguniform(0.0001, 0.01),
     }
     low_cost_partial_config = {
