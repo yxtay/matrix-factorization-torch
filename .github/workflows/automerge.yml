@@ -43,11 +43,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: automerge
-        run: |
-          gh pr edit "${PR_NUMBER}" --title "ci: ${PR_TITLE}"
-          gh pr merge "${PR_NUMBER}" --auto --squash
+        run: gh pr merge "${PR_NUMBER}" --auto --squash
         env:
           GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
