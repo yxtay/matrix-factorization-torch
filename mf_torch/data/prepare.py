@@ -129,29 +129,43 @@ def load_users(src_dir: str = DATA_DIR) -> pl.LazyFrame:
 ###
 
 
-def ordered_split(
+def train_test_split(
     ratings: pl.LazyFrame,
     *,
     group_col: str = "user_id",
     order_col: str = "timestamp",
     train_prop: float = 0.8,
+    val_prop: float = 0.2,
 ) -> pl.LazyFrame:
-    return (
+    ratings = (
         ratings.lazy()
         .with_columns(
+            datetime=pl.from_epoch("timestamp"),
             p=((pl.col(order_col).rank("ordinal") - 1) / pl.count(order_col)).over(
                 group_col
-            )
+            ),
         )
         .with_columns(is_train=pl.col("p") < train_prop)
         .drop("p")
+    )
+    users_split = (
+        ratings.filter("is_train")
+        .group_by("user_id")
+        .len()
+        .with_columns(p=((pl.col("len").rank("ordinal") - 1) / pl.count("len")))
+        .with_columns(is_val=pl.col("p") >= 1 - val_prop)
+        .drop("len", "p")
+    )
+    return ratings.join(users_split, on="user_id").with_columns(
+        is_val=~pl.col("is_train") & pl.col("is_val"),
+        is_test=~pl.col("is_train") & ~pl.col("is_val"),
+        is_predict=True,
     )
 
 
 def process_users(
     users: pl.LazyFrame,
     ratings: pl.LazyFrame,
-    val_prop: float = 0.2,
     *,
     src_dir: str = DATA_DIR,
     overwrite: bool = False,
@@ -166,19 +180,29 @@ def process_users(
         ratings.lazy()
         .group_by("user_id")
         .agg(
-            history=pl.struct("movie_id", "rating").filter(pl.col("is_train")),
-            target=pl.struct("movie_id", "rating").filter(~pl.col("is_train")),
-            len=pl.len(),
+            history=pl.struct("datetime", "movie_id", "rating").filter("is_train"),
+            target=pl.struct("datetime", "movie_id", "rating").filter(
+                ~pl.col("is_train")
+            ),
             is_train=pl.any("is_train"),
+            is_val=pl.any("is_val"),
+            is_test=pl.any("is_test"),
+            is_predict=pl.any("is_predict"),
         )
         .with_columns(
-            p=((pl.col("len").rank("ordinal") - 1) / pl.count("len")),
+            history=pl.col("history").list.sort(),
+            target=pl.col("target").list.sort(),
+        )
+        .with_columns(
             history=pl.struct(
                 movie_id=pl.col("history").list.eval(  # devskim: ignore DS189424
                     pl.element().struct.field("movie_id")
                 ),
                 rating=pl.col("history").list.eval(  # devskim: ignore DS189424
                     pl.element().struct.field("rating")
+                ),
+                datetime=pl.col("history").list.eval(  # devskim: ignore DS189424
+                    pl.element().struct.field("datetime")
                 ),
             ),
             target=pl.struct(
@@ -188,14 +212,11 @@ def process_users(
                 rating=pl.col("target").list.eval(  # devskim: ignore DS189424
                     pl.element().struct.field("rating")
                 ),
+                datetime=pl.col("target").list.eval(  # devskim: ignore DS189424
+                    pl.element().struct.field("datetime")
+                ),
             ),
         )
-        .with_columns(is_val=pl.col("p") >= 1 - val_prop)
-        .with_columns(
-            is_test=~pl.col("is_val"),
-            is_predict=True,
-        )
-        .drop("len", "p")
     )
     users_procesed = (
         users.lazy()
@@ -205,8 +226,7 @@ def process_users(
     )
 
     users_procesed.write_parquet(users_parquet)
-    logger.info("users saved: {}", users_parquet)
-
+    logger.info("users saved: {}, shape: {}", users_parquet, users_procesed.shape)
     return pl.scan_parquet(str(users_parquet))
 
 
@@ -240,8 +260,7 @@ def process_movies(
     )
 
     movies_processed.write_parquet(movies_parquet)
-    logger.info("movies saved: {}", movies_parquet)
-
+    logger.info("movies saved: {}, shape: {}", movies_parquet, movies_processed.shape)
     return pl.scan_parquet(str(movies_parquet))
 
 
@@ -263,25 +282,19 @@ def process_ratings(
 
     ratings_processed = (
         ratings.lazy()
-        .join(users.lazy().drop("is_train"), on="user_id")
+        .join(users.lazy().drop(cs.starts_with("is_")), on="user_id")
         .join(movies.lazy().drop(cs.starts_with("is_")), on="movie_id")
-        .with_columns(
-            is_val=~pl.col("is_train") & pl.col("is_val"),
-            is_test=~pl.col("is_train") & ~pl.col("is_val"),
-            is_predict=True,
-        )
         .collect()
     )
     ratings_processed.write_parquet(ratings_parquet)
     logger.info("sparse saved: {}, shape: {}", ratings_parquet, ratings_processed.shape)
-
     return pl.scan_parquet(str(ratings_parquet))
 
 
 def prepare_movielens(
     src_dir: str = DATA_DIR, *, overwrite: bool = False
 ) -> pl.LazyFrame:
-    ratings = load_ratings(src_dir).pipe(ordered_split)
+    ratings = load_ratings(src_dir).pipe(train_test_split)
     users = load_users(src_dir)
     movies = load_movies(src_dir)
 
