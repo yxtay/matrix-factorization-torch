@@ -23,9 +23,9 @@ if TYPE_CHECKING:
 
 
 class Activity(pydantic.BaseModel):
+    datetime: datetime.datetime
     movie_id: int
     rating: int
-    datetime: datetime.datetime
 
 
 class UserQuery(pydantic.BaseModel):
