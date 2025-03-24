@@ -6,9 +6,13 @@ default_stages:
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit
-    rev: v4.1.0
+    rev: v4.2.0
     hooks:
       - id: validate_manifest
+        name: pre-commit autoupdate
+        entry: pre-commit autoupdate
+        always_run: true
+        pass_filenames: false
 
   - repo: meta
     hooks:
@@ -25,27 +29,38 @@ repos:
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext, md]
 
-      - id: check-case-conflict
         # files
+      - id: check-case-conflict
       - id: check-executables-have-shebangs
       - id: check-symlinks
       - id: destroyed-symlinks
       - id: fix-byte-order-marker
 
-      - id: check-added-large-files
         # git
+      - id: check-added-large-files
       - id: check-merge-conflict
       - id: check-vcs-permalinks
       - id: no-commit-to-branch
       - id: forbid-new-submodules
 
-      - id: detect-aws-credentials
+        # python
+      - id: check-ast
+      - id: check-builtin-literals
+      - id: check-docstring-first
+      - id: debug-statements
+      - id: fix-encoding-pragma
+        args: [--remove]
+      - id: name-tests-test
+        args: [--pytest-test-first]
+      - id: requirements-txt-fixer # conflicts with poetry
+
         # security
+      - id: detect-aws-credentials
         args: [--allow-missing-credentials]
       - id: detect-private-key
 
   - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.24.0
+    rev: v8.24.2
     hooks:
       - id: gitleaks
 
@@ -59,13 +74,18 @@ repos:
     hooks:
       - id: biome-check
 
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.13.1-beta
+    hooks:
+      - id: hadolint-docker
+
   - repo: https://github.com/markdownlint/markdownlint
     rev: v0.12.0
     hooks:
       - id: markdownlint
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.0
+    rev: v0.11.2
     hooks:
       - id: ruff
         types_or: [python, pyi, jupyter]
@@ -73,13 +93,23 @@ repos:
       - id: ruff-format
         types_or: [python, pyi, jupyter]
 
+  - repo: https://github.com/koalaman/shellcheck-precommit
+    rev: v0.10.0
+    hooks:
+      - id: shellcheck
+
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.11.0-1
+    hooks:
+      - id: shfmt
+
   - repo: https://github.com/ComPWA/taplo-pre-commit
     rev: v0.9.3
     hooks:
       - id: taplo-format
 
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.6.6
+    rev: 0.6.9
     hooks:
       - id: uv-lock
 
@@ -90,3 +120,4 @@ repos:
 
 ci:
   autoupdate_commit_msg: "ci: pre-commit autoupdate"
+  skip: [validate_manifest, hadolint-docker, shellcheck]
