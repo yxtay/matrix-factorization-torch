@@ -120,4 +120,4 @@ repos:
 
 ci:
   autoupdate_commit_msg: "ci: pre-commit autoupdate"
-  skip: [validate_manifest, hadolint-docker]
+  skip: [validate_manifest, hadolint-docker, shellcheck]
