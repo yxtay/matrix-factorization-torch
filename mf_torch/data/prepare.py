@@ -207,8 +207,8 @@ def process_ratings(
         .agg(history=pl.struct("datetime", "rating", *movies.collect_schema().names()))
         .unique(["user_id", "datetime"])
     )
-    # write file to reduce memory usage
-    with tempfile.TemporaryFile() as f:
+    with tempfile.NamedTemporaryFile() as f:
+        # write file to reduce memory usage
         ratings_history.sink_parquet(f.name)
         ratings_history = pl.read_parquet(f.name)
 
