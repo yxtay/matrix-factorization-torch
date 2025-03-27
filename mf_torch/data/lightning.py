@@ -174,8 +174,7 @@ class UsersProcessor(FeaturesProcessor):
             self.lance_table_name, data=pa_table, mode="overwrite"
         )
         table.create_scalar_index(self.id_col)
-        table.compact_files()
-        table.cleanup_old_versions(datetime.timedelta(days=1))
+        table.optimize(cleanup_older_than=datetime.timedelta(days=0))
         return table
 
     def get_activity(
@@ -242,8 +241,7 @@ class ItemsProcessor(FeaturesProcessor):
             vector_column_name="embedding",
             index_type="IVF_HNSW_PQ",
         )
-        table.compact_files()
-        table.cleanup_old_versions(datetime.timedelta(days=1))
+        table.optimize(cleanup_older_than=datetime.timedelta(days=0))
         return table
 
     def search(
@@ -463,7 +461,7 @@ if __name__ == "__main__":
     rich.print(dm.users_processor.get_activity(1, "target"))
 
     dm.items_processor.get_index(
-        lambda hashes, _: torch.rand(32)  # devskim: ignore DS148264
+        lambda hashes, _: torch.rand(32)  # devskim: ignore DS148264 # noqa: ARG005
     ).search().to_polars().glimpse()
     rich.print(dm.items_processor.get_id(1))
     rich.print(
