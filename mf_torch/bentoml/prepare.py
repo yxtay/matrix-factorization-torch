@@ -43,7 +43,9 @@ def load_args(ckpt_path: str | None) -> dict[str, Any]:
     return {"model": model_args, "data": data_args}
 
 
-def prepare_trainer(ckpt_path: str | None = None) -> Trainer:
+def prepare_trainer(
+    ckpt_path: str | None = None, stage: str = "validate", fast_dev_run: int = 0
+) -> Trainer:
     from mf_torch.lightning import cli_main
 
     if ckpt_path is None:
@@ -52,11 +54,12 @@ def prepare_trainer(ckpt_path: str | None = None) -> Trainer:
     with tempfile.TemporaryDirectory() as tmp:
         trainer_args = {
             "logger": False,
+            "fast_dev_run": fast_dev_run,
             "enable_checkpointing": False,
             "default_root_dir": tmp,
         }
         args = {"trainer": trainer_args, "ckpt_path": ckpt_path, **load_args(ckpt_path)}
-    return cli_main({"validate": args}).trainer
+    return cli_main({stage: args}).trainer
 
 
 def save_model(trainer: Trainer) -> None:

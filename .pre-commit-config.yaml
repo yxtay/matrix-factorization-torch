@@ -70,7 +70,7 @@ repos:
       - id: actionlint
 
   - repo: https://github.com/biomejs/pre-commit
-    rev: v1.9.4
+    rev: v2.0.0-beta.1
     hooks:
       - id: biome-check
 
@@ -114,7 +114,7 @@ repos:
       - id: taplo-format
 
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.6.9
+    rev: 0.6.10
     hooks:
       - id: uv-lock
 
