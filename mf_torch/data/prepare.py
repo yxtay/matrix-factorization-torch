@@ -201,16 +201,18 @@ def process_ratings(
     )
     ratings_history = (
         ratings_merged.rolling(
-            "datetime", period="4w", closed="none", group_by="user_id"
+            "datetime", period="1w", closed="none", group_by="user_id"
         )
         .agg(history=pl.struct("datetime", "rating", *movies.collect_schema().names()))
         .unique(["user_id", "datetime"])
     )
     ratings_processed = ratings_merged.join(
         ratings_history, on=["user_id", "datetime"], validate="m:1"
+    ).collect()
+    ratings_processed.write_parquet(ratings_parquet)
+    logger.info(
+        "ratings saved: {}, shape, {}", ratings_parquet, ratings_processed.shape
     )
-    ratings_processed.sink_parquet(ratings_parquet)
-    logger.info("ratings saved: {}", ratings_parquet)
     return pl.scan_parquet(str(ratings_parquet))
 
 
