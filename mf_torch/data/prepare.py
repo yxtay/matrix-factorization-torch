@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pathlib
 import shutil
+import tempfile
 
 import polars as pl
 from loguru import logger
@@ -206,8 +207,13 @@ def process_ratings(
         .agg(history=pl.struct("datetime", "rating", *movies.collect_schema().names()))
         .unique(["user_id", "datetime"])
     )
+    # write file to reduce memory usage
+    with tempfile.TemporaryFile() as f:
+        ratings_history.sink_parquet(f.name)
+        ratings_history = pl.read_parquet(f.name)
+
     ratings_processed = ratings_merged.join(
-        ratings_history, on=["user_id", "datetime"], validate="m:1"
+        ratings_history.lazy(), on=["user_id", "datetime"], validate="m:1"
     ).collect()
     ratings_processed.write_parquet(ratings_parquet)
     logger.info(
