@@ -5,6 +5,8 @@ services:
       cache_from:
         - ghcr.io/yxtay/matrix-factorization-torch:cache
         - ghcr.io/yxtay/matrix-factorization-torch:main
+    volumes:
+      - ./data:/work/app/data
     healthcheck:
       test: [CMD, uv, run, --no-sync, lightning, fit, --print_config]
     cap_drop:
