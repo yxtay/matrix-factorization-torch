@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pathlib
 import shutil
-import tempfile
 
 import polars as pl
 from loguru import logger
@@ -194,31 +193,21 @@ def process_ratings(
         logger.info("ratings loaded: {}", ratings_parquet)
         return ratings_processed
 
-    with tempfile.TemporaryDirectory() as tmp:
-        # write to file to reduce memory usage
-        ratings_merged = (
-            ratings.lazy()
-            .join(movies.lazy(), on="movie_id", how="left", validate="m:1")
-            .join(users.lazy(), on="user_id", how="left", validate="m:1")
-            .sort(["user_id", "datetime"])
-        )
-        merged_parquet = pathlib.Path(tmp) / "merged.parquet"
-        ratings_merged.sink_parquet(merged_parquet)
-        ratings_merged = pl.read_parquet(merged_parquet).lazy()
-        ratings_history = (
-            ratings_merged.rolling(
-                "datetime", period="1w", closed="none", group_by="user_id"
-            )
-            .agg(
-                history=pl.struct(
-                    "datetime", "rating", *movies.collect_schema().names()
-                )
-            )
-            .unique(["user_id", "datetime"])
-        )
-        history_parquet = pathlib.Path(tmp) / "history.parquet"
-        ratings_history.sink_parquet(history_parquet)
-        ratings_history = pl.read_parquet(history_parquet).lazy()
+    ratings_merged = (
+        ratings.lazy()
+        .join(movies.lazy(), on="movie_id", how="left", validate="m:1")
+        .join(users.lazy(), on="user_id", how="left", validate="m:1")
+        .sort(["user_id", "datetime"])
+    )
+
+    # use loops to avoid memory issues
+    ratings_history = [
+        df.rolling("datetime", period="1w", closed="none", group_by="user_id")
+        .agg(history=pl.struct("datetime", "rating", *movies.collect_schema().names()))
+        .unique(["user_id", "datetime"])
+        for _, df in ratings_merged.collect().group_by("user_id")
+    ]
+    ratings_history = pl.concat(ratings_history).lazy()
 
     ratings_processed = ratings_merged.join(
         ratings_history, on=["user_id", "datetime"], validate="m:1"
