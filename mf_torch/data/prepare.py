@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pathlib
 import shutil
-import tempfile
 
 import polars as pl
 from loguru import logger
@@ -201,26 +200,42 @@ def process_ratings(
         .sort(["user_id", "datetime"])
     )
 
-    logger.info("ratings history")
-    ratings_history = (
-        df.rolling("datetime", period="1w", closed="none", group_by="user_id")
-        .agg(history=pl.struct("datetime", "rating", *movies.collect_schema().names()))
-        .unique(["user_id", "datetime"])
-        for _, df in ratings_merged.collect().group_by("user_id")
-    )
-    with tempfile.NamedTemporaryFile() as f:
-        pl.concat(ratings_history).write_parquet(f.name)
-        ratings_history = pl.read_parquet(f.name).lazy()
+    # use loops to reduce memory usage
+    # ratings_history = (
+    #     df.rolling("datetime", period="1w", closed="none", group_by="user_id")
+    #     .agg(history=pl.struct("datetime", "rating", *movies.collect_schema().names()))
+    #     .unique(["user_id", "datetime"])
+    #     for _, df in ratings_merged.collect().group_by("user_id")
+    # )
+    # with tempfile.NamedTemporaryFile() as f:
+    #     pl.concat(ratings_history).write_parquet(f.name)
+    #     ratings_history = pl.read_parquet(f.name).lazy()
 
     logger.info("ratings process")
-    ratings_processed = ratings_merged.join(
-        ratings_history, on=["user_id", "datetime"], validate="m:1"
-    ).collect()
+    # ratings_processed = ratings_merged.join(
+    #     ratings_history, on=["user_id", "datetime"], validate="m:1"
+    # ).collect()
+    # use loops to reduce memory usage
+    ratings_processed = (
+        gather_history(df.lazy(), movies)
+        for _, df in ratings_merged.collect().group_by("user_id")
+    )
+    ratings_processed = pl.concat(ratings_processed).collect()
     ratings_processed.write_parquet(ratings_parquet)
     logger.info(
         "ratings saved: {}, shape, {}", ratings_parquet, ratings_processed.shape
     )
     return pl.scan_parquet(str(ratings_parquet))
+
+
+def gather_history(ratings: pl.LazyFrame, movies: pl.LazyFrame) -> pl.LazyFrame:
+    ratings_history = (
+        ratings.rolling("datetime", period="1w", closed="none", group_by="user_id")
+        .agg(history=pl.struct("datetime", "rating", *movies.collect_schema().names()))
+        .unique(["user_id", "datetime"])
+    )
+
+    return ratings.join(ratings_history, on=["user_id", "datetime"], validate="m:1")
 
 
 def process_movies(
