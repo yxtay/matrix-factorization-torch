@@ -174,7 +174,8 @@ class UsersProcessor(FeaturesProcessor):
             self.lance_table_name, data=pa_table, mode="overwrite"
         )
         table.create_scalar_index(self.id_col)
-        table.optimize(cleanup_older_than=datetime.timedelta(days=0))
+        table.compact_files()
+        table.cleanup_old_versions(datetime.timedelta(days=0))
         return table
 
     def get_activity(
@@ -241,7 +242,8 @@ class ItemsProcessor(FeaturesProcessor):
             vector_column_name="embedding",
             index_type="IVF_HNSW_PQ",
         )
-        table.optimize(cleanup_older_than=datetime.timedelta(days=0))
+        table.compact_files()
+        table.cleanup_old_versions(datetime.timedelta(days=0))
         return table
 
     def search(
