@@ -9,8 +9,6 @@ from loguru import logger
 
 from mf_torch.params import DATA_DIR, MOVIELENS_1M_URL
 
-pl.enable_string_cache()
-
 ###
 # download data
 ###
@@ -217,7 +215,7 @@ def gather_history(
     ratings: pl.LazyFrame, movies: pl.LazyFrame, path: pathlib.Path
 ) -> None:
     ratings_history = (
-        ratings.rolling("datetime", period="1w", closed="none", group_by="user_id")
+        ratings.rolling("datetime", period="4w", closed="none", group_by="user_id")
         .agg(history=pl.struct("datetime", "rating", *movies.collect_schema().names()))
         .unique(["user_id", "datetime"])
     )
@@ -315,8 +313,8 @@ def prepare_movielens(
 
 def main(data_dir: str = DATA_DIR, *, overwrite: bool = True) -> None:
     download_unpack_data(overwrite=overwrite)
-    ratings = prepare_movielens(data_dir, overwrite=overwrite)
-    ratings.head().collect().glimpse()
+    with pl.StringCache():
+        prepare_movielens(data_dir, overwrite=overwrite).head().collect().glimpse()
 
 
 if __name__ == "__main__":
