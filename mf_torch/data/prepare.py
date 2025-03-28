@@ -199,8 +199,6 @@ def process_ratings(
         .join(movies.lazy(), on="movie_id", how="left", validate="m:1")
         .join(users.lazy(), on="user_id", how="left", validate="m:1")
         .sort(["user_id", "datetime"])
-        .collect()
-        .lazy()
     )
 
     logger.info("ratings history")
