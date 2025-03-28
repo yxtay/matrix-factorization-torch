@@ -198,16 +198,20 @@ def process_ratings(
         .join(movies.lazy(), on="movie_id", how="left", validate="m:1")
         .join(users.lazy(), on="user_id", how="left", validate="m:1")
         .sort(["user_id", "datetime"])
+        .collect()
+        .lazy()
     )
 
     # use loops to avoid memory issues
-    ratings_history = [
-        df.rolling("datetime", period="1w", closed="none", group_by="user_id")
+    ratings_history = (
+        ratings_merged.rolling(
+            "datetime", period="1w", closed="none", group_by="user_id"
+        )
         .agg(history=pl.struct("datetime", "rating", *movies.collect_schema().names()))
         .unique(["user_id", "datetime"])
-        for _, df in ratings_merged.collect().group_by("user_id")
-    ]
-    ratings_history = pl.concat(ratings_history).lazy()
+        .collect()
+        .lazy()
+    )
 
     ratings_processed = ratings_merged.join(
         ratings_history, on=["user_id", "datetime"], validate="m:1"
