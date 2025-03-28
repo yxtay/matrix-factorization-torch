@@ -34,7 +34,7 @@ ray = ["ray[data,train,tune]~=2.42"]
 data = "mf_torch.data.prepare:main"
 lightning = "mf_torch.lightning:cli_main"
 flaml = "mf_torch.flaml:flaml_tune"
-bentoml = "mf_torch.bentoml.prepare:main"
+bentoml_cli = "mf_torch.bentoml.prepare:main"
 
 [tool.uv.sources]
 torch = [{ index = "torch-cpu", marker = "sys_platform == 'linux'" }]

@@ -42,7 +42,7 @@ jobs:
         run: uv run --no-sync lightning fit --print_config
 
       - if: ${{ success() || failure() }}
-        run: uv run --no-sync bentoml
+        run: uv run --no-sync bentoml_cli
 
       - if: ${{ failure() }}
         run: uv run --no-sync python -m mf_torch.lightning
@@ -98,27 +98,37 @@ jobs:
           load: true
 
       - if: ${{ success() || failure() }}
-        run: docker run --rm "${IMAGE_ID}" uv run --no-sync lightning fit --print_config
+        run: |
+          docker run "${IMAGE_ID}" \
+          uv run --no-sync lightning fit --print_config
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
       - if: ${{ success() || failure() }}
-        run: docker run --rm "${IMAGE_ID}" uv run --no-sync bentoml
+        run: |
+          docker run "${IMAGE_ID}" \
+          uv run --no-sync bentoml_cli
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
       - if: ${{ failure() }}
-        run: docker run --rm "${IMAGE_ID}" python -m mf_torch.lightning
+        run: |
+          docker run "${IMAGE_ID}" \
+          python -m mf_torch.lightning
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
       - if: ${{ failure() }}
-        run: docker run --rm "${IMAGE_ID}" python -m mf_torch.data.lightning
+        run: |
+          docker run "${IMAGE_ID}" \
+          python -m mf_torch.data.lightning
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
       - if: ${{ failure() }}
-        run: docker run --rm "${IMAGE_ID}" uv run --no-sync data
+        run: |
+          docker run "${IMAGE_ID}" \
+          uv run --no-sync data
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 

@@ -490,6 +490,8 @@ def cli_main(
 
 
 if __name__ == "__main__":
+    import contextlib
+
     import rich
 
     from mf_torch.data.lightning import MatrixFactorizationDataModule
@@ -506,9 +508,13 @@ if __name__ == "__main__":
     trainer_args = {
         "fast_dev_run": True,
         # "max_epochs": -1,
+        # "limit_train_batches": 1,
+        # "limit_val_batches": 1,
         # "overfit_batches": 1,
     }
     cli = cli_main(args={"trainer": trainer_args}, run=False)
-    cli.trainer.fit(cli.model, datamodule=cli.datamodule)
-    cli.trainer.validate(cli.model, datamodule=cli.datamodule)
-    cli.trainer.test(cli.model, datamodule=cli.datamodule)
+    with contextlib.suppress(ReferenceError):
+        # suppress weak reference on ModelCheckpoint callback
+        cli.trainer.fit(cli.model, datamodule=cli.datamodule)
+        cli.trainer.validate(cli.model, datamodule=cli.datamodule)
+        cli.trainer.test(cli.model, datamodule=cli.datamodule)
