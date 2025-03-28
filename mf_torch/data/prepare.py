@@ -205,14 +205,12 @@ def process_ratings(
 
     logger.info("ratings history")
     ratings_history = (
-        ratings_merged.rolling(
-            "datetime", period="1w", closed="none", group_by="user_id"
-        )
+        df.rolling("datetime", period="1w", closed="none", group_by="user_id")
         .agg(history=pl.struct("datetime", "rating", *movies.collect_schema().names()))
         .unique(["user_id", "datetime"])
-        .collect()
-        .lazy()
+        for _, df in ratings_merged.collect().group_by("user_id")
     )
+    ratings_history = pl.concat(ratings_history).lazy()
 
     logger.info("ratings process")
     ratings_processed = ratings_merged.join(
