@@ -217,10 +217,11 @@ def process_ratings(
     # ).collect()
     # use loops to reduce memory usage
     ratings_processed = (
-        gather_history(df.lazy(), movies)
+        gather_history(df.lazy(), movies).collect()
         for _, df in ratings_merged.collect().group_by("user_id")
     )
-    ratings_processed = pl.concat(ratings_processed).collect()
+    logger.info("ratings history")
+    ratings_processed = pl.concat(ratings_processed)
     ratings_processed.write_parquet(ratings_parquet)
     logger.info(
         "ratings saved: {}, shape, {}", ratings_parquet, ratings_processed.shape
