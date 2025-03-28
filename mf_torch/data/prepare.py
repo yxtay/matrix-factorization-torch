@@ -209,7 +209,7 @@ def process_ratings(
     logger.info("ratings history")
     ratings_processed = pl.concat(ratings_processed)
     logger.info("ratings concat")
-    ratings_processed.write_parquet(ratings_parquet)
+    ratings_processed.write_parquet(ratings_parquet, partition_by="user_id")
     logger.info(
         "ratings saved: {}, shape, {}", ratings_parquet, ratings_processed.shape
     )
