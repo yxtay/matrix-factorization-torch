@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pathlib
 import shutil
+import tempfile
 
 import polars as pl
 from loguru import logger
@@ -193,7 +194,6 @@ def process_ratings(
         logger.info("ratings loaded: {}", ratings_parquet)
         return ratings_processed
 
-    logger.info("ratings merge")
     ratings_merged = (
         ratings.lazy()
         .join(movies.lazy(), on="movie_id", how="left", validate="m:1")
@@ -208,9 +208,13 @@ def process_ratings(
         df.rolling("datetime", period="1w", closed="none", group_by="user_id")
         .agg(history=pl.struct("datetime", "rating", *movies.collect_schema().names()))
         .unique(["user_id", "datetime"])
+        .lazy()
         for _, df in ratings_merged.collect().group_by("user_id")
     )
-    ratings_history = pl.concat(ratings_history).lazy()
+    ratings_history = pl.concat(ratings_history)
+    with tempfile.NamedTemporaryFile() as f:
+        ratings_history.sink_parquet(f.name)
+        ratings_history = pl.read_parquet(f.name).lazy()
 
     logger.info("ratings process")
     ratings_processed = ratings_merged.join(
