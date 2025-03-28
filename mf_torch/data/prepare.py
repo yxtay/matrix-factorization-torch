@@ -193,6 +193,7 @@ def process_ratings(
         logger.info("ratings loaded: {}", ratings_parquet)
         return ratings_processed
 
+    logger.info("ratings merge")
     ratings_merged = (
         ratings.lazy()
         .join(movies.lazy(), on="movie_id", how="left", validate="m:1")
@@ -202,7 +203,7 @@ def process_ratings(
         .lazy()
     )
 
-    # use loops to avoid memory issues
+    logger.info("ratings history")
     ratings_history = (
         ratings_merged.rolling(
             "datetime", period="1w", closed="none", group_by="user_id"
@@ -213,6 +214,7 @@ def process_ratings(
         .lazy()
     )
 
+    logger.info("ratings process")
     ratings_processed = ratings_merged.join(
         ratings_history, on=["user_id", "datetime"], validate="m:1"
     ).collect()
