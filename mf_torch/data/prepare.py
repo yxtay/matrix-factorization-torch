@@ -200,21 +200,7 @@ def process_ratings(
         .sort(["user_id", "datetime"])
     )
 
-    # use loops to reduce memory usage
-    # ratings_history = (
-    #     df.rolling("datetime", period="1w", closed="none", group_by="user_id")
-    #     .agg(history=pl.struct("datetime", "rating", *movies.collect_schema().names()))
-    #     .unique(["user_id", "datetime"])
-    #     for _, df in ratings_merged.collect().group_by("user_id")
-    # )
-    # with tempfile.NamedTemporaryFile() as f:
-    #     pl.concat(ratings_history).write_parquet(f.name)
-    #     ratings_history = pl.read_parquet(f.name).lazy()
-
     logger.info("ratings process")
-    # ratings_processed = ratings_merged.join(
-    #     ratings_history, on=["user_id", "datetime"], validate="m:1"
-    # ).collect()
     # use loops to reduce memory usage
     ratings_processed = (
         gather_history(df.lazy(), movies).collect()
@@ -222,6 +208,7 @@ def process_ratings(
     )
     logger.info("ratings history")
     ratings_processed = pl.concat(ratings_processed)
+    logger.info("ratings concat")
     ratings_processed.write_parquet(ratings_parquet)
     logger.info(
         "ratings saved: {}, shape, {}", ratings_parquet, ratings_processed.shape
