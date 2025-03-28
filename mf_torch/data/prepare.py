@@ -9,6 +9,8 @@ from loguru import logger
 
 from mf_torch.params import DATA_DIR, MOVIELENS_1M_URL
 
+pl.enable_string_cache()
+
 ###
 # download data
 ###
