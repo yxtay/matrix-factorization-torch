@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pathlib
 import shutil
+from concurrent.futures import ThreadPoolExecutor
 
 import polars as pl
 from loguru import logger
@@ -189,7 +190,7 @@ def process_ratings(
 ) -> pl.LazyFrame:
     ratings_parquet = pathlib.Path(src_dir, "ml-1m", "ratings.parquet")
     if ratings_parquet.exists() and not overwrite:
-        ratings_processed = pl.scan_parquet(str(ratings_parquet))
+        ratings_processed = pl.scan_parquet(ratings_parquet)
         logger.info("ratings loaded: {}", ratings_parquet)
         return ratings_processed
 
@@ -200,30 +201,27 @@ def process_ratings(
         .sort(["user_id", "datetime"])
     )
 
-    logger.info("ratings process")
-    # use loops to reduce memory usage
-    ratings_processed = (
-        gather_history(df.lazy(), movies).collect()
-        for _, df in ratings_merged.collect().group_by("user_id")
-    )
-    logger.info("ratings history")
-    ratings_processed = pl.concat(ratings_processed)
-    logger.info("ratings concat")
-    ratings_processed.write_parquet(ratings_parquet, partition_by="user_id")
-    logger.info(
-        "ratings saved: {}, shape, {}", ratings_parquet, ratings_processed.shape
-    )
-    return pl.scan_parquet(str(ratings_parquet))
+    with ThreadPoolExecutor() as executor:
+        for _, df in ratings_merged.collect().group_by("user_id"):
+            executor.submit(
+                gather_history, ratings=df.lazy(), movies=movies, path=ratings_parquet
+            )
+
+    logger.info("ratings saved: {}", ratings_parquet)
+    return pl.scan_parquet(ratings_parquet)
 
 
-def gather_history(ratings: pl.LazyFrame, movies: pl.LazyFrame) -> pl.LazyFrame:
+def gather_history(
+    ratings: pl.LazyFrame, movies: pl.LazyFrame, path: pathlib.Path
+) -> None:
     ratings_history = (
         ratings.rolling("datetime", period="1w", closed="none", group_by="user_id")
         .agg(history=pl.struct("datetime", "rating", *movies.collect_schema().names()))
         .unique(["user_id", "datetime"])
     )
-
-    return ratings.join(ratings_history, on=["user_id", "datetime"], validate="m:1")
+    ratings.join(
+        ratings_history, on=["user_id", "datetime"], validate="m:1"
+    ).collect().write_parquet(path, partition_by="user_id")
 
 
 def process_movies(
@@ -235,7 +233,7 @@ def process_movies(
 ) -> pl.LazyFrame:
     movies_parquet = pathlib.Path(src_dir, "ml-1m", "movies.parquet")
     if movies_parquet.exists() and not overwrite:
-        movies_processed = pl.scan_parquet(str(movies_parquet))
+        movies_processed = pl.scan_parquet(movies_parquet)
         logger.info("movies loaded: {}", movies_parquet)
         return movies_processed
 
@@ -249,7 +247,7 @@ def process_movies(
 
     movies_processed.write_parquet(movies_parquet)
     logger.info("movies saved: {}, shape: {}", movies_parquet, movies_processed.shape)
-    return pl.scan_parquet(str(movies_parquet))
+    return pl.scan_parquet(movies_parquet)
 
 
 def process_users(
@@ -262,7 +260,7 @@ def process_users(
 ) -> pl.LazyFrame:
     users_parquet = pathlib.Path(src_dir, "ml-1m", "users.parquet")
     if users_parquet.exists() and not overwrite:
-        users_procesed = pl.scan_parquet(str(users_parquet))
+        users_procesed = pl.scan_parquet(users_parquet)
         logger.info("users loaded: {}", users_parquet)
         return users_procesed
 
