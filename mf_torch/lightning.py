@@ -443,6 +443,7 @@ def cli_main(
     run: bool = True,
     experiment_name: str = time_now_isoformat(),
     run_name: str | None = None,
+    log_model: bool = True,
 ) -> LightningCLI:
     from jsonargparse import lazy_instance
 
@@ -466,7 +467,7 @@ def cli_main(
             "save_dir": MLFLOW_DIR,
             "experiment_name": experiment_name,
             "run_name": run_name,
-            "log_model": True,
+            "log_model": log_model,
         },
     }
     progress_bar = lazy_instance(lp_callbacks.RichProgressBar)

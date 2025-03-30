@@ -55,7 +55,7 @@ def evaluation_function(
 
     trainer_args = {"max_epochs": config["max_epochs"]}
     args = {"trainer": trainer_args, **get_lightning_args(config)}
-    cli = cli_main({"fit": args})
+    cli = cli_main({"fit": args}, log_model=False)
     return {
         key: cli.trainer.callback_metrics[key].tolist()
         for key in cli.model.metrics["val"]
