@@ -234,9 +234,10 @@ def gather_history(
         .agg(history=pl.struct("datetime", *movie_cols, "rating"))
         .unique(["user_id", "datetime"])
     )
-    ratings.join(
+    ratings_history = ratings.join(
         ratings_history, on=["user_id", "datetime"], validate="m:1"
-    ).write_parquet(path, partition_by="user_id")
+    )
+    ratings_history.write_parquet(path, partition_by="user_id")
     return ratings_history
 
 
