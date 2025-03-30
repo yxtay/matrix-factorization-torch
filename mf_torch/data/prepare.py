@@ -201,10 +201,14 @@ def process_ratings(
         .sort(["user_id", "datetime"])
     )
 
+    movie_cols = movies.collect_schema().names()
     with ThreadPoolExecutor() as executor:
         for _, df in ratings_merged.collect().group_by("user_id"):
             executor.submit(
-                gather_history, ratings=df.lazy(), movies=movies, path=ratings_parquet
+                gather_history,
+                ratings=df.lazy(),
+                movie_cols=movie_cols,
+                path=ratings_parquet,
             )
 
     logger.info("ratings saved: {}", ratings_parquet)
@@ -212,11 +216,11 @@ def process_ratings(
 
 
 def gather_history(
-    ratings: pl.LazyFrame, movies: pl.LazyFrame, path: pathlib.Path
+    ratings: pl.LazyFrame, movie_cols: list[str], path: pathlib.Path
 ) -> None:
     ratings_history = (
         ratings.rolling("datetime", period="4w", closed="none", group_by="user_id")
-        .agg(history=pl.struct("datetime", "rating", *movies.collect_schema().names()))
+        .agg(history=pl.struct("datetime", *movie_cols, "rating"))
         .unique(["user_id", "datetime"])
     )
     ratings.join(
@@ -253,7 +257,7 @@ def process_movies(
 def process_users(
     users: pl.LazyFrame,
     ratings: pl.LazyFrame,
-    movies: pl.LazyFrame,
+    movie_cols: list[str],
     *,
     src_dir: str = DATA_DIR,
     overwrite: bool = False,
@@ -264,15 +268,12 @@ def process_users(
         logger.info("users loaded: {}", users_parquet)
         return users_procesed
 
-    movies_columns = [
-        col for col in movies.collect_schema().names() if not col.startswith("is_")
-    ]
     users_interactions = (
         ratings.lazy()
         .group_by("user_id")
         .agg(
-            history=pl.struct("datetime", "rating", *movies_columns).filter("is_train"),
-            target=pl.struct("datetime", "rating", *movies_columns).filter(
+            history=pl.struct("datetime", *movie_cols, "rating").filter("is_train"),
+            target=pl.struct("datetime", *movie_cols, "rating").filter(
                 ~pl.col("is_train")
             ),
             is_train=pl.any("is_train"),
@@ -302,12 +303,15 @@ def prepare_movielens(
     movies = load_movies(src_dir)
     users = load_users(src_dir)
     ratings = load_ratings(src_dir).pipe(train_test_split)
+    movie_cols = movies.collect_schema().names()
 
     ratings = process_ratings(
         ratings, users, movies, src_dir=src_dir, overwrite=overwrite
     )
     movies = process_movies(movies, ratings, src_dir=src_dir, overwrite=overwrite)
-    users = process_users(users, ratings, movies, src_dir=src_dir, overwrite=overwrite)
+    users = process_users(
+        users, ratings, movie_cols=movie_cols, src_dir=src_dir, overwrite=overwrite
+    )
     return ratings
 
 
