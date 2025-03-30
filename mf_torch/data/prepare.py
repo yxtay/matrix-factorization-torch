@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import functools
 import pathlib
 import shutil
-from concurrent.futures import ThreadPoolExecutor
 
 import polars as pl
 from loguru import logger
@@ -202,30 +202,44 @@ def process_ratings(
     )
 
     movie_cols = movies.collect_schema().names()
-    with ThreadPoolExecutor() as executor:
-        for _, df in ratings_merged.collect().group_by("user_id"):
-            executor.submit(
-                gather_history,
-                ratings=df.lazy(),
-                movie_cols=movie_cols,
-                path=ratings_parquet,
-            )
+    # with ThreadPoolExecutor() as executor:
+    #     for _, df in ratings_merged.collect().group_by("user_id"):
+    #         executor.submit(
+    #             gather_history,
+    #             ratings=df.lazy(),
+    #             movie_cols=movie_cols,
+    #             path=ratings_parquet,
+    #         )
 
-    logger.info("ratings saved: {}", ratings_parquet)
+    ratings_processed = (
+        ratings_merged.collect()
+        .group_by("user_id")
+        .map_groups(
+            functools.partial(
+                gather_history, movie_cols=movie_cols, path=ratings_parquet
+            )
+        )
+    )
+    ratings_processed = pl.read_parquet(ratings_parquet)
+    logger.info(
+        "ratings saved: {}, shape: {}", ratings_parquet, ratings_processed.shape
+    )
     return pl.scan_parquet(ratings_parquet)
 
 
 def gather_history(
-    ratings: pl.LazyFrame, movie_cols: list[str], path: pathlib.Path
-) -> None:
+    ratings: pl.DataFrame, movie_cols: list[str], path: pathlib.Path
+) -> pl.DataFrame:
     ratings_history = (
         ratings.rolling("datetime", period="4w", closed="none", group_by="user_id")
         .agg(history=pl.struct("datetime", *movie_cols, "rating"))
         .unique(["user_id", "datetime"])
     )
-    ratings.join(
+    ratings_history = ratings.join(
         ratings_history, on=["user_id", "datetime"], validate="m:1"
-    ).collect().write_parquet(path, partition_by="user_id")
+    )
+    ratings_history.write_parquet(path, partition_by="user_id")
+    return ratings_history
 
 
 def process_movies(
