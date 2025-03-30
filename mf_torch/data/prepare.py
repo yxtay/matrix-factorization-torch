@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import functools
 import pathlib
 import shutil
-from concurrent.futures import ThreadPoolExecutor
 
 import polars as pl
 from loguru import logger
@@ -202,16 +202,27 @@ def process_ratings(
     )
 
     movie_cols = movies.collect_schema().names()
-    with ThreadPoolExecutor() as executor:
-        for _, df in ratings_merged.collect().group_by("user_id"):
-            executor.submit(
-                gather_history,
-                ratings=df.lazy(),
-                movie_cols=movie_cols,
-                path=ratings_parquet,
+    # with ThreadPoolExecutor() as executor:
+    #     for _, df in ratings_merged.collect().group_by("user_id"):
+    #         executor.submit(
+    #             gather_history,
+    #             ratings=df.lazy(),
+    #             movie_cols=movie_cols,
+    #             path=ratings_parquet,
+    #         )
+    (
+        ratings_merged.collect()
+        .group_by("user_id")
+        .map_groups(
+            functools.partial(
+                gather_history, movie_cols=movie_cols, path=ratings_parquet
             )
-
-    logger.info("ratings saved: {}", ratings_parquet)
+        )
+    )
+    ratings_processed = pl.read_parquet(ratings_parquet)
+    logger.info(
+        "ratings saved: {}, shape: {}", ratings_parquet, ratings_processed.shape
+    )
     return pl.scan_parquet(ratings_parquet)
 
 
