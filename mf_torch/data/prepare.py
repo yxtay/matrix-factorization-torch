@@ -210,7 +210,7 @@ def process_ratings(
                 movie_cols=movie_cols,
                 path=ratings_parquet,
             )
-    ratings_processed = pl.scan_parquet(ratings_parquet).collect()
+    # ratings_processed = pl.scan_parquet(ratings_parquet).collect()
     logger.info(
         "ratings saved: {}, shape: {}", ratings_parquet, ratings_processed.shape
     )
@@ -227,8 +227,8 @@ def gather_history(
     )
     ratings_history = ratings.join(
         ratings_history, on=["user_id", "datetime"], validate="m:1"
-    ).collect()
-    ratings_history.write_parquet(path, partition_by="user_id")
+    )
+    ratings_history.collect().write_parquet(path, partition_by="user_id")
     # return ratings_history.lazy()
 
 
