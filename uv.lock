@@ -1281,7 +1281,7 @@ requires-dist = [
     { name = "mlflow", specifier = "~=2.19" },
     { name = "pandas", specifier = "~=2.2" },
     { name = "polars", extras = ["pandas"], specifier = "~=1.19" },
-    { name = "pylance", specifier = ">=0.25.1" },
+    { name = "pylance", specifier = ">=0.25" },
     { name = "ray", extras = ["data", "train", "tune"], marker = "extra == 'ray'", specifier = "~=2.42" },
     { name = "tensorboard", specifier = "~=2.18" },
     { name = "torch", marker = "sys_platform != 'linux'", specifier = "~=2.5" },
