@@ -294,7 +294,7 @@ def process_users(
     )
 
     users_procesed.write_parquet(users_parquet)
-    logger.info("users saved: {}, shape: {}", users_parquet, users_procesed.shape)
+    logger.info("users saved: {}", users_parquet, users_procesed.shape)
     return pl.scan_parquet(str(users_parquet))
 
 
