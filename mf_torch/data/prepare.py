@@ -211,21 +211,26 @@ def process_ratings(
                 path=ratings_parquet,
             )
 
-    logger.info("ratings saved: {}", ratings_parquet)
-    return pl.scan_parquet(ratings_parquet)
+    ratings_processed = pl.scan_parquet(ratings_parquet)
+    n_row = ratings_processed.select(pl.len()).collect().item()
+    n_col = ratings_processed.collect_schema().len()
+    logger.info("ratings saved: {}, shape: {}", ratings_parquet, (n_row, n_col))
+    return ratings_processed
 
 
 def gather_history(
-    ratings: pl.LazyFrame, movie_cols: list[str], path: pathlib.Path
-) -> None:
+    ratings: pl.LazyFrame, *, movie_cols: list[str], path: pathlib.Path
+) -> pl.LazyFrame:
     ratings_history = (
         ratings.rolling("datetime", period="4w", closed="none", group_by="user_id")
         .agg(history=pl.struct("datetime", *movie_cols, "rating"))
         .unique(["user_id", "datetime"])
     )
-    ratings.join(
+    ratings_history = ratings.join(
         ratings_history, on=["user_id", "datetime"], validate="m:1"
-    ).collect().write_parquet(path, partition_by="user_id")
+    )
+    ratings_history.collect().write_parquet(path, partition_by="user_id")
+    return ratings_history
 
 
 def process_movies(
@@ -257,8 +262,8 @@ def process_movies(
 def process_users(
     users: pl.LazyFrame,
     ratings: pl.LazyFrame,
-    movie_cols: list[str],
     *,
+    movie_cols: list[str],
     src_dir: str = DATA_DIR,
     overwrite: bool = False,
 ) -> pl.LazyFrame:
