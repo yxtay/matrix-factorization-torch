@@ -210,16 +210,13 @@ def process_ratings(
                 movie_cols=movie_cols,
                 path=ratings_parquet,
             )
-    # ratings_processed = pl.scan_parquet(ratings_parquet).collect()
-    logger.info(
-        "ratings saved: {}, shape: {}", ratings_parquet, ratings_processed.shape
-    )
+    logger.info("ratings saved: {}, shape: {}", ratings_parquet)
     return pl.scan_parquet(ratings_parquet)
 
 
 def gather_history(
     ratings: pl.LazyFrame, *, movie_cols: list[str], path: pathlib.Path
-) -> None:
+) -> pl.LazyFrame:
     ratings_history = (
         ratings.rolling("datetime", period="4w", closed="none", group_by="user_id")
         .agg(history=pl.struct("datetime", *movie_cols, "rating"))
@@ -229,7 +226,7 @@ def gather_history(
         ratings_history, on=["user_id", "datetime"], validate="m:1"
     )
     ratings_history.collect().write_parquet(path, partition_by="user_id")
-    # return ratings_history.lazy()
+    return ratings_history
 
 
 def process_movies(
