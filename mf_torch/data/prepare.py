@@ -210,8 +210,12 @@ def process_ratings(
                 movie_cols=movie_cols,
                 path=ratings_parquet,
             )
-    logger.info("ratings saved: {}", ratings_parquet)
-    return pl.scan_parquet(ratings_parquet)
+
+    ratings_processed = pl.scan_parquet(ratings_parquet)
+    n_row = ratings_processed.select(pl.len()).collect().item()
+    n_col = ratings_processed.collect_schema().len()
+    logger.info("ratings saved: {}, shape: {}", ratings_parquet, (n_row, n_col))
+    return ratings_processed
 
 
 def gather_history(
