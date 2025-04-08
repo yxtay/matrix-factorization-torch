@@ -72,6 +72,18 @@ EXAMPLE_USER = UserQuery(
     zipcode="48067",
 )
 
+PACKAGES = [
+    "--extra-index-url https://download.pytorch.org/whl/cpu",
+    "lancedb",
+    "loguru",
+    "pandas",
+    "pylance",
+    "torch",
+    "xxhash",
+]
+image = bentoml.images.PythonImage().python_packages(*PACKAGES)
+ENVS = [{"name": "UV_NO_CACHE", "value": "1"}]
+
 
 @bentoml.service()
 class Embedder:
@@ -175,7 +187,7 @@ class UsersProcessor:
         return Query.model_validate(self.users_processor.process(user_data))
 
 
-@bentoml.service()
+@bentoml.service(image=image, envs=ENVS, workers="cpu_count")
 class Service:
     model_ref = bentoml.models.BentoModel(MODEL_NAME)
     embedder = bentoml.depends(Embedder)
