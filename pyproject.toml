@@ -37,6 +37,16 @@ lightning = "mf_torch.lightning:cli_main"
 flaml = "mf_torch.flaml:flaml_tune"
 bentoml_cli = "mf_torch.bentoml.prepare:main"
 
+[tool.bentoml.build]
+service = "mf_torch.bentoml.service:Service"
+description = "file: ./README.md"
+include = ["**/*.py", "README.md"]
+
+[tool.bentoml.build.python]
+packages = ["lancedb", "loguru", "pandas", "pylance", "torch", "xxhash"]
+extra_index_url = ["https://download.pytorch.org/whl/cpu"]
+envs = [{ name = "UV_NO_CACHE", value = "1" }]
+
 [tool.uv.sources]
 torch = [{ index = "torch-cpu", marker = "sys_platform == 'linux'" }]
 
