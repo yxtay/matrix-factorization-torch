@@ -10,7 +10,7 @@ from lightning import LightningModule
 from lightning.fabric.utilities.rank_zero import rank_zero_only
 from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
 
-from mf_torch.data.lightning import BATCH_TYPE
+from mf_torch.data.lightning import BatchType
 from mf_torch.params import (
     EMBEDDING_DIM,
     EXPORTED_PROGRAM_PATH,
@@ -106,17 +106,17 @@ class MatrixFactorizationLitModule(LightningModule):
         ).drop(columns="embedding")
 
     def compute_losses(
-        self: Self, batch: BATCH_TYPE, step_name: str = "train"
+        self: Self, batch: BatchType, step_name: str = "train"
     ) -> dict[str, torch.Tensor]:
         if self.loss_fns is None:
             msg = "`loss_fns` must be initialised first"
             raise ValueError(msg)
 
-        targets: torch.Tensor = batch["targets"]
+        targets: torch.Tensor = batch["target"]
         # shape: (num_users, num_items)
 
         # user
-        users: dict[str, torch.Tensor] = batch["users"]
+        users: dict[str, torch.Tensor] = batch["user"]
         users_feature_hashes = users["feature_hashes"]
         # shape: (num_users, num_user_features)
         users_feature_weights = users["feature_weights"]
@@ -125,7 +125,7 @@ class MatrixFactorizationLitModule(LightningModule):
         # shape: (num_users, embed_dim)
 
         # item
-        items: dict[str, torch.Tensor] = batch["items"]
+        items: dict[str, torch.Tensor] = batch["item"]
         items_feature_hashes = items["feature_hashes"]
         # shape: (num_items, num_item_features)
         items_feature_weights = items["feature_weights"]
@@ -185,7 +185,7 @@ class MatrixFactorizationLitModule(LightningModule):
                 metric.update(preds=preds, target=target > 0, indexes=indexes)
         return metrics
 
-    def training_step(self: Self, batch: BATCH_TYPE, _: int) -> torch.Tensor:
+    def training_step(self: Self, batch: BatchType, _: int) -> torch.Tensor:
         losses = self.compute_losses(batch, step_name="train")
         self.log_dict(losses)
         train_loss = losses[f"train/{self.hparams.train_loss}"]

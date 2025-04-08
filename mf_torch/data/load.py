@@ -4,6 +4,7 @@ import itertools
 from typing import TYPE_CHECKING, Any
 
 import torch
+import torch.nn.functional as F  # noqa: N812
 import torch.utils.data as torch_data
 import torch.utils.data._utils.collate as torch_collate
 
@@ -86,9 +87,29 @@ def embed_example(example: dict[str, Any], *, model: torch.nn.Module) -> dict[st
 
 
 def pad_jagged_tensors(
-    tensors: list[torch.Tensor], padding: int = PADDING_IDX
+    tensors: list[torch.Tensor], pad_value: int = PADDING_IDX
 ) -> torch.Tensor:
-    return torch.nested.nested_tensor(tensors).to_padded_tensor(padding=padding)
+    return torch.nested.nested_tensor(tensors).to_padded_tensor(padding=pad_value)
+
+
+def pad_tensors(
+    batch: Iterable[torch.Tensor],
+    dim: int = -1,
+    *,
+    pad_left: bool = True,
+    pad_value: int = PADDING_IDX,
+) -> torch.Tensor:
+    it = iter(batch)
+    elem = next(iter(batch))
+    pad_size = max(tensor.size(dim) for tensor in it)
+    pad = [0] * (elem.dim() * 2)
+    pad_dim = 2 * dim + 0 if pad_left else 1
+
+    def pad_tensor(tensor: torch.Tensor) -> torch.Tensor:
+        pad[pad_dim] = pad_size - tensor.size(dim)
+        return F.pad(tensor, pad, value=pad_value)
+
+    return torch.stack([pad_tensor(tensor) for tensor in it])
 
 
 def collate_tensor_fn(
