@@ -5,7 +5,7 @@ import functools
 import math
 import os
 import pathlib
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 import pydantic
 import torch
@@ -49,7 +49,18 @@ if TYPE_CHECKING:
 
     T = TypeVar("T")
 
-BATCH_TYPE = dict[str, dict[str, torch.Tensor] | torch.Tensor]
+
+class FeaturesType(TypedDict):
+    idx: int | torch.Tensor
+    feature_values: list[str]
+    feature_hashes: torch.Tensor
+    feature_weights: torch.Tensor
+
+
+class BatchType(TypedDict):
+    target: torch.Tensor
+    user: dict[str, torch.Tensor]
+    item: dict[str, torch.Tensor]
 
 
 class FeaturesProcessor(pydantic.BaseModel):
@@ -65,7 +76,7 @@ class FeaturesProcessor(pydantic.BaseModel):
     data_dir: str = DATA_DIR
     lance_db_path: str = LANCE_DB_PATH
 
-    def process(self: Self, example: dict[str, Any]) -> dict[str, Any]:
+    def process(self: Self, example: dict[str, Any]) -> FeaturesType:
         features = select_fields(example, fields=list(self.feature_names))
         feature_values, feature_weights = collate_features(
             features, feature_names=self.feature_names
@@ -85,9 +96,7 @@ class FeaturesProcessor(pydantic.BaseModel):
             "feature_weights": feature_weights,
         }
 
-    def get_data(
-        self: Self, subset: str
-    ) -> torch_data.IterDataPipe[dict[str, torch.Tensor]]:
+    def get_data(self: Self, subset: str) -> torch_data.IterDataPipe[FeaturesType]:
         import pyarrow.dataset as ds
 
         from mf_torch.data.load import ParquetDictLoaderIterDataPipe
@@ -109,12 +118,12 @@ class FeaturesProcessor(pydantic.BaseModel):
 
     def get_processed_data(
         self: Self, subset: str
-    ) -> torch_data.IterDataPipe[dict[str, Any]]:
+    ) -> torch_data.IterDataPipe[FeaturesType]:
         return self.get_data(subset).map(self.process)
 
     def get_batch_data(
         self: Self, subset: str
-    ) -> torch_data.IterDataPipe[dict[str, torch.Tensor]]:
+    ) -> torch_data.IterDataPipe[FeaturesType]:
         import torch.utils.data._utils.collate as torch_collate
 
         fields = ["idx", "feature_hashes", "feature_weights"]
@@ -152,7 +161,7 @@ class UsersProcessor(FeaturesProcessor):
 
     @property
     def data_path(self) -> str:
-        return str(pathlib.Path(self.data_dir, "ml-1m", "users.parquet"))
+        return pathlib.Path(self.data_dir, "ml-1m", "users.parquet").as_posix()
 
     def get_index(self: Self, subset: str = "predict") -> lancedb.table.Table:
         import pyarrow.dataset as ds
@@ -198,7 +207,7 @@ class ItemsProcessor(FeaturesProcessor):
 
     @property
     def data_path(self) -> str:
-        return str(pathlib.Path(self.data_dir, "ml-1m", "movies.parquet"))
+        return pathlib.Path(self.data_dir, "ml-1m", "movies.parquet").as_posix()
 
     def get_index(
         self: Self, model: torch.nn.Module, subset: str = "predict"
@@ -271,17 +280,17 @@ class ItemsProcessor(FeaturesProcessor):
         )
 
 
-class MatrixFactorisationDataPipe(torch_data.IterDataPipe[BATCH_TYPE]):
+class MatrixFactorisationDataPipe(torch_data.IterDataPipe[BatchType]):
     def __init__(
         self: Self,
-        users_dataset: torch_data.IterDataPipe[dict[str, torch.Tensor]],
-        items_dataset: torch_data.IterDataPipe[dict[str, torch.Tensor]],
+        users_dataset: torch_data.IterDataPipe[FeaturesType],
+        items_dataset: torch_data.IterDataPipe[FeaturesType],
         data_dir: str = DATA_DIR,
     ) -> None:
         super().__init__()
         self.users_dataset = users_dataset
         self.items_dataset = items_dataset
-        self.data_path = str(pathlib.Path(data_dir, "ml-1m", "ratings.parquet"))
+        self.data_path = pathlib.Path(data_dir, "ml-1m", "ratings.parquet").as_posix()
         self.targets = self.get_targets()
 
     def get_targets(self: Self, subset: str = "train") -> torch.Tensor:
@@ -309,7 +318,7 @@ class MatrixFactorisationDataPipe(torch_data.IterDataPipe[BATCH_TYPE]):
     def __len__(self: Self) -> int:
         return len(self.users_dataset) * len(self.items_dataset)
 
-    def __iter__(self: Self) -> Iterator[BATCH_TYPE]:
+    def __iter__(self: Self) -> Iterator[BatchType]:
         for users_batch in iter(self.users_dataset):
             for items_batch in iter(self.items_dataset):
                 row_idx = users_batch["idx"].numpy(force=True)
@@ -326,9 +335,9 @@ class MatrixFactorisationDataPipe(torch_data.IterDataPipe[BATCH_TYPE]):
                     .coalesce()
                 )
                 yield {
-                    "targets": targets_batch,
-                    "users": users_batch,
-                    "items": items_batch,
+                    "target": targets_batch,
+                    "user": users_batch,
+                    "item": items_batch,
                 }
 
 
@@ -393,6 +402,39 @@ class MatrixFactorizationDataModule(LightningDataModule):
         if stage == "predict":
             self.predict_data = self.users_processor.get_processed_data("predict")
 
+    def process(self: Self, example: dict[str, Any]) -> BatchType:
+        user_features = select_fields(
+            self.users_processor.process(example),
+            fields=["idx", "feature_hashes", "feature_weights"],
+        )
+        item_features = select_fields(
+            self.items_processor.process(example),
+            fields=["idx", "feature_hashes", "feature_weights"],
+        )
+        target = example[TARGET_COL]
+        return {"target": target, "user": user_features, "item": item_features}
+
+    def get_data(self: Self, subset: str) -> torch_data.IterDataPipe[BatchType]:
+        import pyarrow.dataset as ds
+
+        from mf_torch.data.load import ParquetDictLoaderIterDataPipe
+
+        valid_subset = {"train", "val", "test", "predict"}
+        if subset not in valid_subset:
+            msg = f"`{subset}` is not one of `{valid_subset}`"
+            raise ValueError(msg)
+
+        data_path = pathlib.Path(self.data_dir, "ml-1m", "ratings.parquet").as_posix()
+        filter_expr = ds.field(f"is_{subset}")
+        return (
+            ParquetDictLoaderIterDataPipe(
+                [data_path], filter_expr=filter_expr, batch_size=self.batch_size
+            )
+            .shuffle()  # devskim: ignore DS148264
+            .sharding_filter()
+            .map(self.process)
+        )
+
     def get_dataloader(
         self: Self,
         dataset: torch_data.Dataset[T],
@@ -419,18 +461,18 @@ class MatrixFactorizationDataModule(LightningDataModule):
             persistent_workers=num_workers > 0,
         )
 
-    def train_dataloader(self: Self) -> torch_data.DataLoader[BATCH_TYPE]:
+    def train_dataloader(self: Self) -> torch_data.DataLoader[BatchType]:
         return self.get_dataloader(self.train_data, shuffle=True)
 
-    def val_dataloader(self: Self) -> torch_data.DataLoader[dict[str, torch.Tensor]]:
+    def val_dataloader(self: Self) -> torch_data.DataLoader[FeaturesType]:
         return self.get_dataloader(self.val_data)
 
-    def test_dataloader(self: Self) -> torch_data.DataLoader[dict[str, torch.Tensor]]:
+    def test_dataloader(self: Self) -> torch_data.DataLoader[FeaturesType]:
         return self.get_dataloader(self.test_data)
 
     def predict_dataloader(
         self: Self,
-    ) -> torch_data.DataLoader[dict[str, torch.Tensor]]:
+    ) -> torch_data.DataLoader[FeaturesType]:
         return self.get_dataloader(self.predict_data)
 
 

@@ -135,10 +135,10 @@ def get_ray_trainer() -> ray_torch.TorchTrainer:
 
     train_loop_config = {
         # tracking
-        "tensorboard_save_dir": str(pathlib.Path(TENSORBOARD_DIR).absolute()),
-        "mlflow_save_dir": str(pathlib.Path(MLFLOW_DIR).absolute()),
+        "tensorboard_save_dir": pathlib.Path(TENSORBOARD_DIR).absolute().as_posix(),
+        "mlflow_save_dir": pathlib.Path(MLFLOW_DIR).absolute().as_posix(),
         # datamodule
-        "data_dir": str(pathlib.Path(DATA_DIR).absolute()),
+        "data_dir": pathlib.Path(DATA_DIR).absolute().as_posix(),
         "num_hashes": 2,
         # model
         "log_num_embeddings": 16,
