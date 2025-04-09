@@ -96,6 +96,11 @@ class FeaturesProcessor(pydantic.BaseModel):
             "feature_weights": feature_weights,
         }
 
+    def collate(self: Self, batch: list[FeaturesType]) -> BatchType:
+        import torch.utils.data._utils.collate as torch_collate
+
+        return torch_collate.default_collate(batch)
+
     def get_data(self: Self, subset: str) -> torch_data.IterDataPipe[FeaturesType]:
         import pyarrow.dataset as ds
 
@@ -124,14 +129,12 @@ class FeaturesProcessor(pydantic.BaseModel):
     def get_batch_data(
         self: Self, subset: str
     ) -> torch_data.IterDataPipe[FeaturesType]:
-        import torch.utils.data._utils.collate as torch_collate
-
         fields = ["idx", "feature_hashes", "feature_weights"]
         return (
             self.get_processed_data(subset)
             .map(functools.partial(select_fields, fields=fields))
             .batch(self.batch_size)
-            .map(torch_collate.default_collate)
+            .map(self.collate)
         )
 
     @property
