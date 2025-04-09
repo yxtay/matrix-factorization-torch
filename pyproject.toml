@@ -41,11 +41,11 @@ bentoml_cli = "mf_torch.bentoml.prepare:main"
 service = "mf_torch.bentoml.service:Service"
 description = "file: ./README.md"
 include = ["**/*.py", "README.md"]
+envs = [{ name = "UV_NO_CACHE", value = "1" }]
 
 [tool.bentoml.build.python]
 packages = ["lancedb", "loguru", "pandas", "pylance", "torch", "xxhash"]
 extra_index_url = ["https://download.pytorch.org/whl/cpu"]
-envs = [{ name = "UV_NO_CACHE", value = "1" }]
 
 [tool.uv.sources]
 torch = [{ index = "torch-cpu", marker = "sys_platform == 'linux'" }]
