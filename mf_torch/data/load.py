@@ -77,6 +77,17 @@ def select_fields(example: dict[str, Any], *, fields: list[str]) -> dict[str, An
     return {key: example[key] for key in fields}
 
 
+def nest_example(example: dict[str, Any], key: str) -> dict[str, dict[str, Any]]:
+    return {key: example}
+
+
+def merge_examples(examples: tuple[dict[str, Any], ...]) -> dict[str, Any]:
+    merged: dict[str, Any] = {}
+    for example in examples:
+        merged.update(example)
+    return merged
+
+
 def embed_example(example: dict[str, Any], *, model: torch.nn.Module) -> dict[str, Any]:
     return {
         **example,
@@ -99,9 +110,8 @@ def pad_tensors(
     pad_left: bool = True,
     pad_value: int = PADDING_IDX,
 ) -> torch.Tensor:
-    it = iter(batch)
     elem = next(iter(batch))
-    pad_size = max(tensor.size(dim) for tensor in it)
+    pad_size = max(example.size(dim) for example in iter(batch))
     pad = [0] * (elem.dim() * 2)
     pad_dim = 2 * dim + 0 if pad_left else 1
 
@@ -109,7 +119,7 @@ def pad_tensors(
         pad[pad_dim] = pad_size - tensor.size(dim)
         return F.pad(tensor, pad, value=pad_value)
 
-    return torch.stack([pad_tensor(tensor) for tensor in it])
+    return torch.stack([pad_tensor(tensor) for tensor in batch])
 
 
 def collate_tensor_fn(
@@ -117,17 +127,14 @@ def collate_tensor_fn(
 ) -> torch.Tensor:
     it = iter(batch)
     elem_size = next(it).size()
-    if (
-        any(elem.size() != elem_size for elem in it)
-        and (
+    if any(elem.size() != elem_size for elem in it):
+        if all(elem.size()[:-1] == elem_size[:-1] for elem in it):
             # only last dimension different
-            all(elem.size()[:-1] == elem_size[:-1] for elem in it)
-            # only first dimension differen
-            or all(elem.size()[1:] == elem_size[1:] for elem in it)
-        )
-    ):
-        # pad tensor if only first or last dimensions are different
-        return pad_jagged_tensors(list(batch))
+            return pad_tensors(batch, dim=-1)
+        if all(elem.size()[1:] == elem_size[1:] for elem in it):
+            # only first dimension different
+            return pad_tensors(batch, dim=0)
+
     return torch_collate.collate_tensor_fn(batch, collate_fn_map=collate_fn_map)
 
 
@@ -178,3 +185,30 @@ class DeltaTableDictLoaderIterDataPipe(ParquetDictLoaderIterDataPipe):
         import deltalake
 
         return deltalake.DeltaTable(source).to_pyarrow_dataset()
+
+
+@torch_data.functional_datapipe("cycle")
+class CyclerIterDataPipe(torch_data.IterDataPipe[dict[str, Any]]):
+    def __init__(
+        self: Self,
+        source_datapipe: torch_data.IterDataPipe[dict[str, Any]],
+        count: int | None = None,
+    ) -> None:
+        super().__init__()
+        self.source_datapipe = source_datapipe
+        self.count = count
+        if count is not None and count < 0:
+            msg = f"requires count >= 0, but {count = }"
+            raise ValueError(msg)
+
+    def __len__(self: Self) -> int:
+        if self.count is None:
+            # use arbitrary large number so that valid length is shown for zip
+            return 2**31 - 1  # max 32-bit signed integer
+        return len(self.source_datapipe) * self.count
+
+    def __iter__(self: Self) -> Iterator[dict[str, Any]]:
+        i = 0
+        while self.count is None or i < self.count:
+            yield from self.source_datapipe
+            i += 1

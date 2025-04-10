@@ -10,7 +10,7 @@ from lightning import LightningModule
 from lightning.fabric.utilities.rank_zero import rank_zero_only
 from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
 
-from mf_torch.data.lightning import BatchType
+from mf_torch.data.lightning import BatchType, FeaturesType
 from mf_torch.params import (
     EMBEDDING_DIM,
     EXPORTED_PROGRAM_PATH,
@@ -112,42 +112,56 @@ class MatrixFactorizationLitModule(LightningModule):
             msg = "`loss_fns` must be initialised first"
             raise ValueError(msg)
 
-        targets: torch.Tensor = batch["target"]
+        target: torch.Tensor = batch["target"]
         # shape: (num_users, num_items)
 
         # user
-        users: dict[str, torch.Tensor] = batch["user"]
-        users_feature_hashes = users["feature_hashes"]
+        user: dict[str, torch.Tensor] = batch["user"]
+        user_idx = user["idx"]
+        # shape: (num_users,)
+        user_feature_hashes = user["feature_hashes"]
         # shape: (num_users, num_user_features)
-        users_feature_weights = users["feature_weights"]
+        user_feature_weights = user["feature_weights"]
         # shape: (num_users, num_user_features)
-        users_embed = self(users_feature_hashes, users_feature_weights)
+        user_embed = self(user_feature_hashes, user_feature_weights)
         # shape: (num_users, embed_dim)
 
         # item
-        items: dict[str, torch.Tensor] = batch["item"]
-        items_feature_hashes = items["feature_hashes"]
+        item: dict[str, torch.Tensor] = batch["item"]
+        item_idx = item["idx"]
+        # shape: (num_items,)
+        item_feature_hashes = item["feature_hashes"]
         # shape: (num_items, num_item_features)
-        items_feature_weights = items["feature_weights"]
+        item_feature_weights = item["feature_weights"]
         # shape: (num_items, num_item_features)
-        items_embed = self(items_feature_hashes, items_feature_weights)
+        item_embed = self(item_feature_hashes, item_feature_weights)
         # shape: (num_items, embed_dim)
 
-        n_users, n_items = targets.size()
-        nnz = targets.values().numel()
-        metrics = {
-            "batch/users": n_users,
-            "batch/items": n_items,
-            "batch/nnz": nnz,
-            "batch/sparsity": nnz / targets.numel(),
-        }
+        # neg item
+        neg_item = batch["neg_item"]
+        neg_item_idx = neg_item["idx"]
+        # shape: (num_items,)
+        neg_item_feature_hashes = neg_item["feature_hashes"]
+        # shape: (num_items, num_item_features)
+        neg_item_feature_weights = neg_item["feature_weights"]
+        # shape: (num_items, num_item_features)
+        neg_item_embed = self(neg_item_feature_hashes, neg_item_feature_weights)
+        # shape: (num_items, embed_dim)
+        item_idx = torch.cat([item_idx, neg_item_idx])
+        item_embed = torch.cat([item_embed, neg_item_embed])
+        # shape: (num_items, embed_dim)
+
         losses = {}
         for loss_fn in self.loss_fns:
             key = f"{step_name}/{loss_fn.__class__.__name__}"
             losses[key] = loss_fn(
-                users_embed=users_embed, items_embed=items_embed, targets=targets
+                user_embed=user_embed,
+                item_embed=item_embed,
+                target=target,
+                user_idx=user_idx,
+                item_idx=item_idx,
             )
-        return losses | metrics
+        return losses
 
     def update_metrics(
         self: Self, example: dict[str, torch.Tensor], step_name: str = "train"
@@ -185,7 +199,9 @@ class MatrixFactorizationLitModule(LightningModule):
                 metric.update(preds=preds, target=target > 0, indexes=indexes)
         return metrics
 
-    def training_step(self: Self, batch: BatchType, _: int) -> torch.Tensor:
+    def training_step(
+        self: Self, batch: tuple[BatchType, FeaturesType], _: int
+    ) -> torch.Tensor:
         losses = self.compute_losses(batch, step_name="train")
         self.log_dict(losses)
         train_loss = losses[f"train/{self.hparams.train_loss}"]
