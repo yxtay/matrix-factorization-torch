@@ -26,10 +26,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["onnxruntime~=1.20", "onnxscript>=0.2.0"]
-
-[project.optional-dependencies]
-ray = ["ray[data,train,tune]~=2.42"]
+dev = ["onnxruntime~=1.20", "onnxscript>=0.2.0", "ray[train,tune]~=2.42"]
 
 [project.scripts]
 data = "mf_torch.data.prepare:main"

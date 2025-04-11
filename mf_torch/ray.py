@@ -6,50 +6,19 @@ from typing import TYPE_CHECKING
 import ray.train
 import ray.tune
 
+from mf_torch.flaml import get_lightning_args
 from mf_torch.params import DATA_DIR, METRIC, MLFLOW_DIR, TENSORBOARD_DIR
 
 if TYPE_CHECKING:
-    import ray.train.torch as ray_torch
     from lightning import Trainer
     from lightning.pytorch.cli import LightningCLI
-
-
-def get_lightning_args(
-    config: dict[str, bool | float | int | str],
-) -> dict[str, bool | float | int | str]:
-    num_embeddings = 2 ** config["log_num_embeddings"] + 1
-    embedding_dim = 2 ** config["log_embedding_dim"]
-    num_heads = 2 ** config["log_num_heads"]
-
-    hard_negatives_ratio = (
-        config["hard_negatives_ratio"] if config["use_hard_negatives"] else None
-    )
-
-    model_args = {
-        "num_embeddings": num_embeddings,
-        "embedding_dim": embedding_dim,
-        "train_loss": config["train_loss"],
-        "embedder_type": config["embedder_type"],
-        "num_heads": num_heads,
-        "dropout": config["dropout"],
-        "hard_negatives_ratio": hard_negatives_ratio,
-        "sigma": config["sigma"],
-        "margin": config["margin"],
-        "learning_rate": config["learning_rate"],
-    }
-    data_args = {
-        "num_hashes": config["num_hashes"],
-        "num_embeddings": num_embeddings,
-        "data_dir": config["data_dir"],
-    }
-    return {"model": model_args, "data": data_args}
 
 
 def get_cli(config: dict[str, bool | float | int | str]) -> LightningCLI:
     from mf_torch.lightning import cli_main
 
-    experiment_name = ray.train.get_context().get_experiment_name()
-    trial_name = ray.train.get_context().get_trial_name()
+    experiment_name = ray.tune.get_context().get_experiment_name()
+    trial_name = ray.tune.get_context().get_trial_name()
     tensorboard_logger = {
         "class_path": "TensorBoardLogger",
         "init_args": {
@@ -79,7 +48,7 @@ def get_cli(config: dict[str, bool | float | int | str]) -> LightningCLI:
         "plugins": plugins,
     }
     args = {"trainer": trainer_args, **get_lightning_args(config)}
-    return cli_main(args, run=False)
+    return cli_main(args, run=False, log_model=False)
 
 
 def train_loop_per_worker(
@@ -103,36 +72,20 @@ def train_loop_per_worker(
     trainer: Trainer = ray_lightning.prepare_trainer(cli.trainer)
     try:
         trainer.fit(cli.model, datamodule=cli.datamodule, ckpt_path=ckpt_path)
-        trainer.test(cli.model, datamodule=cli.datamodule)
     except SystemExit:
         for logger in trainer.loggers:
             logger.finalize()
         raise
 
 
-def get_run_config() -> ray.train.RunConfig:
-    import ray.tune.stopper as ray_stopper
-
-    checkpoint_config = ray.train.CheckpointConfig(
-        num_to_keep=1,
-        checkpoint_score_attribute=METRIC["name"],
-        checkpoint_score_order=METRIC["mode"],
-    )
-    stopper = ray_stopper.ExperimentPlateauStopper(
-        metric=METRIC["name"], mode=METRIC["mode"]
-    )
-    return ray.train.RunConfig(
-        storage_path=pathlib.Path("ray_results").absolute(),
-        checkpoint_config=checkpoint_config,
-        stop=stopper,
-    )
-
-
-def get_ray_trainer() -> ray_torch.TorchTrainer:
+def train_driver_fn(
+    config: dict[str, bool | float | int | str] | None = None,
+) -> None:
     import os
 
     import ray.train.torch as ray_torch
 
+    config = config or {}
     train_loop_config = {
         # tracking
         "tensorboard_save_dir": pathlib.Path(TENSORBOARD_DIR).absolute().as_posix(),
@@ -146,29 +99,43 @@ def get_ray_trainer() -> ray_torch.TorchTrainer:
         "embedder_type": "base",
         "log_num_heads": 0,
         "dropout": 0.0,
+        "normalize": False,
         # lightning module
         "train_loss": "PairwiseHingeLoss",
         "use_hard_negatives": False,
         "hard_negatives_ratio": 1.0,
         "sigma": 1.0,
         "margin": 1.0,
+        "reg_l1": 0.0001,
+        "reg_l2": 0.01,
         "learning_rate": 0.1,
-    }
+    } | config.get("train_loop_config", {})
     scaling_config = ray.train.ScalingConfig(
         num_workers=1,
         resources_per_worker={"CPU": os.cpu_count() - 1},
     )
-    return ray_torch.TorchTrainer(
+    checkpoint_config = ray.train.CheckpointConfig(
+        num_to_keep=1,
+        checkpoint_score_attribute=METRIC["name"],
+        checkpoint_score_order=METRIC["mode"],
+    )
+    run_config = ray.train.RunConfig(
+        storage_path=pathlib.Path("ray_results").absolute(),
+        checkpoint_config=checkpoint_config,
+    )
+    trainer = ray_torch.TorchTrainer(
         train_loop_per_worker=train_loop_per_worker,
         train_loop_config=train_loop_config,
         scaling_config=scaling_config,
-        run_config=get_run_config(),
+        run_config=run_config,
     )
+    trainer.fit()
 
 
 def get_tuner() -> ray.tune.Tuner:
     import flaml
     import ray.tune.schedulers
+    import ray.tune.stopper as ray_stopper
 
     train_losses = [
         "PairwiseHingeLoss",
@@ -176,7 +143,23 @@ def get_tuner() -> ray.tune.Tuner:
         "AlignmentContrastiveLoss",
         "MutualInformationNeuralEstimationLoss",
     ]
-    search_space = {
+    point_to_evaluate = {
+        "num_hashes": 2,
+        "log_num_embeddings": 16,
+        "log_embedding_dim": 5,
+        "embedder_type": "base",
+        "log_num_heads": 0,
+        "dropout": 0.0,
+        "train_loss": "PairwiseHingeLoss",
+        "use_hard_negatives": False,
+        "hard_negatives_ratio": 1.0,
+        "sigma": 1.0,
+        "margin": 1.0,
+        "reg_l1": 0.0001,
+        "reg_l2": 0.01,
+        "learning_rate": 0.1,
+    }
+    search_space = point_to_evaluate | {
         "num_hashes": ray.tune.randint(2, 5),
         "log_num_embeddings": ray.tune.randint(10, 17),
         "log_embedding_dim": ray.tune.randint(2, 7),
@@ -188,6 +171,8 @@ def get_tuner() -> ray.tune.Tuner:
         "hard_negatives_ratio": ray.tune.quniform(0.5, 2.0, 0.01),
         "sigma": ray.tune.lograndint(1, 1000),
         "margin": ray.tune.quniform(-1.0, 1.0, 0.01),
+        "reg_l1": ray.tune.loguniform(0.0001, 0.01),
+        "reg_l2": ray.tune.loguniform(0.001, 0.1),
         "learning_rate": ray.tune.loguniform(0.001, 0.1),
     }
     low_cost_partial_config = {
@@ -200,27 +185,15 @@ def get_tuner() -> ray.tune.Tuner:
         # "train_loss": "PairwiseHingeLoss",
         "use_hard_negatives": True,
         "hard_negatives_ratio": 1.0,
-        # "learning_rate": 0.1,
+        # "sigma": 1.0,
         # "margin": 1.0,
+        # "reg_l1": 0.0001,
+        # "reg_l2": 0.01,
         # "learning_rate": 0.1,
-    }
-    point_to_evaluate = {
-        "num_hashes": 2,
-        "log_num_embeddings": 16,
-        "log_embedding_dim": 5,
-        # "embedder_type": "base",
-        # "log_num_heads": 0,
-        # "dropout": 0.0,
-        "train_loss": "PairwiseHingeLoss",
-        "use_hard_negatives": False,
-        "hard_negatives_ratio": 1.0,
-        "sigma": 1.0,
-        "margin": 1.0,
-        "learning_rate": 0.1,
     }
     search_alg = flaml.BlendSearch(
         low_cost_partial_config={"train_loop_config": low_cost_partial_config},
-        points_to_evaluate=[{"train_loop_config": point_to_evaluate}],
+        # points_to_evaluate=[{"train_loop_config": point_to_evaluate}],
     )
     scheduler = ray.tune.schedulers.AsyncHyperBandScheduler()
     tune_config = ray.tune.TuneConfig(
@@ -232,11 +205,24 @@ def get_tuner() -> ray.tune.Tuner:
         time_budget_s=60 * 60 * 1,
         max_concurrent_trials=1,
     )
+    checkpoint_config = ray.tune.CheckpointConfig(
+        num_to_keep=1,
+        checkpoint_score_attribute=METRIC["name"],
+        checkpoint_score_order=METRIC["mode"],
+    )
+    stopper = ray_stopper.ExperimentPlateauStopper(
+        metric=METRIC["name"], mode=METRIC["mode"]
+    )
+    run_config = ray.tune.RunConfig(
+        storage_path=pathlib.Path("ray_results").absolute(),
+        checkpoint_config=checkpoint_config,
+        stop=stopper,
+    )
     return ray.tune.Tuner(
-        get_ray_trainer(),
+        train_driver_fn,
         param_space={"train_loop_config": search_space},
         tune_config=tune_config,
-        run_config=get_run_config(),
+        run_config=run_config,
     )
 
 
