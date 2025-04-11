@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from mf_torch.params import METRIC
+from mf_torch.params import DATA_DIR, METRIC
 
 if TYPE_CHECKING:
     import flaml.tune.tune
@@ -37,6 +37,7 @@ def get_lightning_args(
     data_args = {
         "num_hashes": config["num_hashes"],
         "num_embeddings": num_embeddings,
+        "data_dir": config["data_dir"],
     }
     return {"model": model_args, "data": data_args}
 
@@ -55,11 +56,17 @@ def evaluation_function(
 
     trainer_args = {"max_epochs": config["max_epochs"]}
     args = {"trainer": trainer_args, **get_lightning_args(config)}
-    cli = cli_main({"fit": args}, log_model=False)
-    return {
-        key: cli.trainer.callback_metrics[key].tolist()
-        for key in cli.model.metrics["val"]
-    }
+    cli = cli_main(args, run=False, log_model=False)
+    try:
+        cli.trainer.fit(cli.model, datamodule=cli.datamodule)
+        return {
+            key: cli.trainer.callback_metrics[key].tolist()
+            for key in cli.model.metrics["val"]
+        }
+    except (StopIteration, SystemExit):
+        for logger in cli.trainer.loggers:
+            logger.finalize()
+        return {}
 
 
 def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
@@ -72,6 +79,7 @@ def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
         "MutualInformationNeuralEstimationLoss",
     ]
     point_to_evaluate = {
+        "data_dir": DATA_DIR,
         "num_hashes": 2,
         "log_num_embeddings": 16,
         "log_embedding_dim": 5,
