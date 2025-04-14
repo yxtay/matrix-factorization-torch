@@ -31,6 +31,35 @@ jobs:
         with:
           sarif_file: devskim-results.sarif
 
+  grype:
+    permissions:
+      actions: write
+      contents: read
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - uses: anchore/sbom-action@f325610c9f50a54015d37c8d16cb3b0e2c8f4de0 # v0
+        with:
+          output-file: "${{ github.event.repository.name }}-sbom.spdx.json"
+          dependency-snapshot: true
+
+      - uses: anchore/scan-action@7c05671ae9be166aeb155bad2d7df9121823df32 # v6
+        with:
+          sbom: "${{ github.event.repository.name }}-sbom.spdx.json"
+
+      - id: grype
+        uses: anchore/scan-action@7c05671ae9be166aeb155bad2d7df9121823df32 # v6
+        with:
+          path: .
+          severity-cutoff: high
+
+      - if: ${{ success() || failure() }}
+        uses: github/codeql-action/upload-sarif@45775bd8235c68ba998cffa5171334d58593da47 # v3
+        with:
+          sarif_file: ${{ steps.grype.outputs.sarif }}
+
   megalinter:
     permissions:
       contents: write
