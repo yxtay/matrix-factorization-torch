@@ -35,6 +35,7 @@ jobs:
     permissions:
       actions: write
       contents: read
+      security-events: write
 
     runs-on: ubuntu-latest
     steps:
@@ -48,6 +49,7 @@ jobs:
       - uses: anchore/scan-action@7c05671ae9be166aeb155bad2d7df9121823df32 # v6
         with:
           sbom: "${{ github.event.repository.name }}-sbom.spdx.json"
+          severity-cutoff: high
 
       - id: grype
         uses: anchore/scan-action@7c05671ae9be166aeb155bad2d7df9121823df32 # v6
