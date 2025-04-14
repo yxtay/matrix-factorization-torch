@@ -154,7 +154,7 @@ jobs:
 
   trivy:
     permissions:
-      contents: read
+      contents: write
       security-events: write
 
     runs-on: ubuntu-latest
