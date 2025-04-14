@@ -34,7 +34,7 @@ jobs:
   grype:
     permissions:
       actions: write
-      contents: read
+      contents: write
       security-events: write
 
     runs-on: ubuntu-latest
