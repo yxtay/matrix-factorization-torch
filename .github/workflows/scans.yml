@@ -33,7 +33,7 @@ jobs:
 
   grype:
     permissions:
-      actions: write
+      actions: read
       contents: write
       security-events: write
 
@@ -50,12 +50,14 @@ jobs:
         with:
           sbom: "${{ github.event.repository.name }}-sbom.spdx.json"
           severity-cutoff: high
+          only-fixed: true
 
       - id: grype
         uses: anchore/scan-action@7c05671ae9be166aeb155bad2d7df9121823df32 # v6
         with:
           path: .
           severity-cutoff: high
+          only-fixed: true
 
       - if: ${{ success() || failure() }}
         uses: github/codeql-action/upload-sarif@45775bd8235c68ba998cffa5171334d58593da47 # v3
@@ -135,7 +137,7 @@ jobs:
       security-events: write
 
     if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@6fc714450122bda9d00e4ad5d639ad6a39eedb1f # v1
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@6fc714450122bda9d00e4ad5d639ad6a39eedb1f # v2
 
   osv-scan-push:
     permissions:
@@ -144,7 +146,7 @@ jobs:
       security-events: write
 
     if: ${{ github.event_name == 'push' || github.event_name == 'schedule' }}
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@6fc714450122bda9d00e4ad5d639ad6a39eedb1f # v1
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@6fc714450122bda9d00e4ad5d639ad6a39eedb1f # v2
 
   trivy:
     permissions:
@@ -155,19 +157,21 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
-      - uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30
+      - uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30.0
         with:
           scan-type: fs
           format: github
           output: dependency-results.sbom.json
-          github-pat: ${{ secrets.GITHUB_TOKEN }}
+          github-pat: ${{ github.token }}
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: trivy-sbom-report
           path: "${{ github.workspace }}/dependency-results.sbom.json"
 
-      - uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30
+      - uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30.0
         with:
           scan-type: fs
           exit-code: 1
