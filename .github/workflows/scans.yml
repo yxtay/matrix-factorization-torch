@@ -51,7 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
-          fetch-depth: (${{ github.event.pull_request.commits || 0 }} + 1)
+          fetch-depth: (${{ github.event.pull_request.commits || 2 }} + 1)
 
       - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
         env:
@@ -240,7 +240,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
-          fetch-depth: 3
+          fetch-depth: (${{ github.event.pull_request.commits || 2 }} + 1)
 
       - uses: trufflesecurity/trufflehog@ad258d848807ac956c978b391895800cb4237c1a # v3
         with:
