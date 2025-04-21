@@ -116,6 +116,7 @@ jobs:
           separator: ","
 
       - if: ${{ steps.changed-files.outputs.all_changed_files != '' }}
+        id: kics
         uses: checkmarx/kics-github-action@09100f0152c975eb238c67030f9fd1418acb3666 # v2
         with:
           enable_annotations: true
@@ -127,7 +128,7 @@ jobs:
           output_formats: json,sarif
           bom: true
 
-      - if: ${{ success() || failure() }}
+      - if: ${{ steps.kics.outcome != 'skipped' && (success() || failure()) }}
         uses: github/codeql-action/upload-sarif@45775bd8235c68ba998cffa5171334d58593da47 # v3
         with:
           sarif_file: results.sarif
