@@ -61,7 +61,7 @@ repos:
       - id: gitleaks
 
   - repo: https://github.com/trufflesecurity/trufflehog
-    rev: v3.88.24
+    rev: v3.88.25
     hooks:
       - id: trufflehog
 
@@ -91,7 +91,7 @@ repos:
       - id: markdownlint
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.5
+    rev: v0.11.6
     hooks:
       - id: ruff
         types_or: [python, pyi, jupyter]
