@@ -126,4 +126,4 @@ repos:
 
 ci:
   autoupdate_commit_msg: "ci: pre-commit autoupdate"
-  skip: [hadolint-docker, shellcheck]
+  skip: [trufflehog, hadolint-docker, shellcheck]

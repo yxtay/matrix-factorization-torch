@@ -43,12 +43,14 @@ jobs:
 
   gitleaks:
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
 
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 3
 
       - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
         env:
