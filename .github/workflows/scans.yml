@@ -16,6 +16,22 @@ concurrency:
   cancel-in-progress: ${{ github.ref_name != github.event.repository.default_branch }}
 
 jobs:
+  checkov:
+    permissions:
+      contents: read
+      security-events: write
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - uses: bridgecrewio/checkov-action@e36cf905bc021e37d00c062474c325c1b31fa5f9 # master
+
+      - if: ${{ success() || failure() }}
+        uses: github/codeql-action/upload-sarif@45775bd8235c68ba998cffa5171334d58593da47 # v3
+        with:
+          sarif_file: results.sarif
+
   devskim:
     permissions:
       contents: read
@@ -82,6 +98,39 @@ jobs:
         uses: github/codeql-action/upload-sarif@45775bd8235c68ba998cffa5171334d58593da47 # v3
         with:
           sarif_file: ${{ steps.grype.outputs.sarif }}
+
+  kics:
+    permissions:
+      checks: write
+      contents: read
+      pull-requests: write
+      security-events: write
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - id: changed-files
+        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 #v45
+        with:
+          separator: ","
+
+      - if: ${{ steps.changed-files.outputs.all_changed_files != '' }}
+        uses: checkmarx/kics-github-action@09100f0152c975eb238c67030f9fd1418acb3666 # v2
+        with:
+          enable_annotations: true
+          enable_comments: true
+          enable_jobs_summary: true
+          comments_with_queries: true
+          path: ${{ steps.changed-files.outputs.all_changed_files }}
+          fail_on: high
+          output_formats: json,sarif
+          bom: true
+
+      - if: ${{ success() || failure() }}
+        uses: github/codeql-action/upload-sarif@45775bd8235c68ba998cffa5171334d58593da47 # v3
+        with:
+          sarif_file: results.sarif
 
   megalinter:
     permissions:
@@ -280,3 +329,26 @@ jobs:
           GITHUB_ACTOR: trunk-io
           GITHUB_ACTOR_ID: 74779146
           GITHUB_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+  vorpal:
+    permissions:
+      checks: write
+      contents: read
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - id: changed-files
+        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 #v45
+        with:
+          files: "**/*.{cs,java,js,py}"
+          separator: ","
+
+      - if: ${{ steps.changed-files.outputs.all_changed_files != '' }}
+        uses: checkmarx/vorpal-reviewdog-github-action@e1d13fe263794580947b3cfa456b9140bbfb1a81 # v1
+        with:
+          source_path: ${{ steps.changed-files.outputs.all_changed_files }}
+          reporter: github-pr-check
+          filter_mode: file
+          fail_on_error: true
