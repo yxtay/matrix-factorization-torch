@@ -117,7 +117,7 @@ jobs:
 
       - if: ${{ steps.changed-files.outputs.all_changed_files != '' }}
         id: kics
-        uses: checkmarx/kics-github-action@09100f0152c975eb238c67030f9fd1418acb3666 # v2
+        uses: checkmarx/kics-github-action@5373b38b35d09a400790b9e560189064d185391f # v2
         with:
           enable_annotations: true
           enable_comments: true
