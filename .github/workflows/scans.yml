@@ -31,26 +31,45 @@ jobs:
         with:
           sarif_file: devskim-results.sarif
 
-  grype:
+  dustilock:
     permissions:
-      actions: read
-      contents: write
-      security-events: write
+      contents: read
 
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
-      - uses: anchore/sbom-action@f325610c9f50a54015d37c8d16cb3b0e2c8f4de0 # v0
-        with:
-          output-file: "${{ github.event.repository.name }}-sbom.spdx.json"
-          dependency-snapshot: true
+      - uses: checkmarx/dustilock@9a0cc4fe3da93f7efb38679896c074dc94d60ac6 # v1
 
-      - uses: anchore/scan-action@7c05671ae9be166aeb155bad2d7df9121823df32 # v6
+  gitleaks:
+    permissions:
+      contents: write
+      pull-requests: write
+      security-events: write
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
-          sbom: "${{ github.event.repository.name }}-sbom.spdx.json"
-          severity-cutoff: high
-          only-fixed: true
+          fetch-depth: (${{ github.event.pull_request.commits || 2 }} + 1)
+
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - if: ${{ success() || failure() }}
+        uses: github/codeql-action/upload-sarif@45775bd8235c68ba998cffa5171334d58593da47 # v3
+        with:
+          sarif_file: results.sarif
+
+  grype:
+    permissions:
+      contents: read
+      security-events: write
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - id: grype
         uses: anchore/scan-action@7c05671ae9be166aeb155bad2d7df9121823df32 # v6
@@ -148,6 +167,33 @@ jobs:
     if: ${{ github.event_name == 'push' || github.event_name == 'schedule' }}
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@6fc714450122bda9d00e4ad5d639ad6a39eedb1f # v2
 
+  syft:
+    permissions:
+      actions: read
+      contents: write
+      security-events: write
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - uses: anchore/sbom-action@f325610c9f50a54015d37c8d16cb3b0e2c8f4de0 # v0
+        with:
+          output-file: "${{ github.event.repository.name }}-sbom.spdx.json"
+          dependency-snapshot: true
+
+      - id: grype
+        uses: anchore/scan-action@7c05671ae9be166aeb155bad2d7df9121823df32 # v6
+        with:
+          sbom: "${{ github.event.repository.name }}-sbom.spdx.json"
+          severity-cutoff: high
+          only-fixed: true
+
+      - if: ${{ success() || failure() }}
+        uses: github/codeql-action/upload-sarif@45775bd8235c68ba998cffa5171334d58593da47 # v3
+        with:
+          sarif_file: ${{ steps.grype.outputs.sarif }}
+
   trivy:
     permissions:
       contents: write
@@ -157,7 +203,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
-      - uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30.0
+      - uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30
         with:
           scan-type: fs
           format: github
@@ -171,7 +217,7 @@ jobs:
           name: trivy-sbom-report
           path: "${{ github.workspace }}/dependency-results.sbom.json"
 
-      - uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30.0
+      - uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30
         with:
           scan-type: fs
           exit-code: 1
@@ -194,7 +240,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
-          fetch-depth: 3
+          fetch-depth: (${{ github.event.pull_request.commits || 2 }} + 1)
 
       - uses: trufflesecurity/trufflehog@ad258d848807ac956c978b391895800cb4237c1a # v3
         with:
