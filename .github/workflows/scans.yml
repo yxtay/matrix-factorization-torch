@@ -25,10 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
-      - uses: bridgecrewio/checkov-action@99bb2caf247dfd9f03cf984373bc6043d4e32ebf # v12
-        with:
-          output_format: sarif
-          output_file_path: results.sarif
+      - uses: bridgecrewio/checkov-action@e36cf905bc021e37d00c062474c325c1b31fa5f9 # master
 
       - if: ${{ success() || failure() }}
         uses: github/codeql-action/upload-sarif@45775bd8235c68ba998cffa5171334d58593da47 # v3
