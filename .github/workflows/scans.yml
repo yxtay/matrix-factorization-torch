@@ -27,8 +27,8 @@ jobs:
 
       - uses: bridgecrewio/checkov-action@99bb2caf247dfd9f03cf984373bc6043d4e32ebf # v12
         with:
-          output_format: cli,sarif
-          output_file_path: console,results.sarif
+          output_format: sarif
+          output_file_path: results.sarif
 
       - if: ${{ success() || failure() }}
         uses: github/codeql-action/upload-sarif@45775bd8235c68ba998cffa5171334d58593da47 # v3
@@ -114,7 +114,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - id: changed-files
-        uses: tj-actions/changed-files@2f7c5bfce28377bc069a65ba478de0a74aa0ca32 #v46.0.1
+        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 #v45
         with:
           separator: ","
 
@@ -343,7 +343,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - id: changed-files
-        uses: tj-actions/changed-files@2f7c5bfce28377bc069a65ba478de0a74aa0ca32 #v46.0.1
+        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 #v45
         with:
           separator: ","
 

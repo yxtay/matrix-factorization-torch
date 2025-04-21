@@ -4,3 +4,15 @@ cli:
 lint:
   disabled:
     - black
+plugins:
+  sources:
+    - id: trunk
+      ref: v1.6.8
+      uri: https://github.com/trunk-io/plugins
+actions:
+  disabled:
+    - trunk-announce
+    - trunk-check-pre-push
+    - trunk-fmt-pre-commit
+  enabled:
+    - trunk-upgrade-available
