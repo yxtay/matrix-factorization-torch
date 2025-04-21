@@ -342,11 +342,7 @@ jobs:
       - id: changed-files
         uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 #v45
         with:
-          files: |
-            **.cs
-            **.java
-            **.js
-            **.py
+          files: "**/*.{cs,java,js,py}"
           separator: ","
 
       - if: ${{ steps.changed-files.outputs.all_changed_files != '' }}
