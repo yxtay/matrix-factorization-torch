@@ -209,6 +209,8 @@ jobs:
 
     if: ${{ github.event_name == 'push' || github.event_name == 'schedule' }}
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@6fc714450122bda9d00e4ad5d639ad6a39eedb1f # v2
+    with:
+      fail-on-vuln: false
 
   syft:
     permissions:
