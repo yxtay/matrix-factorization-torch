@@ -43,7 +43,7 @@ ARG PYTHONDONTWRITEBYTECODE=1
 ARG UV_NO_CACHE=1
 
 # set up python
-COPY --from=ghcr.io/astral-sh/uv:latest@sha256:3362a526af7eca2fcd8604e6a07e873fb6e4286d8837cb753503558ce1213664 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:latest@sha256:50ac11cc602e41982998a6eb61f6c8e0c8cf0d10424b04910cc84cce952b04e6 /uv /uvx /bin/
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv venv --seed "${VIRTUAL_ENV}" && \
