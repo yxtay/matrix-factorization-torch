@@ -60,11 +60,6 @@ repos:
     hooks:
       - id: gitleaks
 
-  - repo: https://github.com/trufflesecurity/trufflehog
-    rev: v3.88.25
-    hooks:
-      - id: trufflehog
-
   - repo: https://github.com/rhysd/actionlint
     rev: v1.7.7
     hooks:
@@ -126,4 +121,4 @@ repos:
 
 ci:
   autoupdate_commit_msg: "ci: pre-commit autoupdate"
-  skip: [trufflehog, hadolint-docker, shellcheck]
+  skip: [hadolint-docker, shellcheck]
