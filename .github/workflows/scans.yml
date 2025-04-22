@@ -117,7 +117,7 @@ jobs:
           enable_jobs_summary: true
           comments_with_queries: true
           path: .
-          fail_on: high
+          fail_on: critical,high
           output_formats: sarif
           bom: true
 
