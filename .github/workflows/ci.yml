@@ -97,15 +97,17 @@ jobs:
             ${{ env.GHCR_IMAGE_NAME }}:cache
           load: true
 
-      - if: ${{ success() || failure() }}
-        run: |
+      - run: docker run "${IMAGE_ID}" uv pip list
+        env:
+          IMAGE_ID: ${{ steps.build.outputs.imageid }}
+
+      - run: |
           docker run "${IMAGE_ID}" \
           uv run --no-sync lightning fit --print_config
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
-      - if: ${{ success() || failure() }}
-        run: |
+      - run: |
           docker run "${IMAGE_ID}" \
           python -m mf_torch.bentoml.prepare
         env:
