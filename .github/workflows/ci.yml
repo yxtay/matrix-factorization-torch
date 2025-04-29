@@ -35,23 +35,23 @@ jobs:
 
       - run: |
           uv lock --check
-          uv sync --frozen --no-default-groups
+          uv sync --frozen
           uv pip list
 
       - if: ${{ success() || failure() }}
-        run: uv run --no-sync lightning fit --print_config
+        run: uv run lightning fit --print_config
 
       - if: ${{ success() || failure() }}
-        run: uv run --no-sync bentoml_cli
+        run: uv run bentoml_cli
 
       - if: ${{ failure() }}
-        run: uv run --no-sync python -m mf_torch.lightning
+        run: uv run python -m mf_torch.lightning
 
       - if: ${{ failure() }}
-        run: uv run --no-sync python -m mf_torch.data.lightning
+        run: uv run python -m mf_torch.data.lightning
 
       - if: ${{ failure() }}
-        run: uv run --no-sync data
+        run: uv run data
 
   docker:
     permissions:
@@ -97,17 +97,19 @@ jobs:
             ${{ env.GHCR_IMAGE_NAME }}:cache
           load: true
 
-      - if: ${{ success() || failure() }}
-        run: |
+      - run: docker run "${IMAGE_ID}" uv pip list
+        env:
+          IMAGE_ID: ${{ steps.build.outputs.imageid }}
+
+      - run: |
           docker run "${IMAGE_ID}" \
           uv run --no-sync lightning fit --print_config
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
-      - if: ${{ success() || failure() }}
-        run: |
+      - run: |
           docker run "${IMAGE_ID}" \
-          uv run --no-sync bentoml_cli
+          python -m mf_torch.bentoml.prepare
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
@@ -128,7 +130,7 @@ jobs:
       - if: ${{ failure() }}
         run: |
           docker run "${IMAGE_ID}" \
-          uv run --no-sync data
+          python -m mf_torch.data.prepare
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
