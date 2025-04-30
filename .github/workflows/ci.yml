@@ -24,7 +24,8 @@ jobs:
 
     runs-on: ubuntu-latest
     env:
-      ENVIRONMENT: ci
+      UV_LOCKED: 1
+      UV_NO_SYNC: 1
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
@@ -35,7 +36,7 @@ jobs:
 
       - run: |
           uv lock --check
-          uv sync --frozen
+          uv sync --locked
           uv pip list
 
       - if: ${{ success() || failure() }}
@@ -97,40 +98,34 @@ jobs:
             ${{ env.GHCR_IMAGE_NAME }}:cache
           load: true
 
-      - run: docker run "${IMAGE_ID}" uv pip list
+      - if: ${{ success() || failure() }}
+        run: docker run "${IMAGE_ID}" uv pip list
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
-      - run: |
-          docker run "${IMAGE_ID}" \
-          uv run --no-sync lightning fit --print_config
+      - if: ${{ success() || failure() }}
+        run: docker run "${IMAGE_ID}" uv run lightning fit --print_config
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
-      - run: |
-          docker run "${IMAGE_ID}" \
-          python -m mf_torch.bentoml.prepare
-        env:
-          IMAGE_ID: ${{ steps.build.outputs.imageid }}
-
-      - if: ${{ failure() }}
-        run: |
-          docker run "${IMAGE_ID}" \
-          python -m mf_torch.lightning
+      - if: ${{ success() || failure() }}
+        run: docker run "${IMAGE_ID}" uv run bentoml_cli
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
       - if: ${{ failure() }}
-        run: |
-          docker run "${IMAGE_ID}" \
-          python -m mf_torch.data.lightning
+        run: docker run "${IMAGE_ID}" python -m mf_torch.lightning
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
       - if: ${{ failure() }}
-        run: |
-          docker run "${IMAGE_ID}" \
-          python -m mf_torch.data.prepare
+        run: docker run "${IMAGE_ID}" python -m mf_torch.data.lightning
+        env:
+          IMAGE_ID: ${{ steps.build.outputs.imageid }}
+
+      - if: ${{ failure() }}
+        run: docker run "${IMAGE_ID}" uv run data
+
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
