@@ -1,7 +1,7 @@
 ##
 # base
 ##
-FROM python:3.12-slim@sha256:7553b601a98773b8b7632f4566d273926a99791dc33e51d4296ceac99d10af6a AS base
+FROM python:3.12-slim@sha256:cc04e14a91386565eb37fc4679302f33212f0f4cfa314f04c48992f3880cdcc2 AS base
 LABEL maintainer="wyextay@gmail.com"
 
 # set up user
@@ -43,7 +43,7 @@ ARG PYTHONDONTWRITEBYTECODE=1
 ARG UV_NO_CACHE=1
 
 # set up python
-COPY --from=ghcr.io/astral-sh/uv:latest@sha256:4a6c9444b126bd325fba904bff796bf91fb777bf6148d60109c4cb1de2ffc497 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:latest@sha256:bc574e793452103839d769a20249cfe4c8b6e40e5c29fda34ceee26120eabe3b /uv /uvx /bin/
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv venv --seed "${VIRTUAL_ENV}" && \
