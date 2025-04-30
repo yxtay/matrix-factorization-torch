@@ -24,6 +24,7 @@ jobs:
 
     runs-on: ubuntu-latest
     env:
+      UV_LOCKED: 1
       UV_NO_SYNC: 1
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4

@@ -40,7 +40,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && rm -rf /var/lib/apt/lists/*
 
 ARG PYTHONDONTWRITEBYTECODE=1
-ENV UV_FROZEN=1 \
+ENV UV_LOCKED=1 \
     UV_NO_CACHE=1 \
     UV_NO_SYNC=1
 
