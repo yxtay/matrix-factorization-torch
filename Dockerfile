@@ -1,7 +1,9 @@
+# hadolint global ignore=DL3008
+# kics-scan disable=965a08d7-ef86-4f14-8792-4a3b2098937e,451d79dc-0588-476a-ad03-3c7f0320abb3
 ##
 # base
 ##
-FROM python:3.12-slim@sha256:bae1a061b657f403aaacb1069a7f67d91f7ef5725ab17ca36abc5f1b2797ff92 AS base
+FROM debian:stable-slim@sha256:88f88a2b8bd1873876a2ff15df523a66602aa57177e24b5f22064c4886ec398a AS base
 LABEL maintainer="wyextay@gmail.com"
 
 # set up user
@@ -15,6 +17,7 @@ ARG VIRTUAL_ENV=${APP_HOME}/.venv
 ENV PATH=${VIRTUAL_ENV}/bin:${PATH} \
     PYTHONFAULTHANDLER=1 \
     PYTHONUNBUFFERED=1 \
+    UV_PYTHON_INSTALL_DIR=/opt \
     VIRTUAL_ENV=${VIRTUAL_ENV}
 
 WORKDIR ${APP_HOME}
@@ -36,7 +39,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && \
     apt-get install --yes --no-install-recommends \
-        build-essential=12.9 \
+        build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 ARG PYTHONDONTWRITEBYTECODE=1
@@ -46,9 +49,8 @@ ENV UV_LOCKED=1 \
 
 # set up python
 COPY --from=ghcr.io/astral-sh/uv:latest@sha256:87a04222b228501907f487b338ca6fc1514a93369bfce6930eb06c8d576e58a4 /uv /uvx /bin/
-COPY pyproject.toml uv.lock ./
+COPY .python-version pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv venv --seed "${VIRTUAL_ENV}" && \
     uv sync --no-default-groups --no-install-project && \
     chown -R "${USER}:${USER}" "${VIRTUAL_ENV}" && \
     chown -R "${USER}:${USER}" "${APP_HOME}" && \
