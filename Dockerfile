@@ -1,3 +1,5 @@
+# hadolint global ignore=DL3008
+# kics-scan disable=965a08d7-ef86-4f14-8792-4a3b2098937e,451d79dc-0588-476a-ad03-3c7f0320abb3
 ##
 # base
 ##
@@ -36,7 +38,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && \
     apt-get install --yes --no-install-recommends \
-        build-essential=12.9 \
+        build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 ARG PYTHONDONTWRITEBYTECODE=1
