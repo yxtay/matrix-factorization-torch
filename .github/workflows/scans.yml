@@ -25,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
-      - uses: bridgecrewio/checkov-action@6bb1aec72ebdc28a351cccc5e80c7c5cfd6f0890 # master
+      - uses: bridgecrewio/checkov-action@de75ec2538b4dee22a8d1db76c8bb759d015e18d # master
 
       - if: ${{ success() || failure() }}
         uses: github/codeql-action/upload-sarif@60168efe1c415ce0f5521ea06d5c2062adbeed1b # v3
@@ -222,7 +222,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
-      - uses: anchore/sbom-action@9f7302141466aa6482940f15371237e9d9f4c34a # v0
+      - uses: anchore/sbom-action@e11c554f704a0b820cbf8c51673f6945e0731532 # v0
         with:
           output-file: "${{ github.event.repository.name }}-sbom.spdx.json"
           dependency-snapshot: true
@@ -302,12 +302,12 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - uses: trunk-io/trunk-action@4d5ecc89b2691705fd08c747c78652d2fc806a94 # v1
+      - uses: trunk-io/trunk-action@06c428bf05832198443baab1096754b166a6c466 # v1
         env:
           INPUT_GITHUB_REF_NAME: ${{ github.event.pull_request.head.ref || github.ref_name }}
 
       - if: ${{ failure() && github.event_name == 'pull_request' }}
-        uses: trunk-io/trunk-action@4d5ecc89b2691705fd08c747c78652d2fc806a94 # v1
+        uses: trunk-io/trunk-action@06c428bf05832198443baab1096754b166a6c466 # v1
         env:
           INPUT_AUTOFIX_AND_PUSH: true
           INPUT_GITHUB_REF_NAME: ${{ format('HEAD:refs/heads/{0}', github.event.pull_request.head.ref) }}
