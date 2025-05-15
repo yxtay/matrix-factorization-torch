@@ -48,7 +48,7 @@ ENV UV_LOCKED=1 \
     UV_NO_SYNC=1
 
 # set up python
-COPY --from=ghcr.io/astral-sh/uv:latest@sha256:87a04222b228501907f487b338ca6fc1514a93369bfce6930eb06c8d576e58a4 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:latest@sha256:9618e472e7ed9aa980719c68e51416e7ec23d85742d9ccca5c817d76ed2eb5aa /uv /uvx /bin/
 COPY .python-version pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --no-default-groups --no-install-project && \
