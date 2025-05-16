@@ -32,6 +32,40 @@ jobs:
         with:
           sarif_file: results.sarif
 
+  clair:
+    permissions:
+      contents: read
+      security-events: write
+
+    runs-on: ubuntu-latest
+    env:
+      GHCR_IMAGE_NAME: ghcr.io/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - id: build
+        uses: docker/build-push-action@1dc73863535b631f98b2378be8619f83b136f4a0 # v6
+        with:
+          cache-from: ${{ env.GHCR_IMAGE_NAME }}:cache
+          load: true
+
+      - run: |
+          docker save "${IMAGE_ID}" | podman load
+          podman save -o "${GITHUB_SHA}" "${IMAGE_ID}"
+        env:
+          IMAGE_ID: ${{ steps.build.outputs.imageid }}
+
+      - uses: quay/clair-action@08810958361ae9d2a2a625facc0e0fc88bea5e8a # V0
+        with:
+          image-path: ${{ github.sha }}
+          output: clair_results.sarif
+          db-file: matcher.db
+
+      - if: ${{ success() || failure() }}
+        uses: github/codeql-action/upload-sarif@60168efe1c415ce0f5521ea06d5c2062adbeed1b # v3
+        with:
+          sarif_file: clair_results.sarif
+
   devskim:
     permissions:
       contents: read
@@ -93,6 +127,37 @@ jobs:
           path: .
           severity-cutoff: high
           only-fixed: true
+
+      - if: ${{ success() || failure() }}
+        uses: github/codeql-action/upload-sarif@60168efe1c415ce0f5521ea06d5c2062adbeed1b # v3
+        with:
+          sarif_file: ${{ steps.grype.outputs.sarif }}
+
+  grype-container:
+    permissions:
+      contents: read
+      security-events: write
+
+    runs-on: ubuntu-latest
+    env:
+      GHCR_IMAGE_NAME: ghcr.io/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - id: build
+        uses: docker/build-push-action@1dc73863535b631f98b2378be8619f83b136f4a0 # v6
+        with:
+          cache-from: ${{ env.GHCR_IMAGE_NAME }}:cache
+          load: true
+
+      - id: grype
+        uses: anchore/scan-action@2c901ab7378897c01b8efaa2d0c9bf519cc64b9e # v6
+        with:
+          image: ${{ env.IMAGE_ID }}
+          severity-cutoff: high
+          only-fixed: true
+        env:
+          IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
       - if: ${{ success() || failure() }}
         uses: github/codeql-action/upload-sarif@60168efe1c415ce0f5521ea06d5c2062adbeed1b # v3
@@ -277,6 +342,39 @@ jobs:
         with:
           sarif_file: trivy-results.sarif
 
+  trivy-container:
+    permissions:
+      contents: write
+      security-events: write
+
+    runs-on: ubuntu-latest
+    env:
+      GHCR_IMAGE_NAME: ghcr.io/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - id: build
+        uses: docker/build-push-action@1dc73863535b631f98b2378be8619f83b136f4a0 # v6
+        with:
+          cache-from: ${{ env.GHCR_IMAGE_NAME }}:cache
+          load: true
+
+      - uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30
+        with:
+          image-ref: ${{ env.IMAGE_ID}}
+          exit-code: 1
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-results.sarif
+        env:
+          IMAGE_ID: ${{ steps.build.outputs.imageid }}
+
+      - if: ${{ success() || failure() }}
+        uses: github/codeql-action/upload-sarif@60168efe1c415ce0f5521ea06d5c2062adbeed1b # v3
+        with:
+          sarif_file: trivy-results.sarif
+
   trufflehog:
     permissions:
       contents: read
@@ -295,12 +393,19 @@ jobs:
     permissions:
       checks: write
       contents: write
+      issues: write # create labels
+      pull-requests: write
 
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - if: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.title, 'upgrade trunk') }}
+        uses: trunk-io/trunk-action/upgrade@b8812b3da2f527db878ef7541c4177f8d280cd89 # v1
+        with:
+          prefix: "ci: "
 
       - uses: trunk-io/trunk-action@b8812b3da2f527db878ef7541c4177f8d280cd89 # v1
         env:
