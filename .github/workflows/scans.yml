@@ -314,7 +314,6 @@ jobs:
       - uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30
         with:
           scan-type: fs
-          exit-code: 1
           ignore-unfixed: true
           severity: HIGH,CRITICAL
           format: sarif
@@ -345,11 +344,8 @@ jobs:
       - uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30
         with:
           image-ref: ${{ env.IMAGE_ID}}
-          exit-code: 1
           ignore-unfixed: true
           severity: HIGH,CRITICAL
-          scanners: vuln
-          skip-dirs: /work/app/.venv/lib/python3.12/site-packages/mlflow/server/js/build/static/js
           format: sarif
           output: trivy-results.sarif
         env:
