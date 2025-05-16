@@ -314,13 +314,26 @@ jobs:
       - uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30
         with:
           scan-type: fs
+          format: github
+          output: dependency-results.sbom.json
+          github-pat: ${{ github.token }}
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: trivy-sbom-report
+          path: dependency-results.sbom.json
+
+      - uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30
+        with:
+          scan-type: fs
           ignore-unfixed: true
           severity: HIGH,CRITICAL
           format: sarif
           output: trivy-results.sarif
 
-      - if: ${{ success() || failure() }}
-        uses: github/codeql-action/upload-sarif@60168efe1c415ce0f5521ea06d5c2062adbeed1b # v3
+      - uses: github/codeql-action/upload-sarif@60168efe1c415ce0f5521ea06d5c2062adbeed1b # v3
         with:
           sarif_file: trivy-results.sarif
 
@@ -351,40 +364,10 @@ jobs:
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
-      - if: ${{ success() || failure() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: trivy-container
-          path: trivy-results.sarif
-
-      - if: ${{ success() || failure() }}
-        uses: github/codeql-action/upload-sarif@60168efe1c415ce0f5521ea06d5c2062adbeed1b # v3
+      - uses: github/codeql-action/upload-sarif@60168efe1c415ce0f5521ea06d5c2062adbeed1b # v3
         with:
           sarif_file: trivy-results.sarif
 
-  trivy-sbom:
-    permissions:
-      contents: write
-      security-events: write
-
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-
-      - uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30
-        with:
-          scan-type: fs
-          format: github
-          output: dependency-results.sbom.json
-          github-pat: ${{ github.token }}
-          ignore-unfixed: true
-          severity: HIGH,CRITICAL
-
-      - if: ${{ success() || failure() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: trivy-sbom-report
-          path: dependency-results.sbom.json
   trufflehog:
     permissions:
       contents: read
