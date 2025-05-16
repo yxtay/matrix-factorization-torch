@@ -160,11 +160,10 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-.trunk/
-data.lock
 /data
+data.lock
+lance_db
 lightning_logs
 megalinter-reports
 mlruns
 ray_results
-lance_db
