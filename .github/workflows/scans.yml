@@ -216,9 +216,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: megalinter-reports
-          path: |
-            megalinter-reports
-            mega-linter.log
+          path: megalinter-reports
 
       - if: ${{ success() || failure() }}
         uses: github/codeql-action/upload-sarif@60168efe1c415ce0f5521ea06d5c2062adbeed1b # v3
@@ -325,20 +323,17 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: trivy-sbom-report
-          path: "${{ github.workspace }}/dependency-results.sbom.json"
+          path: dependency-results.sbom.json
 
       - uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30
         with:
           scan-type: fs
-          exit-code: 1
           ignore-unfixed: true
           severity: HIGH,CRITICAL
           format: sarif
           output: trivy-results.sarif
-          skip-setup-trivy: true
 
-      - if: ${{ success() || failure() }}
-        uses: github/codeql-action/upload-sarif@60168efe1c415ce0f5521ea06d5c2062adbeed1b # v3
+      - uses: github/codeql-action/upload-sarif@60168efe1c415ce0f5521ea06d5c2062adbeed1b # v3
         with:
           sarif_file: trivy-results.sarif
 
@@ -362,7 +357,6 @@ jobs:
       - uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30
         with:
           image-ref: ${{ env.IMAGE_ID}}
-          exit-code: 1
           ignore-unfixed: true
           severity: HIGH,CRITICAL
           format: sarif
@@ -370,8 +364,7 @@ jobs:
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
-      - if: ${{ success() || failure() }}
-        uses: github/codeql-action/upload-sarif@60168efe1c415ce0f5521ea06d5c2062adbeed1b # v3
+      - uses: github/codeql-action/upload-sarif@60168efe1c415ce0f5521ea06d5c2062adbeed1b # v3
         with:
           sarif_file: trivy-results.sarif
 
