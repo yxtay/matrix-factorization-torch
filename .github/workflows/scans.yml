@@ -365,7 +365,7 @@ jobs:
           exit-code: 1
           ignore-unfixed: true
           severity: HIGH,CRITICAL
-          skip-dirs: ${VIRTUAL_ENV}/lib/python3.12/site-packages/mlflow/server/js/build/static/js
+          skip-dirs: /work/app/.venv/lib/python3.12/site-packages/mlflow/server/js/build/static/js
           format: sarif
           output: trivy-results.sarif
         env:
