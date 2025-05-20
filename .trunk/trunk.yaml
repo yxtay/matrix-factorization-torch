@@ -21,7 +21,7 @@ lint:
     - bandit@1.8.3
     - biome@1.9.4
     - black@25.1.0
-    - checkov@3.2.425
+    - checkov@3.2.427
     - git-diff-check
     - hadolint@2.12.1-beta
     - isort@6.0.1
