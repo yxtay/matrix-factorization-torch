@@ -35,9 +35,7 @@ APT::AutoRemove::RecommendsImportant "false";
 APT::AutoRemove::SuggestsImportant "false";
 EOF
 
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && \
+RUN apt-get update && \
     apt-get install --yes --no-install-recommends \
         build-essential \
     && rm -rf /var/lib/apt/lists/*
@@ -50,16 +48,14 @@ ENV UV_LOCKED=1 \
 # set up python
 COPY --from=ghcr.io/astral-sh/uv:latest@sha256:69e13c7ae3a7649cbe0c912ca8afe00656966622a13f2db2d7eef7bb01118ccf /uv /uvx /bin/
 COPY .python-version pyproject.toml uv.lock ./
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --no-default-groups --no-install-project && \
+RUN uv sync --no-default-groups --no-install-project && \
     chown -R "${USER}:${USER}" "${VIRTUAL_ENV}" && \
     chown -R "${USER}:${USER}" "${APP_HOME}" && \
     uv pip list
 
 # set up project
 COPY mf_torch mf_torch
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --no-default-groups
+RUN uv sync --no-default-groups
 
 USER ${USER}
 HEALTHCHECK CMD [ uv, run, lightning, fit, --print_config ]
