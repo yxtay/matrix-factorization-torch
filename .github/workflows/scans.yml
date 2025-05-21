@@ -175,7 +175,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
-      - uses: checkmarx/kics-github-action@c456d047c6b73a360a5e1deb892e3f90fa372a04 # v2
+      - uses: checkmarx/kics-github-action@5373b38b35d09a400790b9e560189064d185391f # v2
         with:
           enable_annotations: true
           enable_comments: true
