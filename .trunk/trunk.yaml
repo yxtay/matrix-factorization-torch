@@ -31,7 +31,7 @@ lint:
     - ruff@0.11.10
     - taplo@0.9.3
     - trivy@0.62.1
-    - trufflehog@3.88.31
+    - trufflehog@3.88.32
     - yamllint@1.37.1
 actions:
   disabled:
