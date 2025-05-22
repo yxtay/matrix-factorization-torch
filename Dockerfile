@@ -3,7 +3,7 @@
 ##
 # base
 ##
-FROM debian:stable-slim@sha256:88f88a2b8bd1873876a2ff15df523a66602aa57177e24b5f22064c4886ec398a AS base
+FROM debian:stable-slim@sha256:b3ef39b8a45ee3b689c462dfa711454bcfc9c9965fe81c6cfb7ff4029b5b8cd7 AS base
 LABEL maintainer="wyextay@gmail.com"
 
 # set up user
