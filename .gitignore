@@ -164,6 +164,5 @@ cython_debug/
 data.lock
 lance_db
 lightning_logs
-megalinter-reports
 mlruns
 ray_results
