@@ -45,8 +45,6 @@ RUN apt-get update && \
 
 ARG PYTHONDONTWRITEBYTECODE=1
 ARG UV_NO_CACHE=1
-ENV UV_LOCKED=1 \
-    UV_NO_SYNC=1
 
 # set up python
 COPY --from=ghcr.io/astral-sh/uv:latest@sha256:83285c39ee68ed64708fca1495c2d0aad084e9ac02a8910f5180b8e36bcf803a /uv /uvx /bin/
