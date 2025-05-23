@@ -6,7 +6,9 @@ build-backend = "poetry.core.masonry.api"
 name = "mf_torch"
 version = "0.1.0"
 description = "Matrix Factorization Recommender Models in PyTorch with MovieLens"
-authors = [{ name = "YuXuan Tay", email = "wyextay@gmail.com" }]
+authors = [
+  { name = "YuXuan Tay", email = "5795122+yxtay@users.noreply.github.com" },
+]
 license = "MIT"
 requires-python = "~=3.12"
 dependencies = [
