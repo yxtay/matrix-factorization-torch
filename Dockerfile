@@ -17,6 +17,8 @@ ARG VIRTUAL_ENV=${APP_HOME}/.venv
 ENV PATH=${VIRTUAL_ENV}/bin:${PATH} \
     PYTHONFAULTHANDLER=1 \
     PYTHONUNBUFFERED=1 \
+    UV_LOCKED=1 \
+    UV_NO_SYNC=1 \
     UV_PYTHON_DOWNLOADS=manual \
     UV_PYTHON_INSTALL_DIR=/opt \
     VIRTUAL_ENV=${VIRTUAL_ENV}
@@ -42,8 +44,8 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 ARG PYTHONDONTWRITEBYTECODE=1
+ARG UV_NO_CACHE=1
 ENV UV_LOCKED=1 \
-    UV_NO_CACHE=1 \
     UV_NO_SYNC=1
 
 # set up python
