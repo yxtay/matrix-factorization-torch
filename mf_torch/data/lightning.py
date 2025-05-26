@@ -122,7 +122,6 @@ class FeaturesProcessor(pydantic.BaseModel):
             .cycle(count=cycle)
             .shuffle()  # devskim: ignore DS148264
             .sharding_filter()
-            .map(self.process)
         )
 
     def get_processed_data(
@@ -241,6 +240,13 @@ class ItemsProcessor(FeaturesProcessor):
         num_partitions = self.num_partitions or 2 ** int(math.log2(num_items) / 2)
         num_sub_vectors = self.num_sub_vectors or embedding_dim // 8
 
+        if torch.cuda.is_available():
+            accelerator = "cuda"
+        elif torch.mps.is_available():
+            accelerator = "mps"
+        else:
+            accelerator = None
+
         schema = pa.RecordBatch.from_pylist(batch).schema
         schema = schema.set(
             schema.get_field_index("embedding"),
@@ -255,11 +261,12 @@ class ItemsProcessor(FeaturesProcessor):
         )
         table.create_scalar_index(self.id_col)
         table.create_index(
+            vector_column_name="embedding",
             metric="cosine",
             num_partitions=num_partitions,
             num_sub_vectors=num_sub_vectors,
-            vector_column_name="embedding",
             index_type="IVF_HNSW_PQ",
+            accelerator=accelerator,
         )
         table.optimize(
             cleanup_older_than=datetime.timedelta(days=0),
@@ -350,6 +357,15 @@ class InteractionsProcessor(pydantic.BaseModel):
             .map(self.process)
             .zip(neg_item_dp)
             .map(merge_examples)
+        )
+
+    def get_batch_data(
+        self: Self, subset: str
+    ) -> torch_data.IterDataPipe[FeaturesType]:
+        return (
+            self.get_processed_data(subset)
+            .batch(self.batch_size)
+            .collate(collate_fn=self.collate)
         )
 
 
@@ -497,7 +513,7 @@ class MatrixFactorizationDataModule(LightningDataModule):
             collate_fn=collate_fn,
             shuffle=shuffle,
             num_workers=num_workers,
-            pin_memory=True,
+            pin_memory=torch.cuda.is_available(),
             multiprocessing_context=multiprocessing_context,
             persistent_workers=num_workers > 0,
         )
