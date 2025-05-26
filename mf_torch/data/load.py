@@ -107,13 +107,13 @@ def pad_tensors(
     batch: Iterable[torch.Tensor],
     dim: int = -1,
     *,
-    pad_end: bool = False,
+    pad_start: bool = False,
     pad_value: int = 0,
 ) -> torch.Tensor:
     elem = next(iter(batch))
     pad_size = max(example.size(dim) for example in iter(batch))
     pad = [0] * (elem.dim() * 2)
-    pad_dim = 2 * dim + pad_end
+    pad_dim = 2 * dim + pad_start
 
     def pad_tensor(tensor: torch.Tensor) -> torch.Tensor:
         # pad tuple dimensions is reversed
