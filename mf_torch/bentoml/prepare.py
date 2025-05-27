@@ -10,9 +10,9 @@ import torch
 
 from mf_torch.params import (
     CHECKPOINT_PATH,
-    EXPORTED_PROGRAM_PATH,
     LANCE_DB_PATH,
     MODEL_NAME,
+    MODEL_PATH,
     PROCESSORS_JSON,
 )
 
@@ -69,7 +69,7 @@ def save_model(trainer: Trainer) -> None:
     with bentoml.models.create(MODEL_NAME) as model_ref:
         trainer.save_checkpoint(model_ref.path_of(CHECKPOINT_PATH))
         model: MatrixFactorizationLitModule = trainer.model
-        model.export_dynamo(model_ref.path_of(EXPORTED_PROGRAM_PATH))
+        model.save_pretrained(model_ref.path_of(MODEL_PATH))
 
         processors_args = {
             "users": model.users_processor.model_dump(),

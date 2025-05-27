@@ -22,8 +22,6 @@ from mf_torch.params import (
 )
 
 if TYPE_CHECKING:
-    from typing import Self
-
     import pandas as pd
     import torchmetrics
     from lightning import Callback, Trainer
@@ -31,17 +29,15 @@ if TYPE_CHECKING:
     from mlflow import MlflowClient
 
     import mf_torch.models as mf_models
-    from mf_torch.data.lightning import (
-        ItemsProcessor,
-        UsersProcessor,
-    )
+    from mf_torch.data.lightning import ItemsProcessor, UsersProcessor
 
 
 class MatrixFactorizationLitModule(LightningModule):
     def __init__(  # noqa: PLR0913
-        self: Self,
+        self,
         *,
         encoder_model_name: str = ENCODER_MODEL_NAME,  # noqa: ARG002
+        num_hidden_layers: int | None = None,  # noqa: ARG002
         train_loss: str = "PairwiseHingeLoss",  # noqa: ARG002
         hard_negatives_ratio: float | None = None,  # noqa: ARG002
         sigma: float = 1.0,  # noqa: ARG002
@@ -59,7 +55,7 @@ class MatrixFactorizationLitModule(LightningModule):
         self.users_processor: UsersProcessor | None = None
         self.items_processor: ItemsProcessor | None = None
 
-    def forward(self: Self, text: list[str]) -> torch.Tensor:
+    def forward(self, text: list[str]) -> torch.Tensor:
         if self.model is None:
             msg = "`model` must be initialised first"
             raise ValueError(msg)
@@ -68,7 +64,7 @@ class MatrixFactorizationLitModule(LightningModule):
 
     @torch.inference_mode()
     def recommend(
-        self: Self,
+        self,
         text: list[str],
         *,
         top_k: int = TOP_K,
@@ -82,13 +78,13 @@ class MatrixFactorizationLitModule(LightningModule):
         history = self.users_processor.get_activity(user_id, "history")
         exclude_item_ids = (exclude_item_ids or []) + list(history.keys())
 
-        embed = self(text).numpy(force=True)
+        embed = self([text]).numpy(force=True)
         return self.items_processor.search(
             embed, exclude_item_ids=exclude_item_ids, top_k=top_k
         ).drop(columns="embedding")
 
     def compute_losses(
-        self: Self, batch: BatchType, step_name: str = "train"
+        self, batch: BatchType, step_name: str = "train"
     ) -> dict[str, torch.Tensor]:
         if self.loss_fns is None:
             msg = "`loss_fns` must be initialised first"
@@ -140,7 +136,7 @@ class MatrixFactorizationLitModule(LightningModule):
         return losses
 
     def update_metrics(
-        self: Self, example: dict[str, torch.Tensor], step_name: str = "train"
+        self, example: dict[str, torch.Tensor], step_name: str = "train"
     ) -> torchmetrics.MetricCollection:
         import torchmetrics.retrieval as tm_retrieval
 
@@ -175,30 +171,26 @@ class MatrixFactorizationLitModule(LightningModule):
                 metric.update(preds=preds, target=target > 0, indexes=indexes)
         return metrics
 
-    def training_step(self: Self, batch: BatchType, _: int) -> torch.Tensor:
+    def training_step(self, batch: BatchType, _: int) -> torch.Tensor:
         losses = self.compute_losses(batch, step_name="train")
         self.log_dict(losses)
-        train_loss = losses[f"train/{self.hparams.train_loss}"]
-        reg_loss = losses["train/RegularizationLoss"]
-        return train_loss + reg_loss
+        return losses[f"train/{self.hparams.train_loss}"]
 
-    def validation_step(self: Self, batch: FeaturesType, _: int) -> None:
+    def validation_step(self, batch: FeaturesType, _: int) -> None:
         metrics = self.update_metrics(batch, step_name="val")
         self.log_dict(metrics)
 
-    def test_step(self: Self, batch: FeaturesType, _: int) -> None:  # noqa: PT019
+    def test_step(self, batch: FeaturesType, _: int) -> None:  # noqa: PT019
         metrics = self.update_metrics(batch, step_name="test")
         self.log_dict(metrics)
 
-    def predict_step(self: Self, batch: FeaturesType, _: int) -> pd.DataFrame:
+    def predict_step(self, batch: FeaturesType, _: int) -> pd.DataFrame:
         user_id_col = self.trainer.datamodule.users_processor.id_col
         return self.recommend(
-            batch["text"],
-            top_k=self.hparams.top_k,
-            user_id=batch[user_id_col],
+            batch["text"], top_k=self.hparams.top_k, user_id=batch[user_id_col]
         )
 
-    def on_train_start(self: Self) -> None:
+    def on_train_start(self) -> None:
         if self.metrics is None:
             msg = "`metrics` must be initialised first"
             raise ValueError(msg)
@@ -216,22 +208,22 @@ class MatrixFactorizationLitModule(LightningModule):
                 # reset mlflow run status to "RUNNING"
                 logger.experiment.update_run(logger.run_id, status="RUNNING")
 
-    def on_validation_start(self: Self) -> None:
+    def on_validation_start(self) -> None:
         self.users_processor = self.trainer.datamodule.users_processor
         self.users_processor.get_index()
         self.items_processor = self.trainer.datamodule.items_processor
         self.items_processor.get_index(self)
 
-    def on_test_start(self: Self) -> None:
+    def on_test_start(self) -> None:
         self.on_validation_start()
 
-    def on_predict_start(self: Self) -> None:
+    def on_predict_start(self) -> None:
         self.on_validation_start()
 
-    def configure_optimizers(self: Self) -> torch.optim.Optimizer:
+    def configure_optimizers(self) -> torch.optim.Optimizer:
         return torch.optim.AdamW(self.parameters(), lr=self.hparams.learning_rate)
 
-    def configure_callbacks(self: Self) -> list[Callback]:
+    def configure_callbacks(self) -> list[Callback]:
         checkpoint = lp_callbacks.ModelCheckpoint(
             monitor=METRIC["name"], mode=METRIC["mode"]
         )
@@ -240,7 +232,7 @@ class MatrixFactorizationLitModule(LightningModule):
         )
         return [checkpoint, early_stop]
 
-    def configure_model(self: Self) -> None:
+    def configure_model(self) -> None:
         if self.model is None:
             self.model = self.get_model()
             # self.compile()
@@ -249,14 +241,15 @@ class MatrixFactorizationLitModule(LightningModule):
         if self.metrics is None:
             self.metrics = self.get_metrics()
 
-    def get_model(self: Self) -> torch.nn.Module:
-        import mf_torch.models as mf_models
+    def get_model(self) -> torch.nn.Module:
+        from mf_torch.models import MatrixFactorization
 
-        return mf_models.MatrixFactorization(
-            model_name_or_path=self.hparams.encoder_model_name
+        return MatrixFactorization(
+            model_name_or_path=self.hparams.encoder_model_name,
+            num_hidden_layers=self.hparams.get("num_hidden_layers"),
         )
 
-    def get_loss_fns(self: Self) -> torch.nn.ModuleList:
+    def get_loss_fns(self) -> torch.nn.ModuleList:
         import mf_torch.losses as mf_losses
 
         loss_classes = [
@@ -271,22 +264,16 @@ class MatrixFactorizationLitModule(LightningModule):
             mf_losses.PairwiseLogisticLoss,
         ]
         loss_fns = [
-            mf_losses.RegularizationLoss(
-                reg_l1=self.hparams.reg_l1,
-                reg_l2=self.hparams.reg_l2,
-            ),
-            *(
-                loss_class(
-                    hard_negatives_ratio=self.hparams.get("hard_negatives_ratio"),
-                    sigma=self.hparams.sigma,
-                    margin=self.hparams.margin,
-                )
-                for loss_class in loss_classes
-            ),
+            loss_class(
+                hard_negatives_ratio=self.hparams.get("hard_negatives_ratio"),
+                sigma=self.hparams.sigma,
+                margin=self.hparams.margin,
+            )
+            for loss_class in loss_classes
         ]
         return torch.nn.ModuleList(loss_fns)
 
-    def get_metrics(self: Self) -> torch.nn.ModuleDict:
+    def get_metrics(self) -> torch.nn.ModuleDict:
         import torchmetrics
         import torchmetrics.retrieval as tm_retrieval
 
@@ -306,12 +293,13 @@ class MatrixFactorizationLitModule(LightningModule):
         return torch.nn.ModuleDict(metrics)
 
     @property
-    def example_input_array(self: Self) -> tuple[list[str]]:
-        return (["{}"],)
+    def example_input_array(self) -> tuple[list[str]]:
+        return (["", "{}"],)
 
-    def export_torchscript(
-        self: Self, path: str | None = None
-    ) -> torch.jit.ScriptModule:
+    def save_pretrained(self, path: str) -> None:
+        self.model.save_pretrained(path)
+
+    def export_torchscript(self, path: str | None = None) -> torch.jit.ScriptModule:
         script_module = torch.jit.script(self.model.eval())  # devskim: ignore DS189424
 
         if path is None:
@@ -319,9 +307,7 @@ class MatrixFactorizationLitModule(LightningModule):
         torch.jit.save(script_module, path)  # nosec
         return script_module
 
-    def export_dynamo(
-        self: Self, path: str | None = None
-    ) -> torch.export.ExportedProgram:
+    def export_dynamo(self, path: str | None = None) -> torch.export.ExportedProgram:
         batch = torch.export.Dim("batch")
         dynamic_shapes = {"text": (batch,)}
         exported_program = torch.export.export(
@@ -335,7 +321,7 @@ class MatrixFactorizationLitModule(LightningModule):
         torch.export.save(exported_program, path)  # nosec
         return exported_program
 
-    def export_onnx(self: Self, path: str | None = None) -> torch.onnx.ONNXProgram:
+    def export_onnx(self, path: str | None = None) -> torch.onnx.ONNXProgram:
         if path is None:
             path = pathlib.Path(self.trainer.log_dir) / ONNX_PROGRAM_PATH
 
@@ -445,15 +431,14 @@ if __name__ == "__main__":
 
     from mf_torch.data.lightning import MatrixFactorizationDataModule
 
-    datamodule = MatrixFactorizationDataModule(batch_size=4)
+    datamodule = MatrixFactorizationDataModule()
     datamodule.prepare_data()
     datamodule.setup("fit")
     model = MatrixFactorizationLitModule()
     model.configure_model()
-    model.eval()
 
     with torch.inference_mode():
-        rich.print(model(*model.example_input_array))
+        rich.print(model(model.example_input_array))
         rich.print(model.compute_losses(next(iter(datamodule.train_dataloader()))))
 
     trainer_args = {
@@ -463,8 +448,7 @@ if __name__ == "__main__":
         # "limit_val_batches": 1,
         # "overfit_batches": 1,
     }
-    data_args = {"batch_size": 4}
-    cli = cli_main(args={"trainer": trainer_args, "data": data_args}, run=False)
+    cli = cli_main(args={"trainer": trainer_args}, run=False)
     with contextlib.suppress(ReferenceError):
         # suppress weak reference on ModelCheckpoint callback
         cli.trainer.fit(cli.model, datamodule=cli.datamodule)

@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime  # noqa: TC003
 import json
 import pathlib
-from typing import Annotated, Self
+from typing import Annotated
 
 import bentoml
 import pydantic
@@ -12,9 +12,9 @@ from bentoml.validators import DType
 from loguru import logger
 
 from mf_torch.params import (
-    EXPORTED_PROGRAM_PATH,
     LANCE_DB_PATH,
     MODEL_NAME,
+    MODEL_PATH,
     PROCESSORS_JSON,
     TOP_K,
 )
@@ -51,12 +51,12 @@ class ItemCandidate(pydantic.BaseModel):
 
 EXAMPLE_ITEM = ItemQuery(
     movie_id=1,
-    movie_text='{"title": "Toy Story (1995)", "genres": ["Animation", "Children\'s", "Comedy"]}',
+    movie_text='{"title":"Toy Story (1995)","genres":["Animation","Children\'s","Comedy"]}',
 )
 
 EXAMPLE_USER = UserQuery(
     user_id=1,
-    user_text='{"gender": "F", "age": 1, "occupation": 10, "zipcode": "48067"}',
+    user_text='{"gender":"F","age":1,"occupation":10,"zipcode":"48067"}',
 )
 
 PACKAGES = [
@@ -77,16 +77,16 @@ class Embedder:
     model_ref = bentoml.models.BentoModel(MODEL_NAME)
 
     @logger.catch(reraise=True)
-    def __init__(self: Self) -> None:
-        path = self.model_ref.path_of(EXPORTED_PROGRAM_PATH)
-        self.model = torch.export.load(path).module()  # nosec
+    def __init__(self) -> None:
+        path = self.model_ref.path_of(MODEL_PATH)
+        self.model = SentenceTransformer(path, local_files_only=True, backend="onnx")
         logger.info("model loaded: {}", path)
 
     @bentoml.api()
     @logger.catch(reraise=True)
     @torch.inference_mode()
-    def embed(self: Self, query: Query) -> Query:
-        query.embedding = self.model([query.text]).squeeze(0)
+    def embed(self, query: Query) -> Query:
+        query.embedding = self.model.encode(query.text)
         return query
 
 
@@ -95,7 +95,7 @@ class ItemsProcessor:
     model_ref = bentoml.models.BentoModel(MODEL_NAME)
 
     @logger.catch(reraise=True)
-    def __init__(self: Self) -> None:
+    def __init__(self) -> None:
         from mf_torch.data.lightning import ItemsProcessor
 
         lance_db_path = self.model_ref.path_of(LANCE_DB_PATH)
@@ -108,7 +108,7 @@ class ItemsProcessor:
     @bentoml.api()
     @logger.catch(reraise=True)
     def search(
-        self: Self, query: Query, exclude_item_ids: list[int], top_k: int = TOP_K
+        self, query: Query, exclude_item_ids: list[int], top_k: int = TOP_K
     ) -> list[ItemCandidate]:
         from pydantic import TypeAdapter
 
@@ -123,7 +123,7 @@ class ItemsProcessor:
 
     @bentoml.api()
     @logger.catch(reraise=True)
-    def get_id(self: Self, item_id: int) -> ItemQuery:
+    def get_id(self, item_id: int) -> ItemQuery:
         from bentoml.exceptions import NotFound
 
         result = self.items_processor.get_id(item_id)
@@ -134,7 +134,7 @@ class ItemsProcessor:
 
     @bentoml.api()
     @logger.catch(reraise=True)
-    def process(self: Self, item: ItemQuery) -> Query:
+    def process(self, item: ItemQuery) -> Query:
         item_data = item.model_dump()
         return Query.model_validate(self.items_processor.process(item_data))
 
@@ -144,7 +144,7 @@ class UsersProcessor:
     model_ref = bentoml.models.BentoModel(MODEL_NAME)
 
     @logger.catch(reraise=True)
-    def __init__(self: Self) -> None:
+    def __init__(self) -> None:
         from mf_torch.data.lightning import UsersProcessor
 
         lance_db_path = self.model_ref.path_of(LANCE_DB_PATH)
@@ -156,7 +156,7 @@ class UsersProcessor:
 
     @bentoml.api()
     @logger.catch(reraise=True)
-    def get_id(self: Self, user_id: int) -> UserQuery:
+    def get_id(self, user_id: int) -> UserQuery:
         from bentoml.exceptions import NotFound
 
         result = self.users_processor.get_id(user_id)
@@ -167,7 +167,7 @@ class UsersProcessor:
 
     @bentoml.api()
     @logger.catch(reraise=True)
-    def process(self: Self, user: UserQuery) -> Query:
+    def process(self, user: UserQuery) -> Query:
         user_data = user.model_dump()
         return Query.model_validate(self.users_processor.process(user_data))
 
@@ -182,7 +182,7 @@ class Service:
     @bentoml.api()
     @logger.catch(reraise=True)
     async def recommend_with_query(
-        self: Self,
+        self,
         query: Query,
         exclude_item_ids: list[int] | None = None,
         top_k: int = TOP_K,
@@ -194,13 +194,13 @@ class Service:
 
     @bentoml.api()
     @logger.catch(reraise=True)
-    async def embed_query(self: Self, query: Query) -> Query:
+    async def embed_query(self, query: Query) -> Query:
         return await self.embedder.to_async.embed(query)
 
     @bentoml.api()
     @logger.catch(reraise=True)
     async def search_items(
-        self: Self,
+        self,
         query: Query,
         exclude_item_ids: list[int] | None = None,
         top_k: int = TOP_K,
@@ -213,7 +213,7 @@ class Service:
     @bentoml.api()
     @logger.catch(reraise=True)
     async def recommend_with_item(
-        self: Self,
+        self,
         item: ItemQuery,
         exclude_item_ids: list[int] | None = None,
         top_k: int = TOP_K,
@@ -228,13 +228,13 @@ class Service:
 
     @bentoml.api()
     @logger.catch(reraise=True)
-    async def process_item(self: Self, item: ItemQuery) -> Query:
+    async def process_item(self, item: ItemQuery) -> Query:
         return await self.items_processor.to_async.process(item)
 
     @bentoml.api()
     @logger.catch(reraise=True)
     async def recommend_with_item_id(
-        self: Self,
+        self,
         item_id: int,
         exclude_item_ids: list[int] | None = None,
         top_k: int = TOP_K,
@@ -246,13 +246,13 @@ class Service:
 
     @bentoml.api()
     @logger.catch(reraise=True)
-    async def item_id(self: Self, item_id: int) -> ItemQuery:
+    async def item_id(self, item_id: int) -> ItemQuery:
         return await self.items_processor.to_async.get_id(item_id)
 
     @bentoml.api()
     @logger.catch(reraise=True)
     async def recommend_with_user(
-        self: Self,
+        self,
         user: UserQuery,
         exclude_item_ids: list[int] | None = None,
         top_k: int = TOP_K,
@@ -270,13 +270,13 @@ class Service:
 
     @bentoml.api()
     @logger.catch(reraise=True)
-    async def process_user(self: Self, user: UserQuery) -> Query:
+    async def process_user(self, user: UserQuery) -> Query:
         return await self.users_processor.to_async.process(user)
 
     @bentoml.api()
     @logger.catch(reraise=True)
     async def recommend_with_user_id(
-        self: Self,
+        self,
         user_id: int,
         exclude_item_ids: list[int] | None = None,
         top_k: int = TOP_K,
@@ -288,7 +288,7 @@ class Service:
 
     @bentoml.api()
     @logger.catch(reraise=True)
-    async def user_id(self: Self, user_id: int) -> UserQuery:
+    async def user_id(self, user_id: int) -> UserQuery:
         return await self.users_processor.to_async.get_id(user_id)
 
     @bentoml.api()

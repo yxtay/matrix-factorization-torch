@@ -24,6 +24,7 @@ TOP_K = 20
 # serving
 CHECKPOINT_PATH = "checkpoint.ckpt"
 PROCESSORS_JSON = "processors.json"
+MODEL_PATH = "model"
 EXPORTED_PROGRAM_PATH = "exported_program.pt"
 ONNX_PROGRAM_PATH = "program.onnx"
 ITEMS_TABLE_NAME = "movies"

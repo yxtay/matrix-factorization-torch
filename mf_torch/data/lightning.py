@@ -35,7 +35,7 @@ from mf_torch.params import (
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from typing import Any, Self, TypeVar
+    from typing import Any, TypeVar
 
     import lancedb
     import numpy as np
@@ -68,7 +68,7 @@ class FeaturesProcessor(pydantic.BaseModel):
     data_dir: str = DATA_DIR
     lance_db_path: str = LANCE_DB_PATH
 
-    def process(self: Self, example: dict[str, Any]) -> FeaturesType:
+    def process(self, example: dict[str, Any]) -> FeaturesType:
         import xxhash
 
         return {
@@ -78,7 +78,7 @@ class FeaturesProcessor(pydantic.BaseModel):
         }
 
     def get_data(
-        self: Self, subset: str, cycle: int = 1
+        self, subset: str, cycle: int = 1
     ) -> torch_data.IterDataPipe[FeaturesType]:
         import pyarrow.dataset as ds
 
@@ -98,12 +98,12 @@ class FeaturesProcessor(pydantic.BaseModel):
         )
 
     def get_processed_data(
-        self: Self, subset: str, cycle: int = 1
+        self, subset: str, cycle: int = 1
     ) -> torch_data.IterDataPipe[FeaturesType]:
         return self.get_data(subset, cycle=cycle).map(self.process)
 
     def get_batch_data(
-        self: Self, subset: str, cycle: int | None = 1
+        self, subset: str, cycle: int | None = 1
     ) -> torch_data.IterDataPipe[FeaturesType]:
         fields = ["idx", "text"]
         return (
@@ -114,16 +114,16 @@ class FeaturesProcessor(pydantic.BaseModel):
         )
 
     @property
-    def lance_db(self: Self) -> lancedb.DBConnection:
+    def lance_db(self) -> lancedb.DBConnection:
         import lancedb
 
         return lancedb.connect(self.lance_db_path)
 
     @property
-    def lance_table(self: Self) -> lancedb.table.Table:
+    def lance_table(self) -> lancedb.table.Table:
         return self.lance_db.open_table(self.lance_table_name)
 
-    def get_id(self: Self, id_val: int | None) -> dict[str, Any]:
+    def get_id(self, id_val: int | None) -> dict[str, Any]:
         if id_val is None:
             return {}
         result = self.lance_table.search().where(f"{self.id_col} = {id_val}").to_list()
@@ -141,7 +141,7 @@ class UsersProcessor(FeaturesProcessor):
     def data_path(self) -> str:
         return pathlib.Path(self.data_dir, "ml-1m", "users.parquet").as_posix()
 
-    def get_index(self: Self, subset: str = "predict") -> lancedb.table.Table:
+    def get_index(self, subset: str = "predict") -> lancedb.table.Table:
         import pyarrow.dataset as ds
         import pyarrow.parquet as pq
 
@@ -160,9 +160,7 @@ class UsersProcessor(FeaturesProcessor):
         )
         return table
 
-    def get_activity(
-        self: Self, id_val: int | None, activity_name: str
-    ) -> dict[int, int]:
+    def get_activity(self, id_val: int | None, activity_name: str) -> dict[int, int]:
         activity = self.get_id(id_val).get(activity_name, {})
         return {item[ITEM_ID_COL]: item[TARGET_COL] for item in activity}
 
@@ -182,7 +180,7 @@ class ItemsProcessor(FeaturesProcessor):
         return pathlib.Path(self.data_dir, "ml-1m", "movies.parquet").as_posix()
 
     def get_index(
-        self: Self, model: torch.nn.Module, subset: str = "predict"
+        self, model: torch.nn.Module, subset: str = "predict"
     ) -> lancedb.table.Table:
         import pyarrow as pa
 
@@ -239,7 +237,7 @@ class ItemsProcessor(FeaturesProcessor):
         return table
 
     def search(
-        self: Self,
+        self,
         embedding: npt.NDArray[np.float64],
         exclude_item_ids: list[int] | None = None,
         top_k: int = TOP_K,
@@ -271,7 +269,7 @@ class InteractionsProcessor(pydantic.BaseModel):
     batch_size: int = BATCH_SIZE
     data_dir: str = DATA_DIR
 
-    def process(self: Self, example: dict[str, Any]) -> BatchType:
+    def process(self, example: dict[str, Any]) -> BatchType:
         fields = ["idx", "text"]
         user_features = select_fields(
             self.users_processor.process(example), fields=fields
@@ -282,7 +280,7 @@ class InteractionsProcessor(pydantic.BaseModel):
         target = example[self.target_col]
         return {"target": target, "user": user_features, "item": item_features}
 
-    def collate(self: Self, batch: list[BatchType]) -> BatchType:
+    def collate(self, batch: list[BatchType]) -> BatchType:
         import torch.utils.data._utils.collate as torch_collate
 
         target = torch_collate.default_collate([example["target"] for example in batch])
@@ -293,9 +291,7 @@ class InteractionsProcessor(pydantic.BaseModel):
         )
         return {"target": target, "user": user, "item": item, "neg_item": neg_item}
 
-    def get_processed_data(
-        self: Self, subset: str
-    ) -> torch_data.IterDataPipe[BatchType]:
+    def get_processed_data(self, subset: str) -> torch_data.IterDataPipe[BatchType]:
         import pyarrow.dataset as ds
 
         from mf_torch.data.load import ParquetDictLoaderIterDataPipe
@@ -322,9 +318,7 @@ class InteractionsProcessor(pydantic.BaseModel):
             .map(merge_examples)
         )
 
-    def get_batch_data(
-        self: Self, subset: str
-    ) -> torch_data.IterDataPipe[FeaturesType]:
+    def get_batch_data(self, subset: str) -> torch_data.IterDataPipe[FeaturesType]:
         return (
             self.get_processed_data(subset)
             .batch(self.batch_size)
@@ -334,7 +328,7 @@ class InteractionsProcessor(pydantic.BaseModel):
 
 class MatrixFactorizationDataModule(LightningDataModule):
     def __init__(  # noqa: PLR0913
-        self: Self,
+        self,
         data_dir: str = DATA_DIR,
         batch_size: int = BATCH_SIZE,
         num_partitions: int | None = None,
@@ -365,7 +359,7 @@ class MatrixFactorizationDataModule(LightningDataModule):
             data_dir=data_dir,
         )
 
-    def prepare_data(self: Self, *, overwrite: bool = False) -> pl.LazyFrame:
+    def prepare_data(self, *, overwrite: bool = False) -> pl.LazyFrame:
         from filelock import FileLock
 
         from mf_torch.data.prepare import download_unpack_data, prepare_movielens
@@ -375,7 +369,7 @@ class MatrixFactorizationDataModule(LightningDataModule):
             download_unpack_data(MOVIELENS_1M_URL, data_dir, overwrite=overwrite)
             return prepare_movielens(data_dir, overwrite=overwrite)
 
-    def setup(self: Self, stage: str) -> None:
+    def setup(self, stage: str) -> None:
         if stage == "fit":
             self.train_data = self.interactions_processor.get_processed_data("train")
 
@@ -389,7 +383,7 @@ class MatrixFactorizationDataModule(LightningDataModule):
             self.predict_data = self.users_processor.get_processed_data("predict")
 
     def get_dataloader(
-        self: Self,
+        self,
         dataset: torch_data.Dataset[T],
         *,
         batch_size: int | None = None,
@@ -414,7 +408,7 @@ class MatrixFactorizationDataModule(LightningDataModule):
             persistent_workers=num_workers > 0,
         )
 
-    def train_dataloader(self: Self) -> torch_data.DataLoader[BatchType]:
+    def train_dataloader(self) -> torch_data.DataLoader[BatchType]:
         batch_size = self.hparams.get("batch_size")
         return self.get_dataloader(
             self.train_data,
@@ -423,13 +417,13 @@ class MatrixFactorizationDataModule(LightningDataModule):
             shuffle=True,
         )
 
-    def val_dataloader(self: Self) -> torch_data.DataLoader[FeaturesType]:
+    def val_dataloader(self) -> torch_data.DataLoader[FeaturesType]:
         return self.get_dataloader(self.val_data)
 
-    def test_dataloader(self: Self) -> torch_data.DataLoader[FeaturesType]:
+    def test_dataloader(self) -> torch_data.DataLoader[FeaturesType]:
         return self.get_dataloader(self.test_data)
 
-    def predict_dataloader(self: Self) -> torch_data.DataLoader[FeaturesType]:
+    def predict_dataloader(self) -> torch_data.DataLoader[FeaturesType]:
         return self.get_dataloader(self.predict_data)
 
 
@@ -464,8 +458,8 @@ if __name__ == "__main__":
     rich.print(dm.users_processor.get_activity(1, "target"))
 
     dm.items_processor.get_index(
-        lambda _: torch.rand(32)  # devskim: ignore DS148264
+        lambda _: torch.rand(1, 32)  # devskim: ignore DS148264
     ).search().to_polars().glimpse()
     rich.print(dm.items_processor.get_id(1))
-    query_vector = torch.rand(32).numpy()  # devskim: ignore DS148264
+    query_vector = torch.rand(1, 32).numpy()  # devskim: ignore DS148264
     rich.print(dm.items_processor.search(query_vector, top_k=5))

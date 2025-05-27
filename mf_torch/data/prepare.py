@@ -97,10 +97,10 @@ def load_users(src_dir: str = DATA_DIR) -> pl.LazyFrame:
     users_dat = pathlib.Path(src_dir, "ml-1m", "users.dat")
     dtype = {
         "user_id": "int32",
-        "gender": "category",
+        "gender": "str",
         "age": "int32",
         "occupation": "int32",
-        "zipcode": "category",
+        "zipcode": "str",
     }
 
     users = (
