@@ -13,9 +13,7 @@ import torch.utils.data as torch_data
 from lightning import LightningDataModule
 
 from mf_torch.data.load import (
-    collate_features,
     embed_example,
-    hash_features,
     merge_examples,
     nest_example,
     select_fields,
@@ -23,24 +21,20 @@ from mf_torch.data.load import (
 from mf_torch.params import (
     BATCH_SIZE,
     DATA_DIR,
-    ITEM_FEATURE_NAMES,
     ITEM_ID_COL,
-    ITEM_RN_COL,
+    ITEM_TEXT_COL,
     ITEMS_TABLE_NAME,
     LANCE_DB_PATH,
     MOVIELENS_1M_URL,
-    NUM_EMBEDDINGS,
-    NUM_HASHES,
     TARGET_COL,
     TOP_K,
-    USER_FEATURE_NAMES,
     USER_ID_COL,
-    USER_RN_COL,
+    USER_TEXT_COL,
     USERS_TABLE_NAME,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Callable
     from typing import Any, Self, TypeVar
 
     import lancedb
@@ -54,9 +48,7 @@ if TYPE_CHECKING:
 
 class FeaturesType(TypedDict):
     idx: int | torch.Tensor
-    feature_values: list[str]
-    feature_hashes: torch.Tensor
-    feature_weights: torch.Tensor
+    text: str | list[str]
 
 
 class BatchType(TypedDict):
@@ -68,41 +60,22 @@ class BatchType(TypedDict):
 
 class FeaturesProcessor(pydantic.BaseModel):
     id_col: str
-    rn_col: str
-    feature_names: dict[str, str]
+    text_col: str
     lance_table_name: str
 
     batch_size: int = BATCH_SIZE
-    num_hashes: int = NUM_HASHES
-    num_embeddings: int = NUM_EMBEDDINGS
 
     data_dir: str = DATA_DIR
     lance_db_path: str = LANCE_DB_PATH
 
     def process(self: Self, example: dict[str, Any]) -> FeaturesType:
-        features = select_fields(example, fields=list(self.feature_names))
-        feature_values, feature_weights = collate_features(
-            features, feature_names=self.feature_names
-        )
-        feature_hashes, feature_weights = hash_features(
-            feature_values,
-            feature_weights,
-            num_hashes=self.num_hashes,
-            num_embeddings=self.num_embeddings,
-        )
+        import xxhash
 
         return {
             **example,
-            "idx": example[self.rn_col],
-            "feature_values": feature_values,
-            "feature_hashes": feature_hashes,
-            "feature_weights": feature_weights,
+            "idx": xxhash.xxh32_intdigest(str(example[self.id_col])),
+            "text": example[self.text_col],
         }
-
-    def collate(self: Self, batch: list[FeaturesType]) -> FeaturesType:
-        import torch.utils.data._utils.collate as torch_collate
-
-        return torch_collate.default_collate(batch)
 
     def get_data(
         self: Self, subset: str, cycle: int = 1
@@ -132,12 +105,12 @@ class FeaturesProcessor(pydantic.BaseModel):
     def get_batch_data(
         self: Self, subset: str, cycle: int | None = 1
     ) -> torch_data.IterDataPipe[FeaturesType]:
-        fields = ["idx", "feature_hashes", "feature_weights"]
+        fields = ["idx", "text"]
         return (
             self.get_processed_data(subset, cycle=cycle)
             .map(functools.partial(select_fields, fields=fields))
             .batch(self.batch_size)
-            .collate(collate_fn=self.collate)
+            .collate()
         )
 
     @property
@@ -161,8 +134,7 @@ class FeaturesProcessor(pydantic.BaseModel):
 
 class UsersProcessor(FeaturesProcessor):
     id_col: str = USER_ID_COL
-    rn_col: str = USER_RN_COL
-    feature_names: dict[str, str] = USER_FEATURE_NAMES
+    text_col: str = USER_TEXT_COL
     lance_table_name: str = USERS_TABLE_NAME
 
     @property
@@ -173,15 +145,7 @@ class UsersProcessor(FeaturesProcessor):
         import pyarrow.dataset as ds
         import pyarrow.parquet as pq
 
-        columns = [
-            "user_id",
-            "gender",
-            "age",
-            "occupation",
-            "zipcode",
-            "history",
-            "target",
-        ]
+        columns = [self.id_col, self.text_col, "history", "target"]
         filters = ds.field(f"is_{subset}")
         pa_table = pq.read_table(self.data_path, columns=columns, filters=filters)
 
@@ -205,8 +169,7 @@ class UsersProcessor(FeaturesProcessor):
 
 class ItemsProcessor(FeaturesProcessor):
     id_col: str = ITEM_ID_COL
-    rn_col: str = ITEM_RN_COL
-    feature_names: dict[str, str] = ITEM_FEATURE_NAMES
+    text_col: str = ITEM_TEXT_COL
     lance_table_name: str = ITEMS_TABLE_NAME
 
     num_partitions: int | None = None
@@ -223,7 +186,7 @@ class ItemsProcessor(FeaturesProcessor):
     ) -> lancedb.table.Table:
         import pyarrow as pa
 
-        fields = ["movie_id", "title", "genres", "embedding"]
+        fields = [self.id_col, self.text_col, "embedding"]
         dp = (
             self.get_processed_data(subset)
             .map(functools.partial(torch.inference_mode(embed_example), model=model))
@@ -309,7 +272,7 @@ class InteractionsProcessor(pydantic.BaseModel):
     data_dir: str = DATA_DIR
 
     def process(self: Self, example: dict[str, Any]) -> BatchType:
-        fields = ["idx", "feature_hashes", "feature_weights"]
+        fields = ["idx", "text"]
         user_features = select_fields(
             self.users_processor.process(example), fields=fields
         )
@@ -323,9 +286,9 @@ class InteractionsProcessor(pydantic.BaseModel):
         import torch.utils.data._utils.collate as torch_collate
 
         target = torch_collate.default_collate([example["target"] for example in batch])
-        user = self.users_processor.collate([example["user"] for example in batch])
-        item = self.items_processor.collate([example["item"] for example in batch])
-        neg_item = self.items_processor.collate(
+        user = torch_collate.default_collate([example["user"] for example in batch])
+        item = torch_collate.default_collate([example["item"] for example in batch])
+        neg_item = torch_collate.default_collate(
             [example["neg_item"] for example in batch]
         )
         return {"target": target, "user": user, "item": item, "neg_item": neg_item}
@@ -344,7 +307,7 @@ class InteractionsProcessor(pydantic.BaseModel):
 
         data_path = pathlib.Path(self.data_dir, "ml-1m", "ratings.parquet").as_posix()
         filter_expr = ds.field(f"is_{subset}")
-        fields = ["idx", "feature_hashes", "feature_weights"]
+        fields = ["idx", "text"]
         neg_item_dp = (
             self.items_processor.get_processed_data(subset, cycle=None)
             .map(functools.partial(select_fields, fields=fields))
@@ -369,74 +332,11 @@ class InteractionsProcessor(pydantic.BaseModel):
         )
 
 
-class MatrixFactorisationDataPipe(torch_data.IterDataPipe[BatchType]):
-    def __init__(
-        self: Self,
-        users_dataset: torch_data.IterDataPipe[FeaturesType],
-        items_dataset: torch_data.IterDataPipe[FeaturesType],
-        data_dir: str = DATA_DIR,
-    ) -> None:
-        super().__init__()
-        self.users_dataset = users_dataset
-        self.items_dataset = items_dataset
-        self.data_path = pathlib.Path(data_dir, "ml-1m", "ratings.parquet").as_posix()
-        self.targets = self.get_targets()
-
-    def get_targets(self: Self, subset: str = "train") -> torch.Tensor:
-        import polars as pl
-        import scipy
-
-        valid_subset = {"train", "val", "test", "predict"}
-        if subset not in valid_subset:
-            msg = f"`{subset}` is not one of `{valid_subset}`"
-            raise ValueError(msg)
-
-        columns = {TARGET_COL, USER_RN_COL, ITEM_RN_COL}
-        targets_df = (
-            pl.scan_parquet(self.data_path)
-            .filter(pl.col(f"is_{subset}"))
-            .select(columns)
-            .collect()
-            .to_pandas()
-        )
-        values = targets_df[TARGET_COL]
-        rows = targets_df[USER_RN_COL]
-        cols = targets_df[ITEM_RN_COL]
-        return scipy.sparse.coo_array((values, (rows, cols))).tocsr()
-
-    def __len__(self: Self) -> int:
-        return len(self.users_dataset) * len(self.items_dataset)
-
-    def __iter__(self: Self) -> Iterator[BatchType]:
-        for users_batch in iter(self.users_dataset):
-            for items_batch in iter(self.items_dataset):
-                row_idx = users_batch["idx"].numpy(force=True)
-                col_idx = items_batch["idx"].numpy(force=True)
-                targets = self.targets[row_idx[:, None], col_idx[None, :]]
-                targets_batch = (
-                    torch.sparse_csr_tensor(
-                        targets.indptr,
-                        targets.indices,
-                        targets.data,
-                        targets.shape,
-                    )
-                    .to_sparse_coo()
-                    .coalesce()
-                )
-                yield {
-                    "target": targets_batch,
-                    "user": users_batch,
-                    "item": items_batch,
-                }
-
-
 class MatrixFactorizationDataModule(LightningDataModule):
     def __init__(  # noqa: PLR0913
         self: Self,
         data_dir: str = DATA_DIR,
         batch_size: int = BATCH_SIZE,
-        num_hashes: int = NUM_HASHES,
-        num_embeddings: int = NUM_EMBEDDINGS,
         num_partitions: int | None = None,
         num_sub_vectors: int | None = None,
         num_probes: int = 8,
@@ -446,20 +346,16 @@ class MatrixFactorizationDataModule(LightningDataModule):
         super().__init__()
         self.save_hyperparameters()
 
-        self.users_processor = UsersProcessor(
-            batch_size=batch_size,
-            num_hashes=num_hashes,
-            num_embeddings=num_embeddings,
-            data_dir=data_dir,
-        )
         self.items_processor = ItemsProcessor(
             batch_size=batch_size,
-            num_hashes=num_hashes,
-            num_embeddings=num_embeddings,
             num_partitions=num_partitions,
             num_sub_vectors=num_sub_vectors,
             num_probes=num_probes,
             refine_factor=refine_factor,
+            data_dir=data_dir,
+        )
+        self.users_processor = UsersProcessor(
+            batch_size=batch_size,
             data_dir=data_dir,
         )
         self.interactions_processor = InteractionsProcessor(
@@ -545,8 +441,9 @@ if __name__ == "__main__":
     dm.setup("fit")
 
     dataloaders = [
-        dm.users_processor.get_batch_data("train"),
         dm.items_processor.get_batch_data("train"),
+        dm.users_processor.get_batch_data("train"),
+        dm.interactions_processor.get_processed_data("train"),
         dm.interactions_processor.get_batch_data("train"),
         dm.train_dataloader(),
         dm.val_dataloader(),
@@ -567,12 +464,8 @@ if __name__ == "__main__":
     rich.print(dm.users_processor.get_activity(1, "target"))
 
     dm.items_processor.get_index(
-        lambda hashes, _: torch.rand(32)  # devskim: ignore DS148264
+        lambda _: torch.rand(32)  # devskim: ignore DS148264
     ).search().to_polars().glimpse()
     rich.print(dm.items_processor.get_id(1))
-    rich.print(
-        dm.items_processor.search(
-            torch.rand(32).numpy(),  # devskim: ignore DS148264
-            top_k=5,
-        )
-    )
+    query_vector = torch.rand(32).numpy()  # devskim: ignore DS148264
+    rich.print(dm.items_processor.search(query_vector, top_k=5))

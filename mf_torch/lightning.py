@@ -12,10 +12,9 @@ from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
 
 from mf_torch.data.lightning import BatchType, FeaturesType
 from mf_torch.params import (
-    EMBEDDING_DIM,
+    ENCODER_MODEL_NAME,
     EXPORTED_PROGRAM_PATH,
     METRIC,
-    NUM_EMBEDDINGS,
     ONNX_PROGRAM_PATH,
     SCRIPT_MODULE_PATH,
     TARGET_COL,
@@ -42,13 +41,8 @@ class MatrixFactorizationLitModule(LightningModule):
     def __init__(  # noqa: PLR0913
         self: Self,
         *,
-        num_embeddings: int = NUM_EMBEDDINGS,  # noqa: ARG002
-        embedding_dim: int = EMBEDDING_DIM,  # noqa: ARG002
+        encoder_model_name: str = ENCODER_MODEL_NAME,  # noqa: ARG002
         train_loss: str = "PairwiseHingeLoss",  # noqa: ARG002
-        embedder_type: str = "base",  # noqa: ARG002
-        num_heads: int = 1,  # noqa: ARG002
-        dropout: float = 0.0,  # noqa: ARG002
-        normalize: bool = False,  # noqa: ARG002
         hard_negatives_ratio: float | None = None,  # noqa: ARG002
         sigma: float = 1.0,  # noqa: ARG002
         margin: float = 1.0,  # noqa: ARG002
@@ -65,29 +59,17 @@ class MatrixFactorizationLitModule(LightningModule):
         self.users_processor: UsersProcessor | None = None
         self.items_processor: ItemsProcessor | None = None
 
-        supported_embedder = {"base", "attention", "transformer"}
-        if self.hparams.embedder_type not in supported_embedder:
-            msg = f"{self.hparams.embedder_type = }, not one of {supported_embedder}"
-            raise ValueError(msg)
-
-    def forward(
-        self: Self,
-        feature_hashes: torch.Tensor,
-        feature_weights: torch.Tensor,
-    ) -> torch.Tensor:
+    def forward(self: Self, text: list[str]) -> torch.Tensor:
         if self.model is None:
             msg = "`model` must be initialised first"
             raise ValueError(msg)
 
-        return self.model(
-            feature_hashes=feature_hashes, feature_weights=feature_weights
-        )
+        return self.model(text=text)
 
     @torch.inference_mode()
     def recommend(
         self: Self,
-        feature_hashes: torch.Tensor,
-        feature_weights: torch.Tensor,
+        text: list[str],
         *,
         top_k: int = TOP_K,
         user_id: int | None = None,
@@ -100,7 +82,7 @@ class MatrixFactorizationLitModule(LightningModule):
         history = self.users_processor.get_activity(user_id, "history")
         exclude_item_ids = (exclude_item_ids or []) + list(history.keys())
 
-        embed = self(feature_hashes, feature_weights).numpy(force=True)
+        embed = self(text).numpy(force=True)
         return self.items_processor.search(
             embed, exclude_item_ids=exclude_item_ids, top_k=top_k
         ).drop(columns="embedding")
@@ -119,33 +101,27 @@ class MatrixFactorizationLitModule(LightningModule):
         user: dict[str, torch.Tensor] = batch["user"]
         user_idx = user["idx"]
         # shape: (num_users,)
-        user_feature_hashes = user["feature_hashes"]
-        # shape: (num_users, num_user_features)
-        user_feature_weights = user["feature_weights"]
-        # shape: (num_users, num_user_features)
-        user_embed = self(user_feature_hashes, user_feature_weights)
+        user_text = user["text"]
+        # shape: (num_users,)
+        user_embed = self(user_text)
         # shape: (num_users, embed_dim)
 
         # item
         item: dict[str, torch.Tensor] = batch["item"]
         item_idx = item["idx"]
         # shape: (num_items,)
-        item_feature_hashes = item["feature_hashes"]
-        # shape: (num_items, num_item_features)
-        item_feature_weights = item["feature_weights"]
-        # shape: (num_items, num_item_features)
-        item_embed = self(item_feature_hashes, item_feature_weights)
+        item_text = item["text"]
+        # shape: (num_items,)
+        item_embed = self(item_text)
         # shape: (num_items, embed_dim)
 
         # neg item
         neg_item = batch["neg_item"]
         neg_item_idx = neg_item["idx"]
         # shape: (num_items,)
-        neg_item_feature_hashes = neg_item["feature_hashes"]
-        # shape: (num_items, num_item_features)
-        neg_item_feature_weights = neg_item["feature_weights"]
-        # shape: (num_items, num_item_features)
-        neg_item_embed = self(neg_item_feature_hashes, neg_item_feature_weights)
+        neg_item_text = neg_item["text"]
+        # shape: (num_items,)
+        neg_item_embed = self(neg_item_text)
         # shape: (num_items, embed_dim)
         item_idx = torch.cat([item_idx, neg_item_idx])
         item_embed = torch.cat([item_embed, neg_item_embed])
@@ -199,30 +175,25 @@ class MatrixFactorizationLitModule(LightningModule):
                 metric.update(preds=preds, target=target > 0, indexes=indexes)
         return metrics
 
-    def training_step(
-        self: Self, batch: tuple[BatchType, FeaturesType], _: int
-    ) -> torch.Tensor:
+    def training_step(self: Self, batch: BatchType, _: int) -> torch.Tensor:
         losses = self.compute_losses(batch, step_name="train")
         self.log_dict(losses)
         train_loss = losses[f"train/{self.hparams.train_loss}"]
         reg_loss = losses["train/RegularizationLoss"]
         return train_loss + reg_loss
 
-    def validation_step(self: Self, batch: dict[str, torch.Tensor], _: int) -> None:
+    def validation_step(self: Self, batch: FeaturesType, _: int) -> None:
         metrics = self.update_metrics(batch, step_name="val")
         self.log_dict(metrics)
 
-    def test_step(self: Self, batch: dict[str, torch.Tensor], _: int) -> None:  # noqa: PT019
+    def test_step(self: Self, batch: FeaturesType, _: int) -> None:  # noqa: PT019
         metrics = self.update_metrics(batch, step_name="test")
         self.log_dict(metrics)
 
-    def predict_step(
-        self: Self, batch: dict[str, torch.Tensor], _: int
-    ) -> pd.DataFrame:
+    def predict_step(self: Self, batch: FeaturesType, _: int) -> pd.DataFrame:
         user_id_col = self.trainer.datamodule.users_processor.id_col
         return self.recommend(
-            batch["feature_hashes"],
-            batch["feature_weights"],
+            batch["text"],
             top_k=self.hparams.top_k,
             user_id=batch[user_id_col],
         )
@@ -258,14 +229,6 @@ class MatrixFactorizationLitModule(LightningModule):
         self.on_validation_start()
 
     def configure_optimizers(self: Self) -> torch.optim.Optimizer:
-        if self.model is None:
-            msg = "`model` must be initialised first"
-            raise ValueError(msg)
-
-        if self.model.sparse:
-            return torch.optim.SparseAdam(
-                self.parameters(), lr=self.hparams.learning_rate
-            )
         return torch.optim.AdamW(self.parameters(), lr=self.hparams.learning_rate)
 
     def configure_callbacks(self: Self) -> list[Callback]:
@@ -289,32 +252,8 @@ class MatrixFactorizationLitModule(LightningModule):
     def get_model(self: Self) -> torch.nn.Module:
         import mf_torch.models as mf_models
 
-        match self.hparams.embedder_type:
-            case "base":
-                embedder = mf_models.EmbeddingBag(
-                    num_embeddings=self.hparams.num_embeddings,
-                    embedding_dim=self.hparams.embedding_dim,
-                )
-            case "attention":
-                embedder = mf_models.AttentionEmbeddingBag(
-                    num_embeddings=self.hparams.num_embeddings,
-                    embedding_dim=self.hparams.embedding_dim,
-                    num_heads=self.hparams.num_heads,
-                    dropout=self.hparams.dropout,
-                )
-            case "transformer":
-                embedder = mf_models.TransformerEmbeddingBag(
-                    num_embeddings=self.hparams.num_embeddings,
-                    embedding_dim=self.hparams.embedding_dim,
-                    num_heads=self.hparams.num_heads,
-                    dropout=self.hparams.dropout,
-                )
-            case _:
-                msg = f"{self.hparams.embedder_type = }"
-                raise NotImplementedError(msg)
-
         return mf_models.MatrixFactorization(
-            embedder=embedder, normalize=self.hparams.normalize
+            model_name_or_path=self.hparams.encoder_model_name
         )
 
     def get_loss_fns(self: Self) -> torch.nn.ModuleList:
@@ -367,11 +306,8 @@ class MatrixFactorizationLitModule(LightningModule):
         return torch.nn.ModuleDict(metrics)
 
     @property
-    def example_input_array(self: Self) -> tuple[torch.Tensor, torch.Tensor]:
-        return (
-            torch.zeros((2, 2), dtype=torch.int, device=self.device),
-            torch.zeros((2, 2), dtype=self.dtype, device=self.device),
-        )
+    def example_input_array(self: Self) -> tuple[list[str]]:
+        return (["{}"],)
 
     def export_torchscript(
         self: Self, path: str | None = None
@@ -387,11 +323,7 @@ class MatrixFactorizationLitModule(LightningModule):
         self: Self, path: str | None = None
     ) -> torch.export.ExportedProgram:
         batch = torch.export.Dim("batch")
-        features = torch.export.Dim("features")
-        dynamic_shapes = {
-            "feature_hashes": (batch, features),
-            "feature_weights": (batch, features),
-        }
+        dynamic_shapes = {"text": (batch,)}
         exported_program = torch.export.export(
             self.model.eval(),
             self.example_input_array,
@@ -513,14 +445,16 @@ if __name__ == "__main__":
 
     from mf_torch.data.lightning import MatrixFactorizationDataModule
 
-    datamodule = MatrixFactorizationDataModule()
+    datamodule = MatrixFactorizationDataModule(batch_size=4)
     datamodule.prepare_data()
     datamodule.setup("fit")
     model = MatrixFactorizationLitModule()
     model.configure_model()
+    model.eval()
 
-    rich.print(model(*model.example_input_array))
-    rich.print(model.compute_losses(next(iter(datamodule.train_dataloader()))))
+    with torch.inference_mode():
+        rich.print(model(*model.example_input_array))
+        rich.print(model.compute_losses(next(iter(datamodule.train_dataloader()))))
 
     trainer_args = {
         "fast_dev_run": True,
@@ -529,7 +463,8 @@ if __name__ == "__main__":
         # "limit_val_batches": 1,
         # "overfit_batches": 1,
     }
-    cli = cli_main(args={"trainer": trainer_args}, run=False)
+    data_args = {"batch_size": 4}
+    cli = cli_main(args={"trainer": trainer_args, "data": data_args}, run=False)
     with contextlib.suppress(ReferenceError):
         # suppress weak reference on ModelCheckpoint callback
         cli.trainer.fit(cli.model, datamodule=cli.datamodule)

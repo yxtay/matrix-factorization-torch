@@ -22,32 +22,23 @@ from mf_torch.params import (
 
 class Activity(pydantic.BaseModel):
     datetime: datetime.datetime
-    movie_id: int
     rating: int
+    movie_id: int
+    movie_text: str
 
 
 class UserQuery(pydantic.BaseModel):
-    user_rn: int = 0
-    user_id: int | None = None
-    gender: str | None = None
-    age: int | None = None
-    occupation: int | None = None
-    zipcode: str | None = None
-    history: list[Activity] | None = None
-    target: list[Activity] | None = None
+    user_id: int = 0
+    user_text: str = ""
 
 
 class ItemQuery(pydantic.BaseModel):
-    movie_rn: int = 0
-    movie_id: int | None = None
-    title: str | None = None
-    genres: list[str] | None = None
+    movie_id: int = 0
+    movie_text: str = ""
 
 
 class Query(bentoml.IODescriptor):
-    feature_values: list[str]
-    feature_hashes: Annotated[torch.Tensor, DType("int32")]
-    feature_weights: Annotated[torch.Tensor, DType("float32")]
+    text: str = ""
     embedding: Annotated[torch.Tensor, DType("float32")] | None = None
 
 
@@ -60,16 +51,12 @@ class ItemCandidate(pydantic.BaseModel):
 
 EXAMPLE_ITEM = ItemQuery(
     movie_id=1,
-    title="Toy Story (1995)",
-    genres=["Animation", "Children's", "Comedy"],
+    movie_text='{"title": "Toy Story (1995)", "genres": ["Animation", "Children\'s", "Comedy"]}',
 )
 
 EXAMPLE_USER = UserQuery(
     user_id=1,
-    gender="F",
-    age=1,
-    occupation=10,
-    zipcode="48067",
+    user_text='{"gender": "F", "age": 1, "occupation": 10, "zipcode": "48067"}',
 )
 
 PACKAGES = [
@@ -78,7 +65,7 @@ PACKAGES = [
     "loguru",
     "pandas",
     "pylance",
-    "torch",
+    "sentence-transformers",
     "xxhash",
 ]
 image = bentoml.images.PythonImage().python_packages(*PACKAGES)
@@ -99,9 +86,7 @@ class Embedder:
     @logger.catch(reraise=True)
     @torch.inference_mode()
     def embed(self: Self, query: Query) -> Query:
-        query.embedding = self.model(
-            query.feature_hashes.unsqueeze(0), query.feature_weights.unsqueeze(0)
-        ).squeeze(0)
+        query.embedding = self.model([query.text]).squeeze(0)
         return query
 
 
