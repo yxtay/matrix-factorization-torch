@@ -6,12 +6,14 @@ import pathlib
 from typing import Annotated
 
 import bentoml
+import numpy as np  # noqa: TC002
 import pydantic
 import torch
-from bentoml.validators import DType
+from bentoml.validators import DType, Shape
 from loguru import logger
 
 from mf_torch.params import (
+    EMBEDDING_DIM,
     LANCE_DB_PATH,
     MODEL_NAME,
     MODEL_PATH,
@@ -41,7 +43,9 @@ class ItemQuery(pydantic.BaseModel):
 
 class Query(bentoml.IODescriptor):
     text: str = ""
-    embedding: Annotated[np.ndarray, DType("float32")] | None = None
+    embedding: (
+        Annotated[np.ndarray, Shape((EMBEDDING_DIM,)), DType("float32")] | None
+    ) = None
 
 
 class ItemCandidate(pydantic.BaseModel):
