@@ -121,7 +121,7 @@ class ItemsProcessor:
         from pydantic import TypeAdapter
 
         results_df = self.items_processor.search(
-            query.embedding.numpy(),
+            query.embedding,
             exclude_item_ids=exclude_item_ids,
             top_k=top_k,
         )
