@@ -6,27 +6,17 @@ MLFLOW_DIR = "mlruns"
 
 # data
 TARGET_COL = "rating"
-USER_RN_COL = "user_rn"
-USER_ID_COL = "user_id"
-USER_FEATURE_NAMES = {
-    "user_id": "user_id",
-    "gender": "gender",
-    "age": "age",
-    "occupation": "occupation",
-    "zipcode": "zipcode",
-}
-ITEM_RN_COL = "movie_rn"
 ITEM_ID_COL = "movie_id"
-ITEM_FEATURE_NAMES = {
-    "movie_id": "movie_id",
-    "genres": "genres",
-}
+ITEM_TEXT_COL = "movie_text"
+ITEM_FEATURE_NAMES = ["title", "genres"]
+USER_ID_COL = "user_id"
+USER_TEXT_COL = "user_text"
+USER_FEATURE_NAMES = ["gender", "age", "occupation", "zipcode"]
 
 # model
-BATCH_SIZE = 2**10
-NUM_HASHES = 2
-NUM_EMBEDDINGS = 2**16 + 1
-EMBEDDING_DIM = 32
+ENCODER_MODEL_NAME = "BAAI/bge-small-en-v1.5"
+BATCH_SIZE = 2**5
+EMBEDDING_DIM = 384
 PADDING_IDX = 0
 METRIC = {"name": "val/RetrievalNormalizedDCG", "mode": "max"}
 TOP_K = 20
@@ -34,6 +24,7 @@ TOP_K = 20
 # serving
 CHECKPOINT_PATH = "checkpoint.ckpt"
 PROCESSORS_JSON = "processors.json"
+MODEL_PATH = "model"
 EXPORTED_PROGRAM_PATH = "exported_program.pt"
 ONNX_PROGRAM_PATH = "program.onnx"
 ITEMS_TABLE_NAME = "movies"

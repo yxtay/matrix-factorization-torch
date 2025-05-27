@@ -7,7 +7,12 @@ from concurrent.futures import ThreadPoolExecutor
 import polars as pl
 from loguru import logger
 
-from mf_torch.params import DATA_DIR, MOVIELENS_1M_URL
+from mf_torch.params import (
+    DATA_DIR,
+    ITEM_FEATURE_NAMES,
+    MOVIELENS_1M_URL,
+    USER_FEATURE_NAMES,
+)
 
 ###
 # download data
@@ -22,11 +27,12 @@ def download_data(
     # prepare destination
     dest = pathlib.Path(dest_dir) / pathlib.Path(url).name
 
-    # downlaod zip
+    # download zip
     if not dest.exists() or overwrite:
         dest.parent.mkdir(parents=True, exist_ok=True)
         logger.info("downloading data: {}", url)
         response = requests.get(url, timeout=10, stream=True)
+        response.raise_for_status()
         with dest.open("wb") as f:
             shutil.copyfileobj(response.raw, f)
 
@@ -77,7 +83,8 @@ def load_movies(src_dir: str = DATA_DIR) -> pl.LazyFrame:
         )
         .pipe(pl.from_pandas)
         .with_columns(genres=pl.col("genres").str.split("|"))
-        .with_row_index("movie_rn")
+        .with_columns(movie_text=pl.struct(ITEM_FEATURE_NAMES).struct.json_encode())
+        .drop(*ITEM_FEATURE_NAMES)
     )
     logger.info("movies loaded: {}, shape: {}", movies_dat, movies.shape)
 
@@ -90,10 +97,10 @@ def load_users(src_dir: str = DATA_DIR) -> pl.LazyFrame:
     users_dat = pathlib.Path(src_dir, "ml-1m", "users.dat")
     dtype = {
         "user_id": "int32",
-        "gender": "category",
+        "gender": "str",
         "age": "int32",
         "occupation": "int32",
-        "zipcode": "category",
+        "zipcode": "str",
     }
 
     users = (
@@ -106,7 +113,8 @@ def load_users(src_dir: str = DATA_DIR) -> pl.LazyFrame:
             engine="python",
         )
         .pipe(pl.from_pandas)
-        .with_row_index("user_rn")
+        .with_columns(user_text=pl.struct(USER_FEATURE_NAMES).struct.json_encode())
+        .drop(*USER_FEATURE_NAMES)
     )
     logger.info("users loaded: {}, shape: {}", users_dat, users.shape)
     return users.lazy()
@@ -201,15 +209,9 @@ def process_ratings(
         .sort(["user_id", "datetime"])
     )
 
-    movie_cols = movies.collect_schema().names()
     with ThreadPoolExecutor() as executor:
         for _, df in ratings_merged.collect().group_by("user_id"):
-            executor.submit(
-                gather_history,
-                ratings=df.lazy(),
-                movie_cols=movie_cols,
-                path=ratings_parquet,
-            )
+            executor.submit(gather_history, ratings=df.lazy(), path=ratings_parquet)
 
     ratings_processed = pl.scan_parquet(ratings_parquet)
     n_row = ratings_processed.select(pl.len()).collect().item()
@@ -218,12 +220,10 @@ def process_ratings(
     return ratings_processed
 
 
-def gather_history(
-    ratings: pl.LazyFrame, *, movie_cols: list[str], path: pathlib.Path
-) -> pl.LazyFrame:
+def gather_history(ratings: pl.LazyFrame, *, path: pathlib.Path) -> pl.LazyFrame:
     ratings_history = (
         ratings.rolling("datetime", period="4w", closed="none", group_by="user_id")
-        .agg(history=pl.struct("datetime", *movie_cols, "rating"))
+        .agg(history=pl.struct("datetime", "rating", "movie_id", "movie_text"))
         .unique(["user_id", "datetime"])
     )
     ratings_history = ratings.join(
@@ -263,7 +263,6 @@ def process_users(
     users: pl.LazyFrame,
     ratings: pl.LazyFrame,
     *,
-    movie_cols: list[str],
     src_dir: str = DATA_DIR,
     overwrite: bool = False,
 ) -> pl.LazyFrame:
@@ -277,8 +276,10 @@ def process_users(
         ratings.lazy()
         .group_by("user_id")
         .agg(
-            history=pl.struct("datetime", *movie_cols, "rating").filter("is_train"),
-            target=pl.struct("datetime", *movie_cols, "rating").filter(
+            history=pl.struct("datetime", "rating", "movie_id", "movie_text").filter(
+                "is_train"
+            ),
+            target=pl.struct("datetime", "rating", "movie_id", "movie_text").filter(
                 ~pl.col("is_train")
             ),
             is_train=pl.any("is_train"),
@@ -308,15 +309,12 @@ def prepare_movielens(
     movies = load_movies(src_dir)
     users = load_users(src_dir)
     ratings = load_ratings(src_dir).pipe(train_test_split)
-    movie_cols = movies.collect_schema().names()
 
     ratings = process_ratings(
         ratings, users, movies, src_dir=src_dir, overwrite=overwrite
     )
     movies = process_movies(movies, ratings, src_dir=src_dir, overwrite=overwrite)
-    users = process_users(
-        users, ratings, movie_cols=movie_cols, src_dir=src_dir, overwrite=overwrite
-    )
+    users = process_users(users, ratings, src_dir=src_dir, overwrite=overwrite)
     return ratings
 
 

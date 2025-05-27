@@ -12,23 +12,25 @@ authors = [
 license = "MIT"
 requires-python = "~=3.12"
 dependencies = [
+  "accelerate~=1.7.0",
   "bentoml~=1.3",
   "flaml[automl,blendsearch]~=2.3",
   "jsonargparse[signatures]~=4.35",
-  "lancedb>=0.19",
+  "lancedb>=0.19,<1.0",
   "lightning~=2.5",
-  "loguru>=0.7,<0.8",
+  "loguru>=0.7,<1.0",
   "mlflow~=2.19",
   "pandas~=2.2",
   "polars[pandas]~=1.19",
-  "pylance>=0.25",
+  "pylance>=0.25,<1.0",
+  "sentence-transformers[onnx]~=4.1",
   "tensorboard~=2.18",
   "torch~=2.5",
   "xxhash~=3.4",
 ]
 
 [dependency-groups]
-dev = ["onnxruntime~=1.20", "onnxscript>=0.2.0", "ray[train,tune]~=2.42"]
+dev = ["ray[train,tune]~=2.42"]
 
 [project.scripts]
 data = "mf_torch.data.prepare:main"

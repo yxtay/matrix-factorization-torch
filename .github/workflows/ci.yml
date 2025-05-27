@@ -24,10 +24,19 @@ jobs:
 
     runs-on: ubuntu-latest
     env:
+      HF_HOME: /tmp/huggingface
+      PROJECT_NAME: mf_torch
       UV_LOCKED: 1
       UV_NO_SYNC: 1
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        with:
+          path: ${{ env.HF_HOME }}
+          key: ${{ runner.os }}-huggingface-${{ hashFiles('**/uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-huggingface-
 
       - uses: astral-sh/setup-uv@f0ec1fc3b38f5e7cd731bb6ce540c5af426746bb # v6
 
@@ -46,10 +55,10 @@ jobs:
         run: uv run bentoml_cli
 
       - if: ${{ failure() }}
-        run: uv run python -m mf_torch.lightning
+        run: uv run python -m "${PROJECT_NAME}.lightning"
 
       - if: ${{ failure() }}
-        run: uv run python -m mf_torch.data.lightning
+        run: uv run python -m "${PROJECT_NAME}.data.lightning"
 
       - if: ${{ failure() }}
         run: uv run data
@@ -62,8 +71,22 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GHCR_IMAGE_NAME: ghcr.io/${{ github.repository }}
+      HF_HOME: /tmp/huggingface
+      PROJECT_NAME: mf_torch
+      DOCKER_RUN_CMD: docker run --mount type=bind,source=/tmp/huggingface,target=/tmp/huggingface -e "HF_HOME=/tmp/huggingface"
 
     steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          sparse-checkout: uv.lock
+
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        with:
+          path: ${{ env.HF_HOME }}
+          key: ${{ runner.os }}-huggingface-${{ hashFiles('**/uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-huggingface-
+
       - uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
 
       - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3
@@ -75,33 +98,32 @@ jobs:
           load: true
 
       - if: ${{ success() || failure() }}
-        run: docker run "${IMAGE_ID}" uv pip list
+        run: ${DOCKER_RUN_CMD} "${IMAGE_ID}" uv pip list
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
       - if: ${{ success() || failure() }}
-        run: docker run "${IMAGE_ID}" uv run lightning fit --print_config
+        run: ${DOCKER_RUN_CMD} "${IMAGE_ID}" uv run lightning fit --print_config
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
       - if: ${{ success() || failure() }}
-        run: docker run "${IMAGE_ID}" uv run bentoml_cli
+        run: ${DOCKER_RUN_CMD} "${IMAGE_ID}" uv run bentoml_cli
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
       - if: ${{ failure() }}
-        run: docker run "${IMAGE_ID}" python -m mf_torch.lightning
+        run: ${DOCKER_RUN_CMD} "${IMAGE_ID}" python -m "${PROJECT_NAME}.lightning"
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
       - if: ${{ failure() }}
-        run: docker run "${IMAGE_ID}" python -m mf_torch.data.lightning
+        run: ${DOCKER_RUN_CMD} "${IMAGE_ID}" python -m "${PROJECT_NAME}.data.lightning"
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
       - if: ${{ failure() }}
-        run: docker run "${IMAGE_ID}" uv run data
-
+        run: ${DOCKER_RUN_CMD} "${IMAGE_ID}" uv run data
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
