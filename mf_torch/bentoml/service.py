@@ -80,6 +80,8 @@ class Embedder:
 
     @logger.catch(reraise=True)
     def __init__(self) -> None:
+        from sentence_transformers import SentenceTransformer
+
         path = self.model_ref.path_of(MODEL_PATH)
         self.model = SentenceTransformer(path, local_files_only=True, backend="onnx")
         logger.info("model loaded: {}", path)
