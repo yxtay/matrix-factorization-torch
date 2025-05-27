@@ -50,8 +50,7 @@ class Query(bentoml.IODescriptor):
 
 class ItemCandidate(pydantic.BaseModel):
     movie_id: int
-    title: str
-    genres: list[str]
+    movie_text: str
     score: float
 
 
@@ -71,7 +70,7 @@ PACKAGES = [
     "loguru",
     "pandas",
     "pylance",
-    "sentence-transformers",
+    "sentence-transformers[onnx]",
     "xxhash",
 ]
 image = bentoml.images.PythonImage().python_packages(*PACKAGES)
