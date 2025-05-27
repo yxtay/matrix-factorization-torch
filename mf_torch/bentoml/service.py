@@ -30,6 +30,8 @@ class Activity(pydantic.BaseModel):
 class UserQuery(pydantic.BaseModel):
     user_id: int = 0
     user_text: str = ""
+    history: list[Activity] | None = None
+    target: list[Activity] | None = None
 
 
 class ItemQuery(pydantic.BaseModel):
