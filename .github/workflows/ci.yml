@@ -72,7 +72,7 @@ jobs:
     env:
       GHCR_IMAGE_NAME: ghcr.io/${{ github.repository }}
       HF_HOME: /tmp/huggingface
-      PROJECT_NAME: seq_rec
+      PROJECT_NAME: mf_torch
       DOCKER_RUN_CMD: docker run --mount type=bind,source=/tmp/huggingface,target=/tmp/huggingface -e "HF_HOME=/tmp/huggingface"
 
     steps:
