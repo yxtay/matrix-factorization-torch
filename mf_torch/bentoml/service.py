@@ -41,7 +41,7 @@ class ItemQuery(pydantic.BaseModel):
 
 class Query(bentoml.IODescriptor):
     text: str = ""
-    embedding: Annotated[torch.Tensor, DType("float32")] | None = None
+    embedding: Annotated[np.ndarray, DType("float32")] | None = None
 
 
 class ItemCandidate(pydantic.BaseModel):
