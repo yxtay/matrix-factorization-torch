@@ -314,7 +314,7 @@ class MatrixFactorizationLitModule(LightningModule):
 
     def save(self, path: str | pathlib.Path) -> None:
         path = pathlib.Path(path)
-        self.model.save_pretrained(path / MODEL_PATH)
+        self.model.save_pretrained((path / MODEL_PATH).as_posix())
 
         processors_args = {
             "users": self.users_processor.model_dump(),
