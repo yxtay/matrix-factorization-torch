@@ -14,7 +14,7 @@ USER_TEXT_COL = "user_text"
 USER_FEATURE_NAMES = ["gender", "age", "occupation", "zipcode"]
 
 # model
-ENCODER_MODEL_NAME = "BAAI/bge-small-en-v1.5"
+MODEL_NAME = "BAAI/bge-small-en-v1.5"
 BATCH_SIZE = 2**5
 EMBEDDING_DIM = 384
 PADDING_IDX = 0
