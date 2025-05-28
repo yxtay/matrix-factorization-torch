@@ -216,7 +216,9 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         logits = torch.cat([pos_loss[:, None], losses + negative_masks.log()], dim=-1)
         # shape: (batch_size, num_hard_negatives | num_items + 1)
         loss = F.cross_entropy(
-            logits, torch.zeros(logits.size(0), dtype=torch.long), reduction="none"
+            logits,
+            torch.zeros(logits.size(0), dtype=torch.long, device=logits.device),
+            reduction="none",
         )
         # shape: (batch_size)
         return (loss * target.abs()).sum()
