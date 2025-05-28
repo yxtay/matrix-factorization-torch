@@ -6,6 +6,7 @@ import pathlib
 from typing import Annotated
 
 import bentoml
+import numpy as np  # noqa: TC002
 import numpy.typing as npt  # noqa: TC002
 import pydantic
 import torch
