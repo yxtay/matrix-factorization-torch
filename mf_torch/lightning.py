@@ -14,10 +14,10 @@ from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
 
 from mf_torch.data.lightning import BatchType, FeaturesType
 from mf_torch.params import (
-    ENCODER_MODEL_NAME,
     METRIC,
     TARGET_COL,
     TOP_K,
+    TRANSFORMER_NAME,
 )
 
 if TYPE_CHECKING:
@@ -35,7 +35,7 @@ class MatrixFactorizationLitModule(LightningModule):
     def __init__(  # noqa: PLR0913
         self,
         *,
-        model_name_or_path: str = ENCODER_MODEL_NAME,  # noqa: ARG002
+        model_name_or_path: str = TRANSFORMER_NAME,  # noqa: ARG002
         num_hidden_layers: int | None = None,  # noqa: ARG002
         train_loss: str = "PairwiseHingeLoss",  # noqa: ARG002
         hard_negatives_ratio: float | None = None,  # noqa: ARG002
@@ -313,13 +313,13 @@ class MatrixFactorizationLitModule(LightningModule):
         from mf_torch.params import (
             CHECKPOINT_PATH,
             LANCE_DB_PATH,
-            MODEL_PATH,
             PROCESSORS_JSON,
+            TRANSFORMER_PATH,
         )
 
         path = pathlib.Path(path)
         self.trainer.save_checkpoint(path / CHECKPOINT_PATH)
-        self.model.save_pretrained((path / MODEL_PATH).as_posix())
+        self.model.save_pretrained((path / TRANSFORMER_PATH).as_posix())
 
         processors_args = {
             "users": self.users_processor.model_dump(),

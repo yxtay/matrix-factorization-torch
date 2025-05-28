@@ -12,7 +12,7 @@ USER_ID_COL = "user_id"
 USER_TEXT_COL = "user_text"
 
 # model
-ENCODER_MODEL_NAME = "BAAI/bge-small-en-v1.5"
+TRANSFORMER_NAME = "BAAI/bge-small-en-v1.5"
 BATCH_SIZE = 2**5
 EMBEDDING_DIM = 384
 PADDING_IDX = 0
@@ -24,7 +24,6 @@ CHECKPOINT_PATH = "checkpoint.ckpt"
 ITEMS_TABLE_NAME = "movies"
 LANCE_DB_PATH = "lance_db"
 MODEL_NAME = "mf_torch"
-MODEL_PATH = "model"
 PROCESSORS_JSON = "processors.json"
-SCRIPT_MODULE_PATH = "scriptmodule.pt"
+TRANSFORMER_PATH = "transformer"
 USERS_TABLE_NAME = "users"

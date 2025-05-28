@@ -17,9 +17,9 @@ from mf_torch.params import (
     EMBEDDING_DIM,
     LANCE_DB_PATH,
     MODEL_NAME,
-    MODEL_PATH,
     PROCESSORS_JSON,
     TOP_K,
+    TRANSFORMER_PATH,
 )
 
 
@@ -87,7 +87,7 @@ class Embedder:
     def __init__(self) -> None:
         from sentence_transformers import SentenceTransformer
 
-        path = self.model_ref.path_of(MODEL_PATH)
+        path = self.model_ref.path_of(TRANSFORMER_PATH)
         self.model = SentenceTransformer(path, local_files_only=True, backend="onnx")
         logger.info("model loaded: {}", path)
 
