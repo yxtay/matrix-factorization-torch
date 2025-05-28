@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 import torch
 
-from mf_torch.params import CHECKPOINT_PATH, MODEL_NAME
+from mf_torch.params import MODEL_NAME
 
 if TYPE_CHECKING:
     import bentoml
@@ -58,7 +58,6 @@ def save_model(trainer: Trainer) -> None:
     import bentoml
 
     with bentoml.models.create(MODEL_NAME) as model_ref:
-        trainer.save_checkpoint(model_ref.path_of(CHECKPOINT_PATH))
         model: MatrixFactorizationLitModule = trainer.model
         model.save(model_ref.path)
 
