@@ -24,11 +24,6 @@
       "groupName": "python",
       "matchPackageNames": ["python"],
       "matchUpdateTypes": ["minor"]
-    },
-    {
-      "groupName": "kics-github-action",
-      "matchPackageNames": ["checkmarx/kics-github-action"],
-      "allowedVersions": "!/^c456d04.*$/"
     }
   ]
 }
