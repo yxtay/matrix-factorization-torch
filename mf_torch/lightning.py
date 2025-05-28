@@ -60,7 +60,9 @@ class MatrixFactorizationLitModule(LightningModule):
             raise ValueError(msg)
 
         # input shape: (batch_size,)
-        tokens = self.model.tokenize(text)
+        tokens = self.model.tokenizer(text, padding=True, return_tensors="pt").to(
+            self.device
+        )
         # shape: (batch_size, seq_len)
         # output shape: (batch_size, embed_dim)
         return self.model(tokens)["sentence_embedding"]
@@ -252,7 +254,7 @@ class MatrixFactorizationLitModule(LightningModule):
             config_kwargs["num_hidden_layers"] = self.hparams.get("num_hidden_layers")
 
         model = SentenceTransformer(
-            self.hparams.model_name_or_path, device="cpu", config_kwargs=config_kwargs
+            self.hparams.model_name_or_path, config_kwargs=config_kwargs
         )
         # freeze embeddings layer
         for name, module in model.named_modules():
@@ -400,7 +402,6 @@ def cli_main(
     }
     progress_bar = lazy_instance(lp_callbacks.RichProgressBar)
     trainer_defaults = {
-        "accelerator": "cpu",
         "precision": "bf16-mixed",
         "logger": [tensorboard_logger, mlflow_logger],
         "callbacks": [progress_bar],
