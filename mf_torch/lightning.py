@@ -14,12 +14,8 @@ from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
 
 from mf_torch.data.lightning import BatchType, FeaturesType
 from mf_torch.params import (
-    CHECKPOINT_PATH,
     ENCODER_MODEL_NAME,
-    LANCE_DB_PATH,
     METRIC,
-    MODEL_PATH,
-    PROCESSORS_JSON,
     TARGET_COL,
     TOP_K,
 )
@@ -314,6 +310,13 @@ class MatrixFactorizationLitModule(LightningModule):
         return (["", "{}"],)
 
     def save(self, path: str | pathlib.Path) -> None:
+        from mf_torch.params import (
+            CHECKPOINT_PATH,
+            LANCE_DB_PATH,
+            MODEL_PATH,
+            PROCESSORS_JSON,
+        )
+
         path = pathlib.Path(path)
         self.trainer.save_checkpoint(path / CHECKPOINT_PATH)
         self.model.save_pretrained((path / MODEL_PATH).as_posix())

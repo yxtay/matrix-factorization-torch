@@ -8,10 +8,8 @@ MLFLOW_DIR = "mlruns"
 TARGET_COL = "rating"
 ITEM_ID_COL = "movie_id"
 ITEM_TEXT_COL = "movie_text"
-ITEM_FEATURE_NAMES = ["title", "genres"]
 USER_ID_COL = "user_id"
 USER_TEXT_COL = "user_text"
-USER_FEATURE_NAMES = ["gender", "age", "occupation", "zipcode"]
 
 # model
 ENCODER_MODEL_NAME = "BAAI/bge-small-en-v1.5"
