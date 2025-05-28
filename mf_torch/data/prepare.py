@@ -7,10 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 import polars as pl
 from loguru import logger
 
-from mf_torch.params import (
-    DATA_DIR,
-    MOVIELENS_1M_URL,
-)
+from mf_torch.params import DATA_DIR, MOVIELENS_1M_URL
 
 ###
 # download data
