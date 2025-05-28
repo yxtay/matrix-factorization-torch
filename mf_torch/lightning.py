@@ -344,7 +344,7 @@ class LoggerSaveConfigCallback(SaveConfigCallback):
         for logger in trainer.loggers:
             if isinstance(logger, lp_loggers.MLFlowLogger):
                 with tempfile.TemporaryDirectory() as path:
-                    config_path = pathlib.Path(path) / self.config_filename
+                    config_path = pathlib.Path(path, self.config_filename)
                     self.parser.save(
                         self.config,
                         config_path,

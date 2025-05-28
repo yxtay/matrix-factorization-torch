@@ -51,7 +51,7 @@ def prepare_trainer(
             "default_root_dir": tmp,
         }
         args = {"trainer": trainer_args, "ckpt_path": ckpt_path, **load_args(ckpt_path)}
-    return cli_main({stage: args}).trainer
+        return cli_main({stage: args}).trainer
 
 
 def save_model(trainer: Trainer) -> None:

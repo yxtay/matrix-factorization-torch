@@ -23,7 +23,7 @@ def download_data(
     import requests
 
     # prepare destination
-    dest = pathlib.Path(dest_dir) / pathlib.Path(url).name
+    dest = pathlib.Path(dest_dir, pathlib.Path(url).name)
 
     # download zip
     if not dest.exists() or overwrite:
