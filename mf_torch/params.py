@@ -22,13 +22,10 @@ METRIC = {"name": "val/RetrievalNormalizedDCG", "mode": "max"}
 TOP_K = 20
 
 # serving
-CHECKPOINT_PATH = "checkpoint.ckpt"
-PROCESSORS_JSON = "processors.json"
-MODEL_PATH = "model"
-EXPORTED_PROGRAM_PATH = "exported_program.pt"
-ONNX_PROGRAM_PATH = "program.onnx"
 ITEMS_TABLE_NAME = "movies"
 LANCE_DB_PATH = "lance_db"
 MODEL_NAME = "mf_torch"
+MODEL_PATH = "model"
+PROCESSORS_JSON = "processors.json"
 SCRIPT_MODULE_PATH = "scriptmodule.pt"
 USERS_TABLE_NAME = "users"
