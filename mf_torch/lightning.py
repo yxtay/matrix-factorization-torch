@@ -14,9 +14,9 @@ from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
 
 from mf_torch.data.lightning import BatchType, FeaturesType
 from mf_torch.params import (
+    ENCODER_MODEL_NAME,
     LANCE_DB_PATH,
     METRIC,
-    MODEL_NAME,
     MODEL_PATH,
     PROCESSORS_JSON,
     TARGET_COL,
@@ -38,7 +38,7 @@ class MatrixFactorizationLitModule(LightningModule):
     def __init__(  # noqa: PLR0913
         self,
         *,
-        model_name_or_path: str = MODEL_NAME,  # noqa: ARG002
+        model_name_or_path: str = ENCODER_MODEL_NAME,  # noqa: ARG002
         num_hidden_layers: int | None = None,  # noqa: ARG002
         train_loss: str = "PairwiseHingeLoss",  # noqa: ARG002
         hard_negatives_ratio: float | None = None,  # noqa: ARG002
