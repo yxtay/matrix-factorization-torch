@@ -22,6 +22,7 @@ METRIC = {"name": "val/RetrievalNormalizedDCG", "mode": "max"}
 TOP_K = 20
 
 # serving
+CHECKPOINT_PATH = "checkpoint.ckpt"
 ITEMS_TABLE_NAME = "movies"
 LANCE_DB_PATH = "lance_db"
 MODEL_NAME = "mf_torch"
