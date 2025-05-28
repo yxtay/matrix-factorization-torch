@@ -1,20 +1,11 @@
 from __future__ import annotations
 
-import json
-import pathlib
-import shutil
 import tempfile
 from typing import TYPE_CHECKING, Any
 
 import torch
 
-from mf_torch.params import (
-    CHECKPOINT_PATH,
-    LANCE_DB_PATH,
-    MODEL_NAME,
-    MODEL_PATH,
-    PROCESSORS_JSON,
-)
+from mf_torch.params import MODEL_NAME
 
 if TYPE_CHECKING:
     import bentoml
@@ -60,27 +51,15 @@ def prepare_trainer(
             "default_root_dir": tmp,
         }
         args = {"trainer": trainer_args, "ckpt_path": ckpt_path, **load_args(ckpt_path)}
-    return cli_main({stage: args}).trainer
+        return cli_main({stage: args}).trainer
 
 
 def save_model(trainer: Trainer) -> None:
     import bentoml
 
     with bentoml.models.create(MODEL_NAME) as model_ref:
-        trainer.save_checkpoint(model_ref.path_of(CHECKPOINT_PATH))
         model: MatrixFactorizationLitModule = trainer.model
-        model.save_pretrained(model_ref.path_of(MODEL_PATH))
-
-        processors_args = {
-            "users": model.users_processor.model_dump(),
-            "items": model.items_processor.model_dump(),
-        }
-        pathlib.Path(model_ref.path_of(PROCESSORS_JSON)).write_text(
-            json.dumps(processors_args, indent=2)
-        )
-
-        lance_db_path = model.items_processor.lance_db_path
-        shutil.copytree(lance_db_path, model_ref.path_of(LANCE_DB_PATH))
+        model.save(model_ref.path)
 
 
 def test_bento(
