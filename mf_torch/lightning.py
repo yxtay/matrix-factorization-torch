@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import pathlib
+import shutil
 from typing import TYPE_CHECKING
 
 import lightning.pytorch.callbacks as lp_callbacks
@@ -13,10 +15,7 @@ from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
 from mf_torch.data.lightning import BatchType, FeaturesType
 from mf_torch.params import (
     ENCODER_MODEL_NAME,
-    EXPORTED_PROGRAM_PATH,
     METRIC,
-    ONNX_PROGRAM_PATH,
-    SCRIPT_MODULE_PATH,
     TARGET_COL,
     TOP_K,
 )
@@ -27,8 +26,8 @@ if TYPE_CHECKING:
     from lightning import Callback, Trainer
     from lightning.pytorch.cli import ArgsType
     from mlflow import MlflowClient
+    from sentence_transformers import SentenceTransformer
 
-    import mf_torch.models as mf_models
     from mf_torch.data.lightning import ItemsProcessor, UsersProcessor
 
 
@@ -36,7 +35,7 @@ class MatrixFactorizationLitModule(LightningModule):
     def __init__(  # noqa: PLR0913
         self,
         *,
-        encoder_model_name: str = ENCODER_MODEL_NAME,  # noqa: ARG002
+        model_name_or_path: str = ENCODER_MODEL_NAME,  # noqa: ARG002
         num_hidden_layers: int | None = None,  # noqa: ARG002
         train_loss: str = "PairwiseHingeLoss",  # noqa: ARG002
         hard_negatives_ratio: float | None = None,  # noqa: ARG002
@@ -49,7 +48,7 @@ class MatrixFactorizationLitModule(LightningModule):
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
-        self.model: mf_models.MatrixFactorization | None = None
+        self.model: SentenceTransformer | None = None
         self.loss_fns: torch.nn.ModuleList | None = None
         self.metrics: torch.nn.ModuleDict | None = None
         self.users_processor: UsersProcessor | None = None
@@ -60,7 +59,11 @@ class MatrixFactorizationLitModule(LightningModule):
             msg = "`model` must be initialised first"
             raise ValueError(msg)
 
-        return self.model(text=text)
+        # input shape: (batch_size,)
+        tokens = self.model.tokenize(text)
+        # shape: (batch_size, seq_len)
+        # output shape: (batch_size, embed_dim)
+        return self.model(tokens)["sentence_embedding"]
 
     @torch.inference_mode()
     def recommend(
@@ -242,12 +245,22 @@ class MatrixFactorizationLitModule(LightningModule):
             self.metrics = self.get_metrics()
 
     def get_model(self) -> torch.nn.Module:
-        from mf_torch.models import MatrixFactorization
+        from sentence_transformers import SentenceTransformer
 
-        return MatrixFactorization(
-            model_name_or_path=self.hparams.encoder_model_name,
-            num_hidden_layers=self.hparams.get("num_hidden_layers"),
+        config_kwargs = {}
+        if self.hparams.get("num_hidden_layers"):
+            config_kwargs["num_hidden_layers"] = self.hparams.get("num_hidden_layers")
+
+        model = SentenceTransformer(
+            self.hparams.model_name_or_path, device="cpu", config_kwargs=config_kwargs
         )
+        # freeze embeddings layer
+        for name, module in model.named_modules():
+            if "embeddings" in name:
+                for param in module.parameters():
+                    param.requires_grad = False
+                break
+        return model
 
     def get_loss_fns(self) -> torch.nn.ModuleList:
         import mf_torch.losses as mf_losses
@@ -296,45 +309,26 @@ class MatrixFactorizationLitModule(LightningModule):
     def example_input_array(self) -> tuple[list[str]]:
         return (["", "{}"],)
 
-    def save_pretrained(self, path: str) -> None:
-        self.model.save_pretrained(path)
-
-    def export_torchscript(self, path: str | None = None) -> torch.jit.ScriptModule:
-        script_module = torch.jit.script(self.model.eval())  # devskim: ignore DS189424
-
-        if path is None:
-            path = pathlib.Path(self.trainer.log_dir) / SCRIPT_MODULE_PATH
-        torch.jit.save(script_module, path)  # nosec
-        return script_module
-
-    def export_dynamo(self, path: str | None = None) -> torch.export.ExportedProgram:
-        batch = torch.export.Dim("batch")
-        dynamic_shapes = {"text": (batch,)}
-        exported_program = torch.export.export(
-            self.model.eval(),
-            self.example_input_array,
-            dynamic_shapes=dynamic_shapes,
+    def save(self, path: str | pathlib.Path) -> None:
+        from mf_torch.params import (
+            CHECKPOINT_PATH,
+            LANCE_DB_PATH,
+            MODEL_PATH,
+            PROCESSORS_JSON,
         )
 
-        if path is None:
-            path = pathlib.Path(self.trainer.log_dir) / EXPORTED_PROGRAM_PATH
-        torch.export.save(exported_program, path)  # nosec
-        return exported_program
+        path = pathlib.Path(path)
+        self.trainer.save_checkpoint(path / CHECKPOINT_PATH)
+        self.model.save_pretrained((path / MODEL_PATH).as_posix())
 
-    def export_onnx(self, path: str | None = None) -> torch.onnx.ONNXProgram:
-        if path is None:
-            path = pathlib.Path(self.trainer.log_dir) / ONNX_PROGRAM_PATH
+        processors_args = {
+            "users": self.users_processor.model_dump(),
+            "items": self.items_processor.model_dump(),
+        }
+        (path / PROCESSORS_JSON).write_text(json.dumps(processors_args, indent=2))
 
-        dynamo_path = pathlib.Path(path).parent / EXPORTED_PROGRAM_PATH
-        exported_program = self.export_dynamo(dynamo_path)
-        return torch.onnx.export(
-            exported_program,
-            self.example_input_array,
-            path,
-            dynamo=True,
-            optimize=True,
-            verify=True,
-        )
+        lance_db_path = self.items_processor.lance_db_path
+        shutil.copytree(lance_db_path, path / LANCE_DB_PATH)
 
 
 class LoggerSaveConfigCallback(SaveConfigCallback):
@@ -350,7 +344,7 @@ class LoggerSaveConfigCallback(SaveConfigCallback):
         for logger in trainer.loggers:
             if isinstance(logger, lp_loggers.MLFlowLogger):
                 with tempfile.TemporaryDirectory() as path:
-                    config_path = pathlib.Path(path) / self.config_filename
+                    config_path = pathlib.Path(path, self.config_filename)
                     self.parser.save(
                         self.config,
                         config_path,
