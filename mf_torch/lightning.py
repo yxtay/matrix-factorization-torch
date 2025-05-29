@@ -14,7 +14,9 @@ from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
 
 from mf_torch.data.lightning import BatchType, FeaturesType
 from mf_torch.params import (
+    MAX_SEQ_LENGTH,
     METRIC,
+    NEW_HIDDEN_LAYERS,
     TARGET_COL,
     TOP_K,
     TRANSFORMER_NAME,
@@ -36,7 +38,8 @@ class MatrixFactorizationLitModule(LightningModule):
         self,
         *,
         model_name_or_path: str = TRANSFORMER_NAME,  # noqa: ARG002
-        num_hidden_layers: int | None = None,  # noqa: ARG002
+        new_hidden_layers: int = NEW_HIDDEN_LAYERS,  # noqa: ARG002
+        max_seq_length: int = MAX_SEQ_LENGTH,  # noqa: ARG002
         train_loss: str = "PairwiseHingeLoss",  # noqa: ARG002
         hard_negatives_ratio: float | None = None,  # noqa: ARG002
         sigma: float = 1.0,  # noqa: ARG002
@@ -60,9 +63,13 @@ class MatrixFactorizationLitModule(LightningModule):
             raise ValueError(msg)
 
         # input shape: (batch_size,)
-        tokens = self.model.tokenizer(text, padding=True, return_tensors="pt").to(
-            self.device
-        )
+        tokens = self.model.tokenizer(
+            text,
+            padding="max_length",
+            truncation="longest_first",
+            max_length=self.hparams.max_seq_length,
+            return_tensors="pt",
+        ).to(self.device)
         # shape: (batch_size, seq_len)
         # output shape: (batch_size, embed_dim)
         return self.model(tokens)["sentence_embedding"]
@@ -249,19 +256,21 @@ class MatrixFactorizationLitModule(LightningModule):
     def get_model(self) -> torch.nn.Module:
         from sentence_transformers import SentenceTransformer
 
-        config_kwargs = {}
-        if self.hparams.get("num_hidden_layers"):
-            config_kwargs["num_hidden_layers"] = self.hparams.get("num_hidden_layers")
+        pretrained = SentenceTransformer(self.hparams.model_name_or_path)
+        freeze_param_names = {name for name, _ in pretrained.named_parameters()}
+
+        config = pretrained[0].auto_model.config
+        num_hidden_layers = config.num_hidden_layers + self.hparams.new_hidden_layers
+        config_kwargs = {"num_hidden_layers": num_hidden_layers}
 
         model = SentenceTransformer(
-            self.hparams.model_name_or_path, config_kwargs=config_kwargs
+            self.hparams.model_name_or_path,
+            config_kwargs=config_kwargs,
         )
         # freeze embeddings layer
-        for name, module in model.named_modules():
-            if "embeddings" in name:
-                for param in module.parameters():
-                    param.requires_grad = False
-                break
+        for name, param in model.named_parameters():
+            if name in freeze_param_names:
+                param.requires_grad = False
         return model
 
     def get_loss_fns(self) -> torch.nn.ModuleList:
