@@ -16,181 +16,6 @@ concurrency:
   cancel-in-progress: ${{ github.ref_name != github.event.repository.default_branch }}
 
 jobs:
-  checkov:
-    permissions:
-      contents: read
-      security-events: write
-
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-
-      - uses: bridgecrewio/checkov-action@84bb9993ad52a967bfc75a42c7a8ea0b8996286a # master
-
-      - if: ${{ success() || failure() }}
-        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3
-        with:
-          sarif_file: results.sarif
-
-  clair:
-    permissions:
-      contents: read
-      security-events: write
-
-    runs-on: ubuntu-latest
-    env:
-      GHCR_IMAGE_NAME: ghcr.io/${{ github.repository }}
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-
-      - id: build
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
-        with:
-          cache-from: ${{ env.GHCR_IMAGE_NAME }}:cache
-          load: true
-
-      - run: |
-          docker save "${IMAGE_ID}" | podman load
-          podman save -o "${GITHUB_SHA}" "${IMAGE_ID}"
-        env:
-          IMAGE_ID: ${{ steps.build.outputs.imageid }}
-
-      - uses: quay/clair-action@08810958361ae9d2a2a625facc0e0fc88bea5e8a # V0
-        with:
-          image-path: ${{ github.sha }}
-          output: clair_results.sarif
-          db-file: matcher.db
-
-      - if: ${{ success() || failure() }}
-        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3
-        with:
-          sarif_file: clair_results.sarif
-
-  devskim:
-    permissions:
-      contents: read
-      security-events: write
-
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-
-      - uses: microsoft/DevSkim-Action@4b5047945a44163b94642a1cecc0d93a3f428cc6 # v1
-
-      - uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3
-        with:
-          sarif_file: devskim-results.sarif
-
-  dustilock:
-    permissions:
-      contents: read
-
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-
-      - uses: checkmarx/dustilock@9a0cc4fe3da93f7efb38679896c074dc94d60ac6 # v1
-
-  gitleaks:
-    permissions:
-      contents: write
-      pull-requests: write
-      security-events: write
-
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-        with:
-          fetch-depth: (${{ github.event.pull_request.commits || 2 }} + 1)
-
-      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-
-      - if: ${{ success() || failure() }}
-        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3
-        with:
-          sarif_file: results.sarif
-
-  grype:
-    permissions:
-      contents: read
-      security-events: write
-
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-
-      - id: grype
-        uses: anchore/scan-action@2c901ab7378897c01b8efaa2d0c9bf519cc64b9e # v6
-        with:
-          path: .
-          severity-cutoff: high
-          only-fixed: true
-
-      - if: ${{ success() || failure() }}
-        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3
-        with:
-          sarif_file: ${{ steps.grype.outputs.sarif }}
-
-  grype-container:
-    permissions:
-      contents: read
-      security-events: write
-
-    runs-on: ubuntu-latest
-    env:
-      GHCR_IMAGE_NAME: ghcr.io/${{ github.repository }}
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-
-      - id: build
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
-        with:
-          cache-from: ${{ env.GHCR_IMAGE_NAME }}:cache
-          load: true
-
-      - id: grype
-        uses: anchore/scan-action@2c901ab7378897c01b8efaa2d0c9bf519cc64b9e # v6
-        with:
-          image: ${{ env.IMAGE_ID }}
-          severity-cutoff: high
-          only-fixed: true
-        env:
-          IMAGE_ID: ${{ steps.build.outputs.imageid }}
-
-      - if: ${{ success() || failure() }}
-        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3
-        with:
-          sarif_file: ${{ steps.grype.outputs.sarif }}
-
-  kics:
-    permissions:
-      checks: write
-      contents: read
-      pull-requests: write
-      security-events: write
-
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-
-      - uses: checkmarx/kics-github-action@1141bda1e68d7ef7e2ab27bb8d90e6b1ad341537 # v2
-        with:
-          enable_annotations: true
-          enable_comments: true
-          enable_jobs_summary: true
-          comments_with_queries: true
-          path: .
-          fail_on: critical,high
-          output_formats: sarif
-          bom: true
-
-      - if: ${{ success() || failure() }}
-        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3
-        with:
-          sarif_file: results.sarif
-
   megalinter:
     permissions:
       contents: write
@@ -255,54 +80,7 @@ jobs:
         with:
           sarif_file: ${{ steps.msdo.outputs.sarifFile }}
 
-  osv-scan-pr:
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@e69cc6c86b31f1e7e23935bbe7031b50e51082de # v2
-
-  osv-scan-push:
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-
-    if: ${{ github.event_name == 'push' || github.event_name == 'schedule' }}
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@e69cc6c86b31f1e7e23935bbe7031b50e51082de # v2
-    with:
-      fail-on-vuln: false
-
-  syft:
-    permissions:
-      actions: read
-      contents: write
-      security-events: write
-
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-
-      - uses: anchore/sbom-action@e11c554f704a0b820cbf8c51673f6945e0731532 # v0
-        with:
-          output-file: "${{ github.event.repository.name }}-sbom.spdx.json"
-          dependency-snapshot: true
-
-      - id: grype
-        uses: anchore/scan-action@2c901ab7378897c01b8efaa2d0c9bf519cc64b9e # v6
-        with:
-          sbom: "${{ github.event.repository.name }}-sbom.spdx.json"
-          severity-cutoff: high
-          only-fixed: true
-
-      - if: ${{ success() || failure() }}
-        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3
-        with:
-          sarif_file: ${{ steps.grype.outputs.sarif }}
-
-  trivy:
+  trivy-fs:
     permissions:
       contents: write
       security-events: write
@@ -320,11 +98,6 @@ jobs:
           ignore-unfixed: true
           severity: HIGH,CRITICAL
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: trivy-sbom-report
-          path: dependency-results.sbom.json
-
       - uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30
         with:
           scan-type: fs
@@ -332,12 +105,13 @@ jobs:
           severity: HIGH,CRITICAL
           format: sarif
           output: trivy-results.sarif
+          scanners: vuln,secret,misconfig
 
       - uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3
         with:
           sarif_file: trivy-results.sarif
 
-  trivy-container:
+  trivy-image:
     permissions:
       contents: write
       security-events: write
@@ -356,6 +130,15 @@ jobs:
 
       - uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30
         with:
+          scan-type: fs
+          format: github
+          output: dependency-results.sbom.json
+          github-pat: ${{ github.token }}
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30
+        with:
           image-ref: ${{ env.IMAGE_ID}}
           ignore-unfixed: true
           severity: HIGH,CRITICAL
@@ -367,68 +150,3 @@ jobs:
       - uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3
         with:
           sarif_file: trivy-results.sarif
-
-  trufflehog:
-    permissions:
-      contents: read
-
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-        with:
-          fetch-depth: (${{ github.event.pull_request.commits || 2 }} + 1)
-
-      - uses: trufflesecurity/trufflehog@90694bf9af66e7536abc5824e7a87246dbf933cb # v3
-        with:
-          extra_args: --results=verified,unknown
-
-  trunk:
-    permissions:
-      checks: write
-      contents: write
-      issues: write # create labels
-      pull-requests: write
-
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-
-      - if: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.title, 'upgrade trunk') }}
-        uses: trunk-io/trunk-action/upgrade@75699af9e26881e564e9d832ef7dc3af25ec031b # v1
-        with:
-          prefix: "ci: "
-
-      - uses: trunk-io/trunk-action@75699af9e26881e564e9d832ef7dc3af25ec031b # v1
-        env:
-          INPUT_GITHUB_REF_NAME: ${{ github.event.pull_request.head.ref || github.ref_name }}
-
-      - if: ${{ failure() && github.event_name == 'pull_request' }}
-        uses: trunk-io/trunk-action@75699af9e26881e564e9d832ef7dc3af25ec031b # v1
-        env:
-          INPUT_AUTOFIX_AND_PUSH: true
-          INPUT_GITHUB_REF_NAME: ${{ format('HEAD:refs/heads/{0}', github.event.pull_request.head.ref) }}
-
-  vorpal:
-    permissions:
-      checks: write
-      contents: read
-
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-
-      - id: changed-files
-        uses: step-security/changed-files@95b56dadb92a30ca9036f16423fd3c088a71ee94 # v46
-        with:
-          files: "**/*.{cs,java,js,py}"
-          separator: ","
-
-      - if: ${{ steps.changed-files.outputs.all_changed_files != '' }}
-        uses: checkmarx/vorpal-reviewdog-github-action@e1d13fe263794580947b3cfa456b9140bbfb1a81 # v1
-        with:
-          source_path: ${{ steps.changed-files.outputs.all_changed_files }}
-          reporter: github-pr-check
-          filter_mode: file
-          fail_on_error: true
