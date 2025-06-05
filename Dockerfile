@@ -47,7 +47,7 @@ ARG PYTHONDONTWRITEBYTECODE=1
 ARG UV_NO_CACHE=1
 
 # set up python
-COPY --from=ghcr.io/astral-sh/uv:latest@sha256:8cb222a0ab487c56ca1368c9f6c221b7fb008a0e4bb81ee623ef1f9d7b08fb6c /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:latest@sha256:d7e699d374d4e5cb52a37d5c8f0ee15e3c7572850325953bf9fa8d781cfa92fc /uv /uvx /bin/
 COPY .python-version pyproject.toml uv.lock ./
 RUN uv python install && \
     uv sync --no-default-groups --no-install-project && \
