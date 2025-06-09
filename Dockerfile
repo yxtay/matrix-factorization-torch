@@ -1,5 +1,7 @@
 # hadolint global ignore=DL3008
 # kics-scan disable=965a08d7-ef86-4f14-8792-4a3b2098937e,451d79dc-0588-476a-ad03-3c7f0320abb3
+FROM ghcr.io/astral-sh/uv:0.7.12@sha256:4faec156e35a5f345d57804d8858c6ba1cf6352ce5f4bffc11b7fdebdef46a38 AS uv
+
 ##
 # base
 ##
@@ -47,7 +49,7 @@ ARG PYTHONDONTWRITEBYTECODE=1
 ARG UV_NO_CACHE=1
 
 # set up python
-COPY --from=ghcr.io/astral-sh/uv:latest@sha256:4faec156e35a5f345d57804d8858c6ba1cf6352ce5f4bffc11b7fdebdef46a38 /uv /uvx /bin/
+COPY --from=uv /uv /uvx /bin/
 COPY .python-version pyproject.toml uv.lock ./
 RUN uv python install && \
     uv sync --no-default-groups --no-install-project && \
