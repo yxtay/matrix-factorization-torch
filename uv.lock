@@ -1540,7 +1540,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "flaml", extras = ["automl", "blendsearch"], specifier = "~=2.3" },
-    { name = "mlflow", specifier = "~=2.19" },
+    { name = "mlflow" },
     { name = "ray", extras = ["train", "tune"], specifier = "~=2.42" },
     { name = "standard-imghdr", specifier = "~=3.13.0" },
 ]
