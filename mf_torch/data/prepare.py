@@ -281,7 +281,9 @@ def process_users(
             history=pl.struct("datetime", "rating", "movie_id", "movie_text").filter(
                 "is_train"
             ),
-            target=pl.struct("rating", "movie_id").filter(~pl.col("is_train")),
+            target=pl.struct("datetime", "rating", "movie_id", "movie_text").filter(
+                ~pl.col("is_train")
+            ),
             is_train=pl.any("is_train"),
             is_val=pl.any("is_val"),
             is_test=pl.any("is_test"),
