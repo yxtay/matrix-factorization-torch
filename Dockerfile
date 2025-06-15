@@ -6,7 +6,7 @@ FROM ghcr.io/astral-sh/uv:0.7.13@sha256:6c1e19020ec221986a210027040044a5df8de762
 # base
 ##
 FROM debian:stable-slim@sha256:50db38a20a279ccf50761943c36f9e82378f92ef512293e1239b26bb77a8b496 AS base
-LABEL maintainer="wyextay@gmail.com"
+LABEL org.opencontainers.image.authors="5795122+yxtay@users.noreply.github.com"
 
 # set up user
 ARG USER=user
