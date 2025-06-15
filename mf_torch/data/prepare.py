@@ -225,9 +225,12 @@ def gather_history(ratings: pl.LazyFrame, *, path: pathlib.Path) -> pl.LazyFrame
         .agg(history=pl.struct("datetime", "rating", "movie_id", "movie_text"))
         .unique(["user_id", "datetime"])
     )
+    ratings_target = ratings.group_by("user_id", "is_train").agg(
+        target=pl.struct("rating", "movie_id")
+    )
     ratings_history = ratings.join(
         ratings_history, on=["user_id", "datetime"], validate="m:1"
-    )
+    ).join(ratings_target, on=["user_id", "is_train"], validate="m:1")
     ratings_history.collect().write_parquet(path, partition_by="user_id")
     return ratings_history
 
