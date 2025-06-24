@@ -6,7 +6,6 @@ FROM ghcr.io/astral-sh/uv:0.7.14@sha256:cda0fdc9b6066975ba4c791597870d18bc3a441d
 # base
 ##
 FROM debian:stable-slim@sha256:50db38a20a279ccf50761943c36f9e82378f92ef512293e1239b26bb77a8b496 AS base
-LABEL org.opencontainers.image.authors="5795122+yxtay@users.noreply.github.com"
 
 # set up user
 ARG USER=user
@@ -22,7 +21,7 @@ ENV PATH=${VIRTUAL_ENV}/bin:${PATH} \
     UV_LOCKED=1 \
     UV_NO_SYNC=1 \
     UV_PYTHON_DOWNLOADS=manual \
-    UV_PYTHON_INSTALL_DIR=/opt \
+    UV_PYTHON_INSTALL_DIR=/opt/python \
     VIRTUAL_ENV=${VIRTUAL_ENV}
 
 WORKDIR ${APP_HOME}
