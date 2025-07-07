@@ -2,14 +2,13 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:best-practices",
-    ":automergeDigest",
-    ":automergeMinor",
-    ":enableVulnerabilityAlerts",
-    ":maintainLockFilesWeekly",
+    "security:openssf-scorecard",
     ":separateMultipleMajorReleases",
+    ":automergeMinor",
+    ":automergeDigest",
+    ":maintainLockFilesWeekly",
     "group:allNonMajor",
-    "group:allDigest",
-    "security:openssf-scorecard"
+    "group:allDigest"
   ],
   "dependencyDashboardOSVVulnerabilitySummary": "all",
   "osvVulnerabilityAlerts": true,
