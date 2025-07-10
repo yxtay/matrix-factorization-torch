@@ -93,3 +93,6 @@ ignore-overlong-task-comments = true
 
 [tool.ruff.lint.pydocstyle]
 convention = "pep257"
+
+[tool.bandit.assert_used]
+skips = ['tests/**']
