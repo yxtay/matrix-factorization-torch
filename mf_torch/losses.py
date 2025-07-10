@@ -143,6 +143,44 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         # shape: (batch_size, num_hard_negatives)
         return losses, negative_masks
 
+    def negative_masks2(
+        self,
+        losses: torch.Tensor,
+        *,
+        item_id: torch.Tensor,
+        pos_ids: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        # accidental hits can be samples with same user or item
+        batch_size = losses.size(0)
+        # limit rows to batch size if num_items > batch_size
+        accidental_hits = item_id[:batch_size, None] == item_id[None, :]
+        # shape: (batch_size, num_items)
+        if pos_ids is not None:
+            # shape: (batch_size, num_positives)
+            # mask shape: (batch_size, num_items, num_positives)
+            accidental_hits |= (pos_ids.unsqueeze(1) == item_id[None, :, None]).any(-1)
+            # shape: (batch_size, num_items)
+        return ~accidental_hits
+
+    def semi_hard_mining(
+        self, losses: torch.Tensor, negative_masks: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        # num_hard_negatives as a ratio of batch_size
+        # important to handle different batch_size, especially last batch
+        num_hard_negatives = int(losses.size(0) * self.hard_negatives_ratio)
+        if self.hard_negatives_ratio > 1 and losses.size(1) <= num_hard_negatives:
+            return losses, negative_masks
+
+        # negative masks log will be 0 or -inf
+        hard_negetives = (losses + negative_masks.log()).topk(
+            k=num_hard_negatives, dim=-1, sorted=False
+        )
+        losses = losses.gather(dim=-1, index=hard_negetives.indices)
+        # shape: (batch_size, num_hard_negatives)
+        negative_masks = negative_masks.gather(dim=-1, index=hard_negetives.indices)
+        # shape: (batch_size, num_hard_negatives)
+        return losses, negative_masks
+
     def alignment_loss(
         self, user_embed: torch.Tensor, item_embed: torch.Tensor, target: torch.Tensor
     ) -> torch.Tensor:
@@ -152,22 +190,6 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         )
         # shape: (batch_size)
         return (loss * target.abs()).sum()
-
-    def uniformity_loss(
-        self, embed: torch.Tensor, *, idx: torch.Tensor
-    ) -> torch.Tensor:
-        logits = -squared_distance(embed, embed)
-        # shape: (batch_size, num_items)
-        losses = logits * self.sigma
-        # shape: (batch_size, num_items)
-        # take upper triangle
-        negative_masks = self.negative_masks(losses, user_idx=idx).triu(diagonal=1)
-        # shape: (batch_size, num_items)
-        losses, negative_masks = self.hard_negative_mining(
-            losses.reshape(1, -1), negative_masks.reshape(1, -1)
-        )
-        # shape: (1, num_hard_negatives | batch_size * num_items)
-        return (losses + negative_masks.log()).logsumexp(dim=-1)
 
     def contrastive_loss(
         self,
@@ -264,37 +286,6 @@ class AlignmentLoss(EmbeddingLoss):
         return self.alignment_loss(user_embed, item_embed, target)
 
 
-class UniformityLoss(EmbeddingLoss):
-    def loss(
-        self,
-        user_embed: torch.Tensor,
-        item_embed: torch.Tensor,
-        target: torch.Tensor,  # noqa: ARG002
-        *,
-        user_idx: torch.Tensor,
-        item_idx: torch.Tensor,
-    ) -> torch.Tensor:
-        item_uniformity_loss = self.uniformity_loss(item_embed, idx=item_idx)
-        user_uniformity_loss = self.uniformity_loss(user_embed, idx=user_idx)
-        return (item_uniformity_loss + user_uniformity_loss) / 2
-
-
-class AlignmentUniformityLoss(EmbeddingLoss):
-    def loss(
-        self,
-        user_embed: torch.Tensor,
-        item_embed: torch.Tensor,
-        target: torch.Tensor,
-        *,
-        user_idx: torch.Tensor,
-        item_idx: torch.Tensor,
-    ) -> torch.Tensor:
-        alingment_loss = self.alignment_loss(user_embed, item_embed, target)
-        item_uniformity_loss = self.uniformity_loss(item_embed, idx=item_idx)
-        user_uniformity_loss = self.uniformity_loss(user_embed, idx=user_idx)
-        return alingment_loss + (item_uniformity_loss + user_uniformity_loss) / 2
-
-
 class ContrastiveLoss(EmbeddingLoss):
     def loss(
         self,
@@ -369,16 +360,18 @@ class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
     ) -> torch.Tensor:
         logits = -squared_distance(user_embed, item_embed) * target.sign()[:, None]
         # shape: (batch_size, num_items)
-        logits_diff = logits.diag()[:, None] - logits
+        pos_logits = logits.diag()
+        # shape: (batch_size,)
+        negative_masks = self.negative_masks(
+            logits, user_idx=user_idx, item_idx=item_idx
+        )
+        # shape: (batch_size, num_items)
+        logits, negative_masks = self.hard_negative_mining(logits, negative_masks)
+        # shape: (batch_size, num_hard_negatives | num_items)
+        logits_diff = pos_logits[:, None] - logits
         # shape: (batch_size, num_items)
         losses = self.score_loss_fn(logits_diff * self.sigma - self.margin)
         # shape: (batch_size, num_items)
-        negative_masks = self.negative_masks(
-            losses, user_idx=user_idx, item_idx=item_idx
-        )
-        # shape: (batch_size, num_items)
-        losses, negative_masks = self.hard_negative_mining(losses, negative_masks)
-        # shape: (batch_size, num_hard_negatives | num_items)
         loss = weighted_mean(losses, negative_masks, dim=-1)
         # shape: (batch_size)
         return (loss * target.abs()).sum()

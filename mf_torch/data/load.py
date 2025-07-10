@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import torch
+import torch.nn.functional as F
 import torch.utils.data as torch_data
+import torch.utils.data._utils.collate as torch_collate
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
@@ -31,6 +33,46 @@ def embed_example(example: dict[str, Any], *, model: torch.nn.Module) -> dict[st
         **example,
         "embedding": model([example["text"]]).squeeze(0).numpy(force=True),
     }
+
+
+def pad_tensors(
+    batch: Iterable[torch.Tensor],
+    dim: int = -1,
+    *,
+    pad_start: bool = False,
+    pad_value: int = 0,
+) -> torch.Tensor:
+    elem = next(iter(batch))
+    pad_size = max(example.size(dim) for example in iter(batch))
+    pad = [0] * (elem.dim() * 2)
+    pad_dim = 2 * dim + pad_start
+
+    def pad_tensor(tensor: torch.Tensor) -> torch.Tensor:
+        # pad tuple dimensions is reversed
+        pad[-pad_dim - 1] = pad_size - tensor.size(dim)
+        return F.pad(tensor, pad, value=pad_value)
+
+    return torch.stack([pad_tensor(example) for example in batch])
+
+
+def collate_tensor_fn(
+    batch: Iterable[torch.Tensor], *, collate_fn_map: dict | None = None
+) -> torch.Tensor:
+    it = iter(batch)
+    elem_size = next(it).size()
+    if any(elem.size() != elem_size for elem in it):
+        it = iter(batch)
+        if all(elem.size()[:-1] == elem_size[:-1] for elem in it):
+            # only last dimension different
+            return pad_tensors(batch, dim=-1)
+        if all(elem.size()[1:] == elem_size[1:] for elem in it):
+            # only first dimension different
+            return pad_tensors(batch, dim=0)
+
+    return torch_collate.collate_tensor_fn(batch, collate_fn_map=collate_fn_map)
+
+
+torch_collate.default_collate_fn_map[torch.Tensor] = collate_tensor_fn
 
 
 @torch_data.functional_datapipe("load_parquet_as_dict")

@@ -12,7 +12,7 @@ from lightning import LightningModule
 from lightning.fabric.utilities.rank_zero import rank_zero_only
 from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
 
-from mf_torch.data.lightning import BatchType, FeaturesType
+from mf_torch.data.lightning import InteractionFeaturesType, ItemFeaturesType
 from mf_torch.params import (
     MAX_SEQ_LENGTH,
     METRIC,
@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from mlflow import MlflowClient
     from sentence_transformers import SentenceTransformer
 
-    from mf_torch.data.lightning import ItemsProcessor, UsersProcessor
+    from mf_torch.data.lightning import ItemProcessor, UserProcessor
 
 
 class MatrixFactorizationLitModule(LightningModule):
@@ -54,8 +54,8 @@ class MatrixFactorizationLitModule(LightningModule):
         self.model: SentenceTransformer | None = None
         self.loss_fns: torch.nn.ModuleList | None = None
         self.metrics: torch.nn.ModuleDict | None = None
-        self.users_processor: UsersProcessor | None = None
-        self.items_processor: ItemsProcessor | None = None
+        self.users_processor: UserProcessor | None = None
+        self.items_processor: ItemProcessor | None = None
 
     def forward(self, text: list[str]) -> torch.Tensor:
         if self.model is None:
@@ -96,7 +96,7 @@ class MatrixFactorizationLitModule(LightningModule):
         ).drop(columns="embedding")
 
     def compute_losses(
-        self, batch: BatchType, step_name: str = "train"
+        self, batch: InteractionFeaturesType, step_name: str = "train"
     ) -> dict[str, torch.Tensor]:
         if self.loss_fns is None:
             msg = "`loss_fns` must be initialised first"
@@ -183,20 +183,20 @@ class MatrixFactorizationLitModule(LightningModule):
                 metric.update(preds=preds, target=target > 0, indexes=indexes)
         return metrics
 
-    def training_step(self, batch: BatchType, _: int) -> torch.Tensor:
+    def training_step(self, batch: InteractionFeaturesType, _: int) -> torch.Tensor:
         losses = self.compute_losses(batch, step_name="train")
         self.log_dict(losses)
         return losses[f"train/{self.hparams.train_loss}"]
 
-    def validation_step(self, batch: FeaturesType, _: int) -> None:
+    def validation_step(self, batch: ItemFeaturesType, _: int) -> None:
         metrics = self.update_metrics(batch, step_name="val")
         self.log_dict(metrics)
 
-    def test_step(self, batch: FeaturesType, _: int) -> None:  # noqa: PT019
+    def test_step(self, batch: ItemFeaturesType, _: int) -> None:  # noqa: PT019
         metrics = self.update_metrics(batch, step_name="test")
         self.log_dict(metrics)
 
-    def predict_step(self, batch: FeaturesType, _: int) -> pd.DataFrame:
+    def predict_step(self, batch: ItemFeaturesType, _: int) -> pd.DataFrame:
         user_id_col = self.trainer.datamodule.users_processor.id_col
         return self.recommend(
             batch["text"], top_k=self.hparams.top_k, user_id=batch[user_id_col]
@@ -280,8 +280,6 @@ class MatrixFactorizationLitModule(LightningModule):
             mf_losses.AlignmentLoss,
             mf_losses.ContrastiveLoss,
             mf_losses.AlignmentContrastiveLoss,
-            mf_losses.UniformityLoss,
-            mf_losses.AlignmentUniformityLoss,
             mf_losses.InfomationNoiseContrastiveEstimationLoss,
             mf_losses.MutualInformationNeuralEstimationLoss,
             mf_losses.PairwiseHingeLoss,
