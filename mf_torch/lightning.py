@@ -435,6 +435,7 @@ if __name__ == "__main__":
         rich.print(model.compute_losses(next(iter(datamodule.train_dataloader()))))
 
     trainer_args = {
+        "accelerator": "cpu",
         "fast_dev_run": True,
         # "max_epochs": -1,
         # "limit_train_batches": 1,

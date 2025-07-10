@@ -40,7 +40,7 @@ def prepare_trainer(
     from mf_torch.lightning import cli_main
 
     if ckpt_path is None:
-        args = {"trainer": {"fast_dev_run": True}}
+        args = {"trainer": {"accelerator": "cpu", "fast_dev_run": True}}
         return cli_main({"fit": args}).trainer
 
     with tempfile.TemporaryDirectory() as tmp:
