@@ -30,8 +30,9 @@ jobs:
     env:
       HF_HOME: /tmp/huggingface
       PROJECT_NAME: mf_torch
-      UV_LOCKED: 1
-      UV_NO_SYNC: 1
+      PYTORCH_MPS_HIGH_WATERMARK_RATIO: "0.0"
+      UV_LOCKED: "1"
+      UV_NO_SYNC: "1"
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
