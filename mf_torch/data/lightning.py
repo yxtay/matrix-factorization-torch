@@ -190,8 +190,8 @@ class ItemProcessor(FeaturesProcessor[ItemFeaturesType], LanceDbProcessor):
 
         if torch.cuda.is_available():
             accelerator = "cuda"
-        elif torch.mps.is_available():
-            accelerator = "mps"
+        # elif torch.mps.is_available():
+        #     accelerator = "mps"
         else:
             accelerator = None
 
@@ -463,15 +463,15 @@ if __name__ == "__main__":
         dm.train_dataloader(),
         dm.val_dataloader(),
     ]
-    # for dataloader in dataloaders:
-    #     batch = next(iter(dataloader))
-    #     rich.print(batch)
-    #     shapes = {
-    #         key: value.shape
-    #         for key, value in batch.items()
-    #         if isinstance(value, torch.Tensor)
-    #     }
-    #     rich.print(shapes)
+    for dataloader in dataloaders:
+        batch = next(iter(dataloader))
+        rich.print(batch)
+        shapes = {
+            key: value.shape
+            for key, value in batch.items()
+            if isinstance(value, torch.Tensor)
+        }
+        rich.print(shapes)
 
     dm.user_processor.get_index().search().to_polars().glimpse()
     rich.print(dm.user_processor.get_id(1))

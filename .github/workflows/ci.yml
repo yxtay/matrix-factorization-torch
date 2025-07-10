@@ -21,8 +21,12 @@ jobs:
   python:
     permissions:
       contents: read
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+      fail-fast: false
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     env:
       HF_HOME: /tmp/huggingface
       PROJECT_NAME: mf_torch

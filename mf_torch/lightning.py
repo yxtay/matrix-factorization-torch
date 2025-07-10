@@ -54,8 +54,8 @@ class MatrixFactorizationLitModule(LightningModule):
         self.model: SentenceTransformer | None = None
         self.loss_fns: torch.nn.ModuleList | None = None
         self.metrics: torch.nn.ModuleDict | None = None
-        self.users_processor: UserProcessor | None = None
-        self.items_processor: ItemProcessor | None = None
+        self.user_processor: UserProcessor | None = None
+        self.item_processor: ItemProcessor | None = None
 
     def forward(self, text: list[str]) -> torch.Tensor:
         if self.model is None:
@@ -83,15 +83,15 @@ class MatrixFactorizationLitModule(LightningModule):
         user_id: int | None = None,
         exclude_item_ids: list[int] | None = None,
     ) -> pd.DataFrame:
-        if self.users_processor is None or self.items_processor is None:
+        if self.user_processor is None or self.item_processor is None:
             msg = "`user_processor` and `item_processor` must be initialised first"
             raise ValueError(msg)
 
-        history = self.users_processor.get_activity(user_id, "history")
+        history = self.user_processor.get_activity(user_id, "history")
         exclude_item_ids = (exclude_item_ids or []) + list(history.keys())
 
         embed = self([text]).numpy(force=True)
-        return self.items_processor.search(
+        return self.item_processor.search(
             embed, exclude_item_ids=exclude_item_ids, top_k=top_k
         ).drop(columns="embedding")
 
@@ -107,7 +107,7 @@ class MatrixFactorizationLitModule(LightningModule):
 
         # user
         user: dict[str, torch.Tensor] = batch["user"]
-        user_idx = user["idx"]
+        pos_idx = user["pos_idx"]
         # shape: (num_users,)
         user_text = user["text"]
         # shape: (num_users,)
@@ -142,8 +142,8 @@ class MatrixFactorizationLitModule(LightningModule):
                 user_embed=user_embed,
                 item_embed=item_embed,
                 target=target,
-                user_idx=user_idx,
                 item_idx=item_idx,
+                pos_idx=pos_idx,
             )
         return losses
 
@@ -156,7 +156,7 @@ class MatrixFactorizationLitModule(LightningModule):
             msg = "`metrics` must be initialised first"
             raise ValueError(msg)
 
-        item_id_col = self.trainer.datamodule.items_processor.id_col
+        item_id_col = self.trainer.datamodule.item_processor.id_col
         pred_scores = self.predict_step(example, 0)
         pred_scores = dict(
             zip(pred_scores[item_id_col], pred_scores["score"], strict=True)
@@ -197,7 +197,7 @@ class MatrixFactorizationLitModule(LightningModule):
         self.log_dict(metrics)
 
     def predict_step(self, batch: ItemFeaturesType, _: int) -> pd.DataFrame:
-        user_id_col = self.trainer.datamodule.users_processor.id_col
+        user_id_col = self.trainer.datamodule.user_processor.id_col
         return self.recommend(
             batch["text"], top_k=self.hparams.top_k, user_id=batch[user_id_col]
         )
@@ -221,10 +221,10 @@ class MatrixFactorizationLitModule(LightningModule):
                 logger.experiment.update_run(logger.run_id, status="RUNNING")
 
     def on_validation_start(self) -> None:
-        self.users_processor = self.trainer.datamodule.users_processor
-        self.users_processor.get_index()
-        self.items_processor = self.trainer.datamodule.items_processor
-        self.items_processor.get_index(self)
+        self.user_processor = self.trainer.datamodule.user_processor
+        self.user_processor.get_index()
+        self.item_processor = self.trainer.datamodule.item_processor
+        self.item_processor.get_index(self)
 
     def on_test_start(self) -> None:
         self.on_validation_start()
@@ -256,20 +256,10 @@ class MatrixFactorizationLitModule(LightningModule):
     def get_model(self) -> torch.nn.Module:
         from sentence_transformers import SentenceTransformer
 
-        pretrained = SentenceTransformer(self.hparams.model_name_or_path)
-        freeze_param_names = {name for name, _ in pretrained.named_parameters()}
-
-        config = pretrained[0].auto_model.config
-        num_hidden_layers = config.num_hidden_layers + self.hparams.new_hidden_layers
-        config_kwargs = {"num_hidden_layers": num_hidden_layers}
-
-        model = SentenceTransformer(
-            self.hparams.model_name_or_path,
-            config_kwargs=config_kwargs,
-        )
+        model = SentenceTransformer(self.hparams.model_name_or_path)
         # freeze embeddings layer
         for name, param in model.named_parameters():
-            if name in freeze_param_names:
+            if name.endswith("embeddings.weight"):
                 param.requires_grad = False
         return model
 
@@ -331,12 +321,12 @@ class MatrixFactorizationLitModule(LightningModule):
         self.model.save_pretrained((path / TRANSFORMER_PATH).as_posix())
 
         processors_args = {
-            "users": self.users_processor.model_dump(),
-            "items": self.items_processor.model_dump(),
+            "users": self.user_processor.model_dump(),
+            "items": self.item_processor.model_dump(),
         }
         (path / PROCESSORS_JSON).write_text(json.dumps(processors_args, indent=2))
 
-        lance_db_path = self.items_processor.lance_db_path
+        lance_db_path = self.item_processor.lance_db_path
         shutil.copytree(lance_db_path, path / LANCE_DB_PATH)
 
 

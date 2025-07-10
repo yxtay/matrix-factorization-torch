@@ -42,7 +42,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         item_embed: torch.Tensor,
         target: torch.Tensor,
         *,
-        user_idx: torch.Tensor,
+        pos_idx: torch.Tensor,
         item_idx: torch.Tensor,
     ) -> torch.Tensor:
         # target shape: (num_users, num_items)
@@ -60,7 +60,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         # target = target.values()
         # # shape: (num_target,)
         return self.loss(
-            user_embed, item_embed, target, user_idx=user_idx, item_idx=item_idx
+            user_embed, item_embed, target, pos_idx=pos_idx, item_idx=item_idx
         )
 
     def check_inputs(
@@ -97,29 +97,9 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         item_embed: torch.Tensor,
         target: torch.Tensor,
         *,
-        user_idx: torch.Tensor,
         item_idx: torch.Tensor,
+        pos_idx: torch.Tensor,
     ) -> torch.Tensor: ...
-
-    def negative_masks(
-        self,
-        losses: torch.Tensor,
-        *,
-        user_idx: torch.Tensor,
-        item_idx: torch.Tensor | None = None,
-    ) -> torch.Tensor:
-        # accidental hits can be samples with same user or item
-        batch_size, num_items = losses.size()
-        # pad columns with zeroes if num_items > batch_size
-        accidental_hits = (
-            user_idx[:, None] == F.pad(user_idx, (0, num_items - batch_size))[None, :]
-        )
-        # shape: (batch_size, num_items)
-        if item_idx is not None:
-            # limit rows to batch size if num_items > batch_size
-            accidental_hits |= item_idx[:batch_size, None] == item_idx[None, :]
-            # shape: (batch_size, num_items)
-        return ~accidental_hits
 
     def hard_negative_mining(
         self, losses: torch.Tensor, negative_masks: torch.Tensor
@@ -143,22 +123,22 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         # shape: (batch_size, num_hard_negatives)
         return losses, negative_masks
 
-    def negative_masks2(
+    def negative_masks(
         self,
         losses: torch.Tensor,
         *,
-        item_id: torch.Tensor,
-        pos_ids: torch.Tensor | None = None,
+        item_idx: torch.Tensor,
+        pos_idx: torch.Tensor | None = None,
     ) -> torch.Tensor:
         # accidental hits can be samples with same user or item
         batch_size = losses.size(0)
         # limit rows to batch size if num_items > batch_size
-        accidental_hits = item_id[:batch_size, None] == item_id[None, :]
+        accidental_hits = item_idx[:batch_size, None] == item_idx[None, :]
         # shape: (batch_size, num_items)
-        if pos_ids is not None:
+        if pos_idx is not None:
             # shape: (batch_size, num_positives)
             # mask shape: (batch_size, num_items, num_positives)
-            accidental_hits |= (pos_ids.unsqueeze(1) == item_id[None, :, None]).any(-1)
+            accidental_hits |= (pos_idx.unsqueeze(1) == item_idx[None, :, None]).any(-1)
             # shape: (batch_size, num_items)
         return ~accidental_hits
 
@@ -197,16 +177,14 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         item_embed: torch.Tensor,
         target: torch.Tensor,
         *,
-        user_idx: torch.Tensor,
         item_idx: torch.Tensor,
+        pos_idx: torch.Tensor,
     ) -> torch.Tensor:
         logits = -squared_distance(user_embed, item_embed)
         # shape: (batch_size, num_items)
         losses = (self.margin - logits * self.sigma).relu()
         # shape: (batch_size, num_items)
-        negative_masks = self.negative_masks(
-            losses, user_idx=user_idx, item_idx=item_idx
-        )
+        negative_masks = self.negative_masks(losses, item_idx=item_idx, pos_idx=pos_idx)
         # shape: (batch_size, num_items)
         losses, negative_masks = self.hard_negative_mining(losses, negative_masks)
         # shape: (batch_size, num_hard_negatives | num_items)
@@ -220,8 +198,8 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         item_embed: torch.Tensor,
         target: torch.Tensor,
         *,
-        user_idx: torch.Tensor,
         item_idx: torch.Tensor,
+        pos_idx: torch.Tensor,
     ) -> torch.Tensor:
         logits = -squared_distance(user_embed, item_embed)
         # shape: (batch_size, num_items)
@@ -229,9 +207,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         # shape: (batch_size, num_items)
         pos_loss = losses.diag()
         # shape: (batch_size)
-        negative_masks = self.negative_masks(
-            losses, user_idx=user_idx, item_idx=item_idx
-        )
+        negative_masks = self.negative_masks(losses, item_idx=item_idx, pos_idx=pos_idx)
         # shape: (batch_size, num_items)
         losses, negative_masks = self.hard_negative_mining(losses, negative_masks)
         # shape: (batch_size, num_hard_negatives | num_items)
@@ -251,8 +227,8 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         item_embed: torch.Tensor,
         target: torch.Tensor,
         *,
-        user_idx: torch.Tensor,
         item_idx: torch.Tensor,
+        pos_idx: torch.Tensor,
     ) -> torch.Tensor:
         logits = -squared_distance(user_embed, item_embed)
         # shape: (batch_size, num_items)
@@ -260,9 +236,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         # shape: (batch_size, num_items)
         pos_loss = losses.diag()
         # shape: (batch_size)
-        negative_masks = self.negative_masks(
-            losses, user_idx=user_idx, item_idx=item_idx
-        )
+        negative_masks = self.negative_masks(losses, item_idx=item_idx, pos_idx=pos_idx)
         # shape: (batch_size, num_items)
         losses, negative_masks = self.hard_negative_mining(losses, negative_masks)
         # shape: (batch_size, num_hard_negatives | num_items)
@@ -280,8 +254,8 @@ class AlignmentLoss(EmbeddingLoss):
         item_embed: torch.Tensor,
         target: torch.Tensor,
         *,
-        user_idx: torch.Tensor,  # noqa: ARG002
         item_idx: torch.Tensor,  # noqa: ARG002
+        pos_idx: torch.Tensor,  # noqa: ARG002
     ) -> torch.Tensor:
         return self.alignment_loss(user_embed, item_embed, target)
 
@@ -293,11 +267,11 @@ class ContrastiveLoss(EmbeddingLoss):
         item_embed: torch.Tensor,
         target: torch.Tensor,
         *,
-        user_idx: torch.Tensor,
         item_idx: torch.Tensor,
+        pos_idx: torch.Tensor,
     ) -> torch.Tensor:
         return self.contrastive_loss(
-            user_embed, item_embed, target, user_idx=user_idx, item_idx=item_idx
+            user_embed, item_embed, target, item_idx=item_idx, pos_idx=pos_idx
         )
 
 
@@ -308,12 +282,12 @@ class AlignmentContrastiveLoss(EmbeddingLoss):
         item_embed: torch.Tensor,
         target: torch.Tensor,
         *,
-        user_idx: torch.Tensor,
         item_idx: torch.Tensor,
+        pos_idx: torch.Tensor,
     ) -> torch.Tensor:
         alignment_loss = self.alignment_loss(user_embed, item_embed, target)
         contrastive_loss = self.contrastive_loss(
-            user_embed, item_embed, target, user_idx=user_idx, item_idx=item_idx
+            user_embed, item_embed, target, item_idx=item_idx, pos_idx=pos_idx
         )
         return alignment_loss + contrastive_loss
 
@@ -325,11 +299,11 @@ class InfomationNoiseContrastiveEstimationLoss(EmbeddingLoss):
         item_embed: torch.Tensor,
         target: torch.Tensor,
         *,
-        user_idx: torch.Tensor,
         item_idx: torch.Tensor,
+        pos_idx: torch.Tensor,
     ) -> torch.Tensor:
         return self.infonce_loss(
-            user_embed, item_embed, target, user_idx=user_idx, item_idx=item_idx
+            user_embed, item_embed, target, item_idx=item_idx, pos_idx=pos_idx
         )
 
 
@@ -340,11 +314,11 @@ class MutualInformationNeuralEstimationLoss(EmbeddingLoss):
         item_embed: torch.Tensor,
         target: torch.Tensor,
         *,
-        user_idx: torch.Tensor,
         item_idx: torch.Tensor,
+        pos_idx: torch.Tensor,
     ) -> torch.Tensor:
         return self.mine_loss(
-            user_embed, item_embed, target, user_idx=user_idx, item_idx=item_idx
+            user_embed, item_embed, target, item_idx=item_idx, pos_idx=pos_idx
         )
 
 
@@ -355,16 +329,14 @@ class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
         item_embed: torch.Tensor,
         target: torch.Tensor,
         *,
-        user_idx: torch.Tensor,
         item_idx: torch.Tensor,
+        pos_idx: torch.Tensor,
     ) -> torch.Tensor:
         logits = -squared_distance(user_embed, item_embed) * target.sign()[:, None]
         # shape: (batch_size, num_items)
         pos_logits = logits.diag()
         # shape: (batch_size,)
-        negative_masks = self.negative_masks(
-            logits, user_idx=user_idx, item_idx=item_idx
-        )
+        negative_masks = self.negative_masks(logits, item_idx=item_idx, pos_idx=pos_idx)
         # shape: (batch_size, num_items)
         logits, negative_masks = self.hard_negative_mining(logits, negative_masks)
         # shape: (batch_size, num_hard_negatives | num_items)
