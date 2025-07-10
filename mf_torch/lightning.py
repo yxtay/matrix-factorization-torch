@@ -156,6 +156,7 @@ class MatrixFactorizationLitModule(LightningModule):
             msg = "`metrics` must be initialised first"
             raise ValueError(msg)
 
+        user_id_col = self.trainer.datamodule.user_processor.id_col
         item_id_col = self.trainer.datamodule.item_processor.id_col
         pred_scores = self.predict_step(example, 0)
         pred_scores = dict(
@@ -173,7 +174,7 @@ class MatrixFactorizationLitModule(LightningModule):
         preds = torch.as_tensor(preds)
         target = [target_scores.get(item_id, 0) for item_id in item_ids]
         target = torch.as_tensor(target)
-        indexes = torch.ones_like(preds, dtype=torch.long) * example["idx"]
+        indexes = torch.ones_like(preds, dtype=torch.long) * example[user_id_col]
 
         metrics: torchmetrics.MetricCollection = self.metrics[step_name]
         for metric in metrics.values():
@@ -256,7 +257,7 @@ class MatrixFactorizationLitModule(LightningModule):
     def get_model(self) -> torch.nn.Module:
         from sentence_transformers import SentenceTransformer
 
-        model = SentenceTransformer(self.hparams.model_name_or_path)
+        model = SentenceTransformer(self.hparams.model_name_or_path, device=self.device)
         # freeze embeddings layer
         for name, param in model.named_parameters():
             if name.endswith("embeddings.weight"):
