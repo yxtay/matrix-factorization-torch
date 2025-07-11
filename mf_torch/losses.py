@@ -120,7 +120,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
             # shape: (batch_size, num_items)
         return ~accidental_hits
 
-    def hard_negative_mining(
+    def hard_mining(
         self, losses: torch.Tensor, negative_masks: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
         if self.hard_negatives_ratio is None:
@@ -186,7 +186,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         # shape: (batch_size, num_items)
         negative_masks = self.negative_masks(losses, item_idx=item_idx, pos_idx=pos_idx)
         # shape: (batch_size, num_items)
-        losses, negative_masks = self.hard_negative_mining(losses, negative_masks)
+        losses, negative_masks = self.hard_mining(losses, negative_masks)
         # shape: (batch_size, num_hard_negatives | num_items)
         loss = weighted_mean(losses, negative_masks, dim=-1)
         # shape: (batch_size)
@@ -209,7 +209,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         # shape: (batch_size)
         negative_masks = self.negative_masks(losses, item_idx=item_idx, pos_idx=pos_idx)
         # shape: (batch_size, num_items)
-        losses, negative_masks = self.hard_negative_mining(losses, negative_masks)
+        losses, negative_masks = self.hard_mining(losses, negative_masks)
         # shape: (batch_size, num_hard_negatives | num_items)
         logits = torch.cat([pos_loss[:, None], losses + negative_masks.log()], dim=-1)
         # shape: (batch_size, num_hard_negatives | num_items + 1)
@@ -238,7 +238,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         # shape: (batch_size)
         negative_masks = self.negative_masks(losses, item_idx=item_idx, pos_idx=pos_idx)
         # shape: (batch_size, num_items)
-        losses, negative_masks = self.hard_negative_mining(losses, negative_masks)
+        losses, negative_masks = self.hard_mining(losses, negative_masks)
         # shape: (batch_size, num_hard_negatives | num_items)
         negative_score = (losses + negative_masks.log()).logsumexp(dim=-1)
         # shape: (batch_size)
@@ -338,7 +338,7 @@ class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
         # shape: (batch_size,)
         negative_masks = self.negative_masks(logits, item_idx=item_idx, pos_idx=pos_idx)
         # shape: (batch_size, num_items)
-        logits, negative_masks = self.hard_negative_mining(logits, negative_masks)
+        logits, negative_masks = self.hard_mining(logits, negative_masks)
         # shape: (batch_size, num_hard_negatives | num_items)
         logits_diff = pos_logits[:, None] - logits
         # shape: (batch_size, num_items)
