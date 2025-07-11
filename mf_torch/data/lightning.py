@@ -208,12 +208,7 @@ class ItemProcessor(
         num_partitions = self.num_partitions or 2 ** int(math.log2(num_items) / 2)
         num_sub_vectors = self.num_sub_vectors or embedding_dim // 8
 
-        if torch.cuda.is_available():
-            accelerator = "cuda"
-        # elif torch.mps.is_available():
-        #     accelerator = "mps"
-        else:
-            accelerator = None
+        accelerator = "cuda" if torch.cuda.is_available() else None
 
         schema = pa.RecordBatch.from_pylist(batch).schema
         schema = schema.set(
