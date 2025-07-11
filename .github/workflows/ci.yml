@@ -52,6 +52,8 @@ jobs:
           uv sync
           uv pip list
 
+      - run: uv run pytest
+
       - if: ${{ success() || failure() }}
         run: uv run lightning fit --print_config
 
