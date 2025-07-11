@@ -1162,7 +1162,7 @@ wheels = [
 
 [[package]]
 name = "lancedb"
-version = "0.24.0"
+version = "0.24.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "deprecation" },
@@ -1175,13 +1175,13 @@ dependencies = [
     { name = "tqdm" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/05/da/613140f8c354c630cb43db57c05464881a345e015ca37bdf58a1f3bc51de/lancedb-0.24.0-cp39-abi3-macosx_10_15_x86_64.whl", hash = "sha256:32954ff46ea51dd174bb6885181612246add07867b1e99fce934c586ea0668ee", size = 31748224, upload-time = "2025-06-20T06:24:11.607Z" },
-    { url = "https://files.pythonhosted.org/packages/44/8b/db0818d7a482d4bc13210e0491556340190dbf2e897ee18a9ba683794b6b/lancedb-0.24.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:0355bb61a2a9fec7d2f644a96f994e4f53521d17e4d3d1fca4c6824f92d63d0e", size = 29197988, upload-time = "2025-06-20T06:25:59.103Z" },
-    { url = "https://files.pythonhosted.org/packages/47/4d/ce8c17330b66af3ce8d88dde7d3af72d49ab0301697b520818a7bebc73b8/lancedb-0.24.0-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:86014528ee986c308adaa94763000c03a3e23420d93516bf69c68d791855511c", size = 30061783, upload-time = "2025-06-20T06:09:41.803Z" },
-    { url = "https://files.pythonhosted.org/packages/1f/ce/5127b944e779604cd9e1516d31d8f7e4d4cb50ec550a5fa1ba261326788b/lancedb-0.24.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:56c16bb960526262a0efe45e3ed98dd27bfde64a1cd0be7146751749eb6b922c", size = 33169350, upload-time = "2025-06-20T06:09:47.949Z" },
-    { url = "https://files.pythonhosted.org/packages/a9/39/f1f8e3986448ddec8d9f49b09865f2e625b31622e4b10d06fcd29830bd8e/lancedb-0.24.0-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:bcad8e621d88ab5463c0a70c938789e6ffd9c719dc3f1ea5bafb2ed41f917a01", size = 30076726, upload-time = "2025-06-20T06:06:08.706Z" },
-    { url = "https://files.pythonhosted.org/packages/eb/96/ec1dedba86b2a7d40ab778bc24a068abb5d67a9a5c996666ac7a2c88f64a/lancedb-0.24.0-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:0462d820a0404c1fd7b737fbc9e131438857d2fccd321852fba8ed5b55283e0a", size = 33215476, upload-time = "2025-06-20T06:08:33.379Z" },
-    { url = "https://files.pythonhosted.org/packages/16/db/9a31008d1c19f628efea0bb32a5420f915dda732df59987a94f523d1fd6f/lancedb-0.24.0-cp39-abi3-win_amd64.whl", hash = "sha256:5f1c22d86f0bd1e5dad3744ac28b02eafec89c83a0627903f840a1a7c77d785f", size = 35075123, upload-time = "2025-06-20T06:26:18.24Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/4a/cbdb6b7a8ca621282c3d9dedae00b372c09b430c69fc0ac149b5b9092b6c/lancedb-0.24.1-cp39-abi3-macosx_10_15_x86_64.whl", hash = "sha256:ae5f028920222ad325521fb447558e274eb92dfd7c189f5875dc3bcc7de07ea6", size = 32792946, upload-time = "2025-07-10T22:21:44.578Z" },
+    { url = "https://files.pythonhosted.org/packages/71/90/7c5218b5d81382901680bb365bb55f92fefa28434c049ec6236be73b7ac1/lancedb-0.24.1-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:baf1eba0e2a8762753dba466e92792a4a21ec504612125ec1d8edd6c15b17eba", size = 30290214, upload-time = "2025-07-10T22:25:47.422Z" },
+    { url = "https://files.pythonhosted.org/packages/e1/01/b184e8f1e94e27b9297778dfde65259a94994138d7d4330334bfdf5756e1/lancedb-0.24.1-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:dc20c56936d8198330a5dee2f1a17dc1f2145a7b48f81bc32193ca16f3907f3b", size = 31147217, upload-time = "2025-07-10T21:55:21.461Z" },
+    { url = "https://files.pythonhosted.org/packages/4e/02/7e67ea8e49757e42251df4e665699fe4d0962f336e3d113ebff84f22bee9/lancedb-0.24.1-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f2509810c743e094d2d900fdc7b0f2bc3cc52a970ecdfb5d404c22b8b8da14cc", size = 34315305, upload-time = "2025-07-10T21:59:31.539Z" },
+    { url = "https://files.pythonhosted.org/packages/46/b9/770c17793062dacaf52c5641af706cffca6ef803fbe80422d7948fc4a0cb/lancedb-0.24.1-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:2fbbdf6a6e6189fc3d026677a303a1b7e0bdfe9b690cfee93c586f6b76eb10ba", size = 31157887, upload-time = "2025-07-10T21:55:33.138Z" },
+    { url = "https://files.pythonhosted.org/packages/9c/ef/f896a8cabf99bc87e8bdc49df0bd08db09a86e8f333312c15375da21921f/lancedb-0.24.1-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:e8ef48eaa8c6c2093f40cbae4968c1fa9126934022b4d6462c5a019688731597", size = 34354984, upload-time = "2025-07-10T22:00:26.294Z" },
+    { url = "https://files.pythonhosted.org/packages/b9/a2/0ab0979ac987313e2dd9b52fddb98eae9cb048e0faebca7a5f9e0a352ea5/lancedb-0.24.1-cp39-abi3-win_amd64.whl", hash = "sha256:091d1757776fd7a0d7adbc5d507f4356e9f479c38a0446009724d8e52d66cbb3", size = 36228285, upload-time = "2025-07-10T22:16:45.817Z" },
 ]
 
 [[package]]
@@ -2280,7 +2280,7 @@ wheels = [
 
 [[package]]
 name = "pylance"
-version = "0.31.0"
+version = "0.31.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
@@ -2288,13 +2288,13 @@ dependencies = [
     { name = "pyarrow", version = "20.0.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bd/3e/4dac6a0a43e18eed6da2d72f0ca9c32151b39d2b5c6ecb11093b714d5f14/pylance-0.31.0-cp39-abi3-macosx_10_15_x86_64.whl", hash = "sha256:55491fa08ba1ce6569e3ba1f78901d9450a4087600d67bafe576108d5f1e3ec3", size = 39390567, upload-time = "2025-07-03T16:53:14.972Z" },
-    { url = "https://files.pythonhosted.org/packages/09/76/c24a7a43de8385549fb153dc4c7a8b8559830a64201f11843a713cea165f/pylance-0.31.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:329b96d75eb1c3ef98d88fcf9a952b20a1319b834e24ab726d5ee0977123e92c", size = 36193517, upload-time = "2025-07-03T16:40:54.122Z" },
-    { url = "https://files.pythonhosted.org/packages/87/39/053e99e09dda916c4cf207d790b1d2cea6bcbf8a8413501c11960d77d44d/pylance-0.31.0-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0f25bb30635e185c71f7b812da93c0f9b919bb5a29086051a822cad1e1bb158d", size = 37954576, upload-time = "2025-07-03T16:26:41.853Z" },
-    { url = "https://files.pythonhosted.org/packages/48/4b/1a1c1849cb81837c433e456e391d72aff0f79a2db9a41fcceb607aaa25d6/pylance-0.31.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b7364625faae74d1060065e3fdf97dd29f323c05e55228c86a44db7244024679", size = 41296392, upload-time = "2025-07-03T16:30:17.585Z" },
-    { url = "https://files.pythonhosted.org/packages/3d/83/55e070823e84fd3048f2d211906ae1b2dd11c106b118ec6806fa079e1a25/pylance-0.31.0-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:8a52990c13f8c72bbf8d023a2106950fc72f61899243544083c0e2d9ee09b7ca", size = 37980767, upload-time = "2025-07-03T16:26:24.427Z" },
-    { url = "https://files.pythonhosted.org/packages/14/ee/5d1e897cb45c28a1be1eda6cecc5444eb975d243076f7433f5a7a60dd29b/pylance-0.31.0-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:736d75e355b1447ecf884d6f00239e6cdd2047c2ef0f85eb525b52a421170782", size = 41310647, upload-time = "2025-07-03T16:30:02.957Z" },
-    { url = "https://files.pythonhosted.org/packages/23/37/6688cbe5553fcfed6d2a2d7fa411c72eb43e0b22306a6ca1421b033788f2/pylance-0.31.0-cp39-abi3-win_amd64.whl", hash = "sha256:cd6953386d32f3fcf6717f54583f4e6f5a1e8854d8d1f83c9aca2fbdc1dc0bdf", size = 42205453, upload-time = "2025-07-03T16:46:45.288Z" },
+    { url = "https://files.pythonhosted.org/packages/13/29/73a31da6c2fe7ea182b322a84b35cdf2a4b35527e09dae4355ec6acb38f5/pylance-0.31.1-cp39-abi3-macosx_10_15_x86_64.whl", hash = "sha256:a1cc4d55f2c43625b16604855b32ff7a281d4075d1d57b7c9d4ab810036c9228", size = 39395338, upload-time = "2025-07-10T17:18:16.256Z" },
+    { url = "https://files.pythonhosted.org/packages/5e/3e/6ffb31c284fa142d8aac0292fac11bcb78337e56ecfa006ac475fa77325a/pylance-0.31.1-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:865b174a75e6b8c71b4ee4074d2f4e668c279b862d13cb7e11180165fd63f355", size = 36188470, upload-time = "2025-07-10T17:04:17.034Z" },
+    { url = "https://files.pythonhosted.org/packages/ae/a3/d44b5cc4571b69060ea77aac88975066f185374825c9b10fcf8e912dd3d8/pylance-0.31.1-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:39e15153f814ad08049bf3701d5dd47c13ecd4695bc5f7ebe7dd6e41f235bb02", size = 37957399, upload-time = "2025-07-10T17:04:15.461Z" },
+    { url = "https://files.pythonhosted.org/packages/02/f3/8cbce87a43bef898a5ce1aed8d41f64d454ddc51cc36b7bf1abbc8fd4a5a/pylance-0.31.1-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7e89c39178ce58691cd27194b7ad485c5b317c6e2f44ea72cdecd27f2c62109e", size = 41290355, upload-time = "2025-07-10T17:04:01.149Z" },
+    { url = "https://files.pythonhosted.org/packages/02/6d/a8142cc4575784c9ddf7bea80a49deff74f91f45fe3019a2f4c579b79c61/pylance-0.31.1-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:141a6f3812a57c7afa90fd770dc86b31d9a9f1fd771c923bc5bead8742009947", size = 38000499, upload-time = "2025-07-10T17:01:02.694Z" },
+    { url = "https://files.pythonhosted.org/packages/1e/a8/0ebb4ac98d467101def0c40d4e24f4376079d45dc2a997ea8a9060ce4f12/pylance-0.31.1-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:514586591e0e028ef02ce4ecf55c716318a46930cf862fa018053249b9d1dbf5", size = 41290903, upload-time = "2025-07-10T17:04:50.309Z" },
+    { url = "https://files.pythonhosted.org/packages/e1/94/b15e2538ffcf9eddf20dd0c5a9a048ab1367e782268e70f4350199537ab3/pylance-0.31.1-cp39-abi3-win_amd64.whl", hash = "sha256:378dabd34c72bce3ce73cec4fda6c30f56bedb1db1afdd2e0437d0ece1b4eea3", size = 42201334, upload-time = "2025-07-10T17:19:14.285Z" },
 ]
 
 [[package]]
