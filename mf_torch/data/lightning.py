@@ -45,27 +45,45 @@ if TYPE_CHECKING:
     import polars as pl
 
 
-T = TypeVar("T")
+FT = TypeVar("FT")
+BT = TypeVar("BT")
 
 
 class ItemFeaturesType(TypedDict):
-    idx: int | torch.Tensor
-    text: str | list[str]
+    idx: int
+    text: str
+
+
+class ItemBatchType(TypedDict):
+    idx: torch.Tensor
+    text: list[str]
 
 
 class UserFeaturesType(TypedDict):
-    pos_idx: set[int] | torch.Tensor
-    text: str | list[str]
+    pos_idx: torch.Tensor
+    text: str
+
+
+class UserBatchType(TypedDict):
+    pos_idx: torch.Tensor
+    text: list[str]
 
 
 class InteractionFeaturesType(TypedDict):
-    target: int | torch.Tensor
+    target: int
     user: UserFeaturesType
     item: ItemFeaturesType
     neg_item: ItemFeaturesType
 
 
-class FeaturesProcessor[T](pydantic.BaseModel):
+class InteractionBatchType(TypedDict):
+    target: torch.Tensor
+    user: UserBatchType
+    item: ItemBatchType
+    neg_item: ItemBatchType
+
+
+class FeaturesProcessor[FT, BT](pydantic.BaseModel):
     batch_size: int = BATCH_SIZE
     data_dir: str = DATA_DIR
 
@@ -77,7 +95,7 @@ class FeaturesProcessor[T](pydantic.BaseModel):
     def fields(self) -> list[str]:
         raise NotImplementedError
 
-    def collate(self, batch: list[T]) -> T:
+    def collate(self, batch: list[FT]) -> BT:
         return torch_collate.default_collate(batch)
 
     def get_data(self, subset: str, cycle: int = 1) -> torch_data.IterDataPipe[T]:
@@ -100,12 +118,12 @@ class FeaturesProcessor[T](pydantic.BaseModel):
 
     def get_processed_data(
         self, subset: str, cycle: int = 1
-    ) -> torch_data.IterDataPipe[T]:
+    ) -> torch_data.IterDataPipe[FT]:
         return self.get_data(subset, cycle=cycle).map(self.process)
 
     def get_batch_data(
         self, subset: str, cycle: int | None = 1
-    ) -> torch_data.IterDataPipe[T]:
+    ) -> torch_data.IterDataPipe[BT]:
         return (
             self.get_processed_data(subset, cycle=cycle)
             .map(functools.partial(select_fields, fields=self.fields))
@@ -139,7 +157,9 @@ class LanceDbProcessor(pydantic.BaseModel):
         return result[0]
 
 
-class ItemProcessor(FeaturesProcessor[ItemFeaturesType], LanceDbProcessor):
+class ItemProcessor(
+    FeaturesProcessor[ItemFeaturesType, ItemBatchType], LanceDbProcessor
+):
     id_col: str = ITEM_ID_COL
     text_col: str = ITEM_TEXT_COL
     lance_table_name: str = ITEMS_TABLE_NAME
@@ -248,7 +268,9 @@ class ItemProcessor(FeaturesProcessor[ItemFeaturesType], LanceDbProcessor):
         )
 
 
-class UserProcessor(FeaturesProcessor[UserFeaturesType], LanceDbProcessor):
+class UserProcessor(
+    FeaturesProcessor[UserFeaturesType, UserBatchType], LanceDbProcessor
+):
     id_col: str = USER_ID_COL
     text_col: str = USER_TEXT_COL
     lance_table_name: str = USERS_TABLE_NAME
@@ -298,7 +320,9 @@ class UserProcessor(FeaturesProcessor[UserFeaturesType], LanceDbProcessor):
         return {item[ITEM_ID_COL]: item[TARGET_COL] for item in activity}
 
 
-class InteractionProcessor(FeaturesProcessor[InteractionFeaturesType]):
+class InteractionProcessor(
+    FeaturesProcessor[InteractionFeaturesType, InteractionBatchType]
+):
     item_processor: ItemProcessor
     user_processor: UserProcessor
 
@@ -320,7 +344,7 @@ class InteractionProcessor(FeaturesProcessor[InteractionFeaturesType]):
         target = example[self.target_col]
         return {"target": target, "user": user_features, "item": item_features}
 
-    def collate(self, batch: list[InteractionFeaturesType]) -> InteractionFeaturesType:
+    def collate(self, batch: list[InteractionFeaturesType]) -> InteractionBatchType:
         target = torch_collate.default_collate([example["target"] for example in batch])
         item = self.item_processor.collate([example["item"] for example in batch])
         user = self.user_processor.collate([example["user"] for example in batch])
@@ -339,7 +363,9 @@ class InteractionProcessor(FeaturesProcessor[InteractionFeaturesType]):
         )
         return super().get_processed_data(subset).zip(neg_item_dp).map(merge_examples)
 
-    def get_batch_data(self, subset: str) -> torch_data.IterDataPipe[ItemFeaturesType]:
+    def get_batch_data(
+        self, subset: str
+    ) -> torch_data.IterDataPipe[InteractionBatchType]:
         return (
             self.get_processed_data(subset)
             .batch(self.batch_size)
@@ -405,12 +431,12 @@ class MatrixFactorizationDataModule(LightningDataModule):
 
     def get_dataloader(
         self,
-        dataset: torch_data.Dataset[T],
+        dataset: torch_data.Dataset[FT],
         *,
         batch_size: int | None = None,
-        collate_fn: Callable[[list[T]], T] | None = None,
+        collate_fn: Callable[[list[FT]], BT] | None = None,
         shuffle: bool = False,
-    ) -> torch_data.DataLoader[T]:
+    ) -> torch_data.DataLoader[BT]:
         num_workers = self.hparams.get("num_workers")
 
         if num_workers is None:
@@ -429,7 +455,7 @@ class MatrixFactorizationDataModule(LightningDataModule):
             persistent_workers=num_workers > 0,
         )
 
-    def train_dataloader(self) -> torch_data.DataLoader[InteractionFeaturesType]:
+    def train_dataloader(self) -> torch_data.DataLoader[InteractionBatchType]:
         batch_size = self.hparams.get("batch_size")
         return self.get_dataloader(
             self.train_data,

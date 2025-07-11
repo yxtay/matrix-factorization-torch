@@ -65,7 +65,7 @@ class MatrixFactorizationLitModule(LightningModule):
             text,
             padding="max_length",
             truncation="longest_first",
-            max_length=self.hparams.max_seq_length,
+            # max_length=self.hparams.max_seq_length,
             return_tensors="pt",
         ).to(self.device)
         # shape: (batch_size, seq_len)
