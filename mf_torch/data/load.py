@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import torch
-import torch.nn.functional as F
+import torch.nn.functional as F  # noqa: N812
 import torch.utils.data as torch_data
 import torch.utils.data._utils.collate as torch_collate
 
