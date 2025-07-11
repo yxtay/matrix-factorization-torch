@@ -39,17 +39,6 @@ repos:
       - id: no-commit-to-branch
       - id: forbid-new-submodules
 
-        # python
-      - id: check-ast
-      - id: check-builtin-literals
-      - id: check-docstring-first
-      - id: debug-statements
-      - id: fix-encoding-pragma
-        args: [--remove]
-      - id: name-tests-test
-        args: [--pytest-test-first]
-      - id: requirements-txt-fixer # conflicts with poetry
-
         # security
       - id: detect-aws-credentials
         args: [--allow-missing-credentials]

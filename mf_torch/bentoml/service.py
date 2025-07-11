@@ -100,19 +100,19 @@ class Embedder:
 
 
 @bentoml.service()
-class ItemsProcessor:
+class ItemProcessor:
     model_ref = bentoml.models.BentoModel(MODEL_NAME)
 
     @logger.catch(reraise=True)
     def __init__(self) -> None:
-        from mf_torch.data.lightning import ItemsProcessor
+        from mf_torch.data.lightning import ItemProcessor
 
         lance_db_path = self.model_ref.path_of(LANCE_DB_PATH)
         processors_args = json.loads(
             pathlib.Path(self.model_ref.path_of(PROCESSORS_JSON)).read_text()
         )
         processors_args["items"].update({"lance_db_path": lance_db_path})
-        self.items_processor = ItemsProcessor.model_validate(processors_args["items"])
+        self.item_processor = ItemProcessor.model_validate(processors_args["items"])
 
     @bentoml.api()
     @logger.catch(reraise=True)
@@ -121,7 +121,7 @@ class ItemsProcessor:
     ) -> list[ItemCandidate]:
         from pydantic import TypeAdapter
 
-        results_df = self.items_processor.search(
+        results_df = self.item_processor.search(
             query.embedding,
             exclude_item_ids=exclude_item_ids,
             top_k=top_k,
@@ -135,7 +135,7 @@ class ItemsProcessor:
     def get_id(self, item_id: int) -> ItemQuery:
         from bentoml.exceptions import NotFound
 
-        result = self.items_processor.get_id(item_id)
+        result = self.item_processor.get_id(item_id)
         if len(result) == 0:
             msg = f"item not found: {item_id = }"
             raise NotFound(msg)
@@ -145,30 +145,30 @@ class ItemsProcessor:
     @logger.catch(reraise=True)
     def process(self, item: ItemQuery) -> Query:
         item_data = item.model_dump()
-        return Query.model_validate(self.items_processor.process(item_data))
+        return Query.model_validate(self.item_processor.process(item_data))
 
 
 @bentoml.service()
-class UsersProcessor:
+class UserProcessor:
     model_ref = bentoml.models.BentoModel(MODEL_NAME)
 
     @logger.catch(reraise=True)
     def __init__(self) -> None:
-        from mf_torch.data.lightning import UsersProcessor
+        from mf_torch.data.lightning import UserProcessor
 
         lance_db_path = self.model_ref.path_of(LANCE_DB_PATH)
         processors_args = json.loads(
             pathlib.Path(self.model_ref.path_of(PROCESSORS_JSON)).read_text()
         )
         processors_args["users"].update({"lance_db_path": lance_db_path})
-        self.users_processor = UsersProcessor.model_validate(processors_args["users"])
+        self.user_processor = UserProcessor.model_validate(processors_args["users"])
 
     @bentoml.api()
     @logger.catch(reraise=True)
     def get_id(self, user_id: int) -> UserQuery:
         from bentoml.exceptions import NotFound
 
-        result = self.users_processor.get_id(user_id)
+        result = self.user_processor.get_id(user_id)
         if len(result) == 0:
             msg = f"user not found: {user_id = }"
             raise NotFound(msg)
@@ -178,15 +178,15 @@ class UsersProcessor:
     @logger.catch(reraise=True)
     def process(self, user: UserQuery) -> Query:
         user_data = user.model_dump()
-        return Query.model_validate(self.users_processor.process(user_data))
+        return Query.model_validate(self.user_processor.process(user_data))
 
 
 @bentoml.service(image=image, envs=ENVS, workers="cpu_count")
 class Service:
     model_ref = bentoml.models.BentoModel(MODEL_NAME)
     embedder = bentoml.depends(Embedder)
-    items_processor = bentoml.depends(ItemsProcessor)
-    users_processor = bentoml.depends(UsersProcessor)
+    item_processor = bentoml.depends(ItemProcessor)
+    user_processor = bentoml.depends(UserProcessor)
 
     @bentoml.api()
     @logger.catch(reraise=True)
@@ -215,7 +215,7 @@ class Service:
         top_k: int = TOP_K,
     ) -> list[ItemCandidate]:
         exclude_item_ids = exclude_item_ids or []
-        return await self.items_processor.to_async.search(
+        return await self.item_processor.to_async.search(
             query, exclude_item_ids=exclude_item_ids, top_k=top_k
         )
 
@@ -238,7 +238,7 @@ class Service:
     @bentoml.api()
     @logger.catch(reraise=True)
     async def process_item(self, item: ItemQuery) -> Query:
-        return await self.items_processor.to_async.process(item)
+        return await self.item_processor.to_async.process(item)
 
     @bentoml.api()
     @logger.catch(reraise=True)
@@ -256,7 +256,7 @@ class Service:
     @bentoml.api()
     @logger.catch(reraise=True)
     async def item_id(self, item_id: int) -> ItemQuery:
-        return await self.items_processor.to_async.get_id(item_id)
+        return await self.item_processor.to_async.get_id(item_id)
 
     @bentoml.api()
     @logger.catch(reraise=True)
@@ -280,7 +280,7 @@ class Service:
     @bentoml.api()
     @logger.catch(reraise=True)
     async def process_user(self, user: UserQuery) -> Query:
-        return await self.users_processor.to_async.process(user)
+        return await self.user_processor.to_async.process(user)
 
     @bentoml.api()
     @logger.catch(reraise=True)
@@ -298,7 +298,7 @@ class Service:
     @bentoml.api()
     @logger.catch(reraise=True)
     async def user_id(self, user_id: int) -> UserQuery:
-        return await self.users_processor.to_async.get_id(user_id)
+        return await self.user_processor.to_async.get_id(user_id)
 
     @bentoml.api()
     @logger.catch(reraise=True)

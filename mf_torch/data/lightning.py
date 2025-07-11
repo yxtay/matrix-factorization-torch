@@ -5,7 +5,7 @@ import functools
 import math
 import os
 import pathlib
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, TypedDict, TypeVar
 
 import pydantic
 import torch
@@ -17,6 +17,7 @@ from mf_torch.data.load import (
     merge_examples,
     nest_example,
     select_fields,
+    torch_collate,
 )
 from mf_torch.params import (
     BATCH_SIZE,
@@ -35,7 +36,7 @@ from mf_torch.params import (
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from typing import Any, TypeVar
+    from typing import Any
 
     import lancedb
     import numpy as np
@@ -43,43 +44,61 @@ if TYPE_CHECKING:
     import pandas as pd
     import polars as pl
 
-    T = TypeVar("T")
+
+FT = TypeVar("FT")
+BT = TypeVar("BT")
 
 
-class FeaturesType(TypedDict):
-    idx: int | torch.Tensor
-    text: str | list[str]
+class ItemFeaturesType(TypedDict):
+    idx: int
+    text: str
 
 
-class BatchType(TypedDict):
+class ItemBatchType(TypedDict):
+    idx: torch.Tensor
+    text: list[str]
+
+
+class UserFeaturesType(TypedDict):
+    pos_idx: torch.Tensor
+    text: str
+
+
+class UserBatchType(TypedDict):
+    pos_idx: torch.Tensor
+    text: list[str]
+
+
+class InteractionFeaturesType(TypedDict):
+    target: int
+    user: UserFeaturesType
+    item: ItemFeaturesType
+    neg_item: ItemFeaturesType
+
+
+class InteractionBatchType(TypedDict):
     target: torch.Tensor
-    user: dict[str, torch.Tensor]
-    item: dict[str, torch.Tensor]
-    neg_item: dict[str, torch.Tensor]
+    user: UserBatchType
+    item: ItemBatchType
+    neg_item: ItemBatchType
 
 
-class FeaturesProcessor(pydantic.BaseModel):
-    id_col: str
-    text_col: str
-    lance_table_name: str
-
+class FeaturesProcessor[FT, BT](pydantic.BaseModel):
     batch_size: int = BATCH_SIZE
-
     data_dir: str = DATA_DIR
-    lance_db_path: str = LANCE_DB_PATH
 
-    def process(self, example: dict[str, Any]) -> FeaturesType:
-        import xxhash
+    @property
+    def data_path(self) -> str:
+        raise NotImplementedError
 
-        return {
-            **example,
-            "idx": xxhash.xxh32_intdigest(str(example[self.id_col])),
-            "text": example[self.text_col],
-        }
+    @property
+    def fields(self) -> list[str]:
+        raise NotImplementedError
 
-    def get_data(
-        self, subset: str, cycle: int = 1
-    ) -> torch_data.IterDataPipe[FeaturesType]:
+    def collate(self, batch: list[FT]) -> BT:
+        return torch_collate.default_collate(batch)
+
+    def get_data(self, subset: str, cycle: int = 1) -> torch_data.IterDataPipe[FT]:
         import pyarrow.dataset as ds
 
         from mf_torch.data.load import ParquetDictLoaderIterDataPipe
@@ -99,19 +118,25 @@ class FeaturesProcessor(pydantic.BaseModel):
 
     def get_processed_data(
         self, subset: str, cycle: int = 1
-    ) -> torch_data.IterDataPipe[FeaturesType]:
+    ) -> torch_data.IterDataPipe[FT]:
         return self.get_data(subset, cycle=cycle).map(self.process)
 
     def get_batch_data(
         self, subset: str, cycle: int | None = 1
-    ) -> torch_data.IterDataPipe[FeaturesType]:
-        fields = ["idx", "text"]
+    ) -> torch_data.IterDataPipe[BT]:
         return (
             self.get_processed_data(subset, cycle=cycle)
-            .map(functools.partial(select_fields, fields=fields))
+            .map(functools.partial(select_fields, fields=self.fields))
             .batch(self.batch_size)
-            .collate()
+            .collate(collate_fn=self.collate)
         )
+
+
+class LanceDbProcessor(pydantic.BaseModel):
+    id_col: str
+    text_col: str
+    lance_table_name: str
+    lance_db_path: str = LANCE_DB_PATH
 
     @property
     def lance_db(self) -> lancedb.DBConnection:
@@ -132,40 +157,9 @@ class FeaturesProcessor(pydantic.BaseModel):
         return result[0]
 
 
-class UsersProcessor(FeaturesProcessor):
-    id_col: str = USER_ID_COL
-    text_col: str = USER_TEXT_COL
-    lance_table_name: str = USERS_TABLE_NAME
-
-    @property
-    def data_path(self) -> str:
-        return pathlib.Path(self.data_dir, "ml-1m", "users.parquet").as_posix()
-
-    def get_index(self, subset: str = "predict") -> lancedb.table.Table:
-        import pyarrow.dataset as ds
-        import pyarrow.parquet as pq
-
-        columns = [self.id_col, self.text_col, "history", "target"]
-        filters = ds.field(f"is_{subset}")
-        pa_table = pq.read_table(self.data_path, columns=columns, filters=filters)
-
-        table = self.lance_db.create_table(
-            self.lance_table_name, data=pa_table, mode="overwrite"
-        )
-        table.create_scalar_index(self.id_col)
-        table.optimize(
-            cleanup_older_than=datetime.timedelta(days=0),
-            delete_unverified=True,
-            retrain=True,
-        )
-        return table
-
-    def get_activity(self, id_val: int | None, activity_name: str) -> dict[int, int]:
-        activity = self.get_id(id_val).get(activity_name, {})
-        return {item[ITEM_ID_COL]: item[TARGET_COL] for item in activity}
-
-
-class ItemsProcessor(FeaturesProcessor):
+class ItemProcessor(
+    FeaturesProcessor[ItemFeaturesType, ItemBatchType], LanceDbProcessor
+):
     id_col: str = ITEM_ID_COL
     text_col: str = ITEM_TEXT_COL
     lance_table_name: str = ITEMS_TABLE_NAME
@@ -178,6 +172,19 @@ class ItemsProcessor(FeaturesProcessor):
     @property
     def data_path(self) -> str:
         return pathlib.Path(self.data_dir, "ml-1m", "movies.parquet").as_posix()
+
+    def process(self, example: dict[str, Any]) -> ItemFeaturesType:
+        import xxhash
+
+        return {
+            **example,
+            "text": example[self.text_col],
+            "idx": xxhash.xxh32_intdigest(str(example[self.id_col])),
+        }
+
+    @property
+    def fields(self) -> list[str]:
+        return ["text", "idx"]
 
     def get_index(
         self, model: torch.nn.Module, subset: str = "predict"
@@ -201,12 +208,7 @@ class ItemsProcessor(FeaturesProcessor):
         num_partitions = self.num_partitions or 2 ** int(math.log2(num_items) / 2)
         num_sub_vectors = self.num_sub_vectors or embedding_dim // 8
 
-        if torch.cuda.is_available():
-            accelerator = "cuda"
-        elif torch.mps.is_available():
-            accelerator = "mps"
-        else:
-            accelerator = None
+        accelerator = "cuda" if torch.cuda.is_available() else None
 
         schema = pa.RecordBatch.from_pylist(batch).schema
         schema = schema.set(
@@ -261,64 +263,104 @@ class ItemsProcessor(FeaturesProcessor):
         )
 
 
-class InteractionsProcessor(pydantic.BaseModel):
-    users_processor: UsersProcessor
-    items_processor: ItemsProcessor
+class UserProcessor(
+    FeaturesProcessor[UserFeaturesType, UserBatchType], LanceDbProcessor
+):
+    id_col: str = USER_ID_COL
+    text_col: str = USER_TEXT_COL
+    lance_table_name: str = USERS_TABLE_NAME
+
+    @property
+    def data_path(self) -> str:
+        return pathlib.Path(self.data_dir, "ml-1m", "users.parquet").as_posix()
+
+    def process(self, example: dict[str, Any]) -> UserFeaturesType:
+        import xxhash
+
+        pos_idx = {
+            xxhash.xxh32_intdigest(str(target[ITEM_ID_COL]))
+            for target in example["target"]
+        }
+        return {
+            **example,
+            "text": example[self.text_col],
+            "pos_idx": torch.as_tensor(list(pos_idx), dtype=torch.int64),
+        }
+
+    @property
+    def fields(self) -> list[str]:
+        return ["text", "pos_idx"]
+
+    def get_index(self, subset: str = "predict") -> lancedb.table.Table:
+        import pyarrow.dataset as ds
+        import pyarrow.parquet as pq
+
+        columns = [self.id_col, self.text_col, "history", "target"]
+        filters = ds.field(f"is_{subset}")
+        pa_table = pq.read_table(self.data_path, columns=columns, filters=filters)
+
+        table = self.lance_db.create_table(
+            self.lance_table_name, data=pa_table, mode="overwrite"
+        )
+        table.create_scalar_index(self.id_col)
+        table.optimize(
+            cleanup_older_than=datetime.timedelta(days=0),
+            delete_unverified=True,
+            retrain=True,
+        )
+        return table
+
+    def get_activity(self, id_val: int | None, activity_name: str) -> dict[int, int]:
+        activity = self.get_id(id_val).get(activity_name, {})
+        return {item[ITEM_ID_COL]: item[TARGET_COL] for item in activity}
+
+
+class InteractionProcessor(
+    FeaturesProcessor[InteractionFeaturesType, InteractionBatchType]
+):
+    item_processor: ItemProcessor
+    user_processor: UserProcessor
 
     target_col: str = TARGET_COL
     batch_size: int = BATCH_SIZE
     data_dir: str = DATA_DIR
 
-    def process(self, example: dict[str, Any]) -> BatchType:
-        fields = ["idx", "text"]
-        user_features = select_fields(
-            self.users_processor.process(example), fields=fields
-        )
+    @property
+    def data_path(self) -> str:
+        return pathlib.Path(self.data_dir, "ml-1m", "ratings.parquet").as_posix()
+
+    def process(self, example: dict[str, Any]) -> InteractionFeaturesType:
         item_features = select_fields(
-            self.items_processor.process(example), fields=fields
+            self.item_processor.process(example), fields=self.item_processor.fields
+        )
+        user_features = select_fields(
+            self.user_processor.process(example), fields=self.user_processor.fields
         )
         target = example[self.target_col]
         return {"target": target, "user": user_features, "item": item_features}
 
-    def collate(self, batch: list[BatchType]) -> BatchType:
-        import torch.utils.data._utils.collate as torch_collate
-
+    def collate(self, batch: list[InteractionFeaturesType]) -> InteractionBatchType:
         target = torch_collate.default_collate([example["target"] for example in batch])
-        user = torch_collate.default_collate([example["user"] for example in batch])
-        item = torch_collate.default_collate([example["item"] for example in batch])
-        neg_item = torch_collate.default_collate(
+        item = self.item_processor.collate([example["item"] for example in batch])
+        user = self.user_processor.collate([example["user"] for example in batch])
+        neg_item = self.item_processor.collate(
             [example["neg_item"] for example in batch]
         )
-        return {"target": target, "user": user, "item": item, "neg_item": neg_item}
+        return {"target": target, "item": item, "user": user, "neg_item": neg_item}
 
-    def get_processed_data(self, subset: str) -> torch_data.IterDataPipe[BatchType]:
-        import pyarrow.dataset as ds
-
-        from mf_torch.data.load import ParquetDictLoaderIterDataPipe
-
-        valid_subset = {"train", "val", "test", "predict"}
-        if subset not in valid_subset:
-            msg = f"`{subset}` is not one of `{valid_subset}`"
-            raise ValueError(msg)
-
-        data_path = pathlib.Path(self.data_dir, "ml-1m", "ratings.parquet").as_posix()
-        filter_expr = ds.field(f"is_{subset}")
-        fields = ["idx", "text"]
+    def get_processed_data(
+        self, subset: str
+    ) -> torch_data.IterDataPipe[InteractionFeaturesType]:
         neg_item_dp = (
-            self.items_processor.get_processed_data(subset, cycle=None)
-            .map(functools.partial(select_fields, fields=fields))
+            self.item_processor.get_processed_data(subset, cycle=None)
+            .map(functools.partial(select_fields, fields=self.item_processor.fields))
             .map(functools.partial(nest_example, key="neg_item"))
         )
-        return (
-            ParquetDictLoaderIterDataPipe([data_path], filter_expr=filter_expr)
-            .shuffle()  # devskim: ignore DS148264
-            .sharding_filter()
-            .map(self.process)
-            .zip(neg_item_dp)
-            .map(merge_examples)
-        )
+        return super().get_processed_data(subset).zip(neg_item_dp).map(merge_examples)
 
-    def get_batch_data(self, subset: str) -> torch_data.IterDataPipe[FeaturesType]:
+    def get_batch_data(
+        self, subset: str
+    ) -> torch_data.IterDataPipe[InteractionBatchType]:
         return (
             self.get_processed_data(subset)
             .batch(self.batch_size)
@@ -340,7 +382,7 @@ class MatrixFactorizationDataModule(LightningDataModule):
         super().__init__()
         self.save_hyperparameters()
 
-        self.items_processor = ItemsProcessor(
+        self.item_processor = ItemProcessor(
             batch_size=batch_size,
             num_partitions=num_partitions,
             num_sub_vectors=num_sub_vectors,
@@ -348,13 +390,13 @@ class MatrixFactorizationDataModule(LightningDataModule):
             refine_factor=refine_factor,
             data_dir=data_dir,
         )
-        self.users_processor = UsersProcessor(
+        self.user_processor = UserProcessor(
             batch_size=batch_size,
             data_dir=data_dir,
         )
-        self.interactions_processor = InteractionsProcessor(
-            users_processor=self.users_processor,
-            items_processor=self.items_processor,
+        self.interaction_processor = InteractionProcessor(
+            item_processor=self.item_processor,
+            user_processor=self.user_processor,
             batch_size=batch_size,
             data_dir=data_dir,
         )
@@ -371,25 +413,25 @@ class MatrixFactorizationDataModule(LightningDataModule):
 
     def setup(self, stage: str) -> None:
         if stage == "fit":
-            self.train_data = self.interactions_processor.get_processed_data("train")
+            self.train_data = self.interaction_processor.get_processed_data("train")
 
         if stage in {"fit", "validate"}:
-            self.val_data = self.users_processor.get_processed_data("val")
+            self.val_data = self.user_processor.get_processed_data("val")
 
         if stage == "test":
-            self.test_data = self.users_processor.get_processed_data("test")
+            self.test_data = self.user_processor.get_processed_data("test")
 
         if stage == "predict":
-            self.predict_data = self.users_processor.get_processed_data("predict")
+            self.predict_data = self.user_processor.get_processed_data("predict")
 
     def get_dataloader(
         self,
-        dataset: torch_data.Dataset[T],
+        dataset: torch_data.Dataset[FT],
         *,
         batch_size: int | None = None,
-        collate_fn: Callable[[list[T]], T] | None = None,
+        collate_fn: Callable[[list[FT]], BT] | None = None,
         shuffle: bool = False,
-    ) -> torch_data.DataLoader[T]:
+    ) -> torch_data.DataLoader[BT]:
         num_workers = self.hparams.get("num_workers")
 
         if num_workers is None:
@@ -408,22 +450,22 @@ class MatrixFactorizationDataModule(LightningDataModule):
             persistent_workers=num_workers > 0,
         )
 
-    def train_dataloader(self) -> torch_data.DataLoader[BatchType]:
+    def train_dataloader(self) -> torch_data.DataLoader[InteractionBatchType]:
         batch_size = self.hparams.get("batch_size")
         return self.get_dataloader(
             self.train_data,
             batch_size=batch_size,
-            collate_fn=self.interactions_processor.collate,
+            collate_fn=self.interaction_processor.collate,
             shuffle=True,
         )
 
-    def val_dataloader(self) -> torch_data.DataLoader[FeaturesType]:
+    def val_dataloader(self) -> torch_data.DataLoader[ItemFeaturesType]:
         return self.get_dataloader(self.val_data)
 
-    def test_dataloader(self) -> torch_data.DataLoader[FeaturesType]:
+    def test_dataloader(self) -> torch_data.DataLoader[ItemFeaturesType]:
         return self.get_dataloader(self.test_data)
 
-    def predict_dataloader(self) -> torch_data.DataLoader[FeaturesType]:
+    def predict_dataloader(self) -> torch_data.DataLoader[ItemFeaturesType]:
         return self.get_dataloader(self.predict_data)
 
 
@@ -435,10 +477,10 @@ if __name__ == "__main__":
     dm.setup("fit")
 
     dataloaders = [
-        dm.items_processor.get_batch_data("train"),
-        dm.users_processor.get_batch_data("train"),
-        dm.interactions_processor.get_processed_data("train"),
-        dm.interactions_processor.get_batch_data("train"),
+        dm.item_processor.get_batch_data("train"),
+        dm.user_processor.get_batch_data("train"),
+        dm.interaction_processor.get_processed_data("train"),
+        dm.interaction_processor.get_batch_data("train"),
         dm.train_dataloader(),
         dm.val_dataloader(),
     ]
@@ -452,14 +494,14 @@ if __name__ == "__main__":
         }
         rich.print(shapes)
 
-    dm.users_processor.get_index().search().to_polars().glimpse()
-    rich.print(dm.users_processor.get_id(1))
-    rich.print(dm.users_processor.get_activity(1, "history"))
-    rich.print(dm.users_processor.get_activity(1, "target"))
+    dm.user_processor.get_index().search().to_polars().glimpse()
+    rich.print(dm.user_processor.get_id(1))
+    rich.print(dm.user_processor.get_activity(1, "history"))
+    rich.print(dm.user_processor.get_activity(1, "target"))
 
-    dm.items_processor.get_index(
+    dm.item_processor.get_index(
         lambda _: torch.rand(1, 32)  # devskim: ignore DS148264
     ).search().to_polars().glimpse()
-    rich.print(dm.items_processor.get_id(1))
+    rich.print(dm.item_processor.get_id(1))
     query_vector = torch.rand(1, 32).numpy()  # devskim: ignore DS148264
-    rich.print(dm.items_processor.search(query_vector, top_k=5))
+    rich.print(dm.item_processor.search(query_vector, top_k=5))
