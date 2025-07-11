@@ -12,7 +12,7 @@ from lightning import LightningModule
 from lightning.fabric.utilities.rank_zero import rank_zero_only
 from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
 
-from mf_torch.data.lightning import InteractionFeaturesType, ItemFeaturesType
+from mf_torch.data.lightning import InteractionBatchType, UserFeaturesType
 from mf_torch.params import (
     MAX_SEQ_LENGTH,
     METRIC,
@@ -94,7 +94,7 @@ class MatrixFactorizationLitModule(LightningModule):
         ).drop(columns="embedding")
 
     def compute_losses(
-        self, batch: InteractionFeaturesType, step_name: str = "train"
+        self, batch: InteractionBatchType, step_name: str = "train"
     ) -> dict[str, torch.Tensor]:
         if self.loss_fns is None:
             msg = "`loss_fns` must be initialised first"
@@ -182,20 +182,20 @@ class MatrixFactorizationLitModule(LightningModule):
                 metric.update(preds=preds, target=target > 0, indexes=indexes)
         return metrics
 
-    def training_step(self, batch: InteractionFeaturesType, _: int) -> torch.Tensor:
+    def training_step(self, batch: InteractionBatchType, _: int) -> torch.Tensor:
         losses = self.compute_losses(batch, step_name="train")
         self.log_dict(losses)
         return losses[f"train/{self.hparams.train_loss}"]
 
-    def validation_step(self, batch: ItemFeaturesType, _: int) -> None:
+    def validation_step(self, batch: UserFeaturesType, _: int) -> None:
         metrics = self.update_metrics(batch, step_name="val")
         self.log_dict(metrics)
 
-    def test_step(self, batch: ItemFeaturesType, _: int) -> None:  # noqa: PT019
+    def test_step(self, batch: UserFeaturesType, _: int) -> None:  # noqa: PT019
         metrics = self.update_metrics(batch, step_name="test")
         self.log_dict(metrics)
 
-    def predict_step(self, batch: ItemFeaturesType, _: int) -> pd.DataFrame:
+    def predict_step(self, batch: UserFeaturesType, _: int) -> pd.DataFrame:
         user_id_col = self.trainer.datamodule.user_processor.id_col
         return self.recommend(
             batch["text"], top_k=self.hparams.top_k, user_id=batch[user_id_col]
