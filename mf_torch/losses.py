@@ -42,8 +42,8 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         item_embed: torch.Tensor,
         target: torch.Tensor,
         *,
-        pos_idx: torch.Tensor,
         item_idx: torch.Tensor,
+        pos_idx: torch.Tensor,
     ) -> torch.Tensor:
         # target shape: (num_users, num_items)
         self.check_inputs(user_embed, item_embed, target)
@@ -60,7 +60,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         # target = target.values()
         # # shape: (num_target,)
         return self.loss(
-            user_embed, item_embed, target, pos_idx=pos_idx, item_idx=item_idx
+            user_embed, item_embed, target, item_idx=item_idx, pos_idx=pos_idx
         )
 
     def check_inputs(
@@ -101,6 +101,25 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         pos_idx: torch.Tensor,
     ) -> torch.Tensor: ...
 
+    def negative_masks(
+        self,
+        losses: torch.Tensor,
+        *,
+        item_idx: torch.Tensor,
+        pos_idx: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        # accidental hits can be samples with same user or item
+        batch_size = losses.size(0)
+        # limit rows to batch size if num_items > batch_size
+        accidental_hits = item_idx[:batch_size, None] == item_idx[None, :]
+        # shape: (batch_size, num_items)
+        if pos_idx is not None:
+            # shape: (batch_size, num_positives)
+            # mask shape: (batch_size, num_items, num_positives)
+            accidental_hits |= (pos_idx.unsqueeze(1) == item_idx[None, :, None]).any(-1)
+            # shape: (batch_size, num_items)
+        return ~accidental_hits
+
     def hard_negative_mining(
         self, losses: torch.Tensor, negative_masks: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -122,25 +141,6 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         negative_masks = negative_masks.gather(dim=-1, index=hard_negetives.indices)
         # shape: (batch_size, num_hard_negatives)
         return losses, negative_masks
-
-    def negative_masks(
-        self,
-        losses: torch.Tensor,
-        *,
-        item_idx: torch.Tensor,
-        pos_idx: torch.Tensor | None = None,
-    ) -> torch.Tensor:
-        # accidental hits can be samples with same user or item
-        batch_size = losses.size(0)
-        # limit rows to batch size if num_items > batch_size
-        accidental_hits = item_idx[:batch_size, None] == item_idx[None, :]
-        # shape: (batch_size, num_items)
-        if pos_idx is not None:
-            # shape: (batch_size, num_positives)
-            # mask shape: (batch_size, num_items, num_positives)
-            accidental_hits |= (pos_idx.unsqueeze(1) == item_idx[None, :, None]).any(-1)
-            # shape: (batch_size, num_items)
-        return ~accidental_hits
 
     def semi_hard_mining(
         self, losses: torch.Tensor, negative_masks: torch.Tensor
