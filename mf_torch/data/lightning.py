@@ -98,7 +98,7 @@ class FeaturesProcessor[FT, BT](pydantic.BaseModel):
     def collate(self, batch: list[FT]) -> BT:
         return torch_collate.default_collate(batch)
 
-    def get_data(self, subset: str, cycle: int = 1) -> torch_data.IterDataPipe[T]:
+    def get_data(self, subset: str, cycle: int = 1) -> torch_data.IterDataPipe[FT]:
         import pyarrow.dataset as ds
 
         from mf_torch.data.load import ParquetDictLoaderIterDataPipe
