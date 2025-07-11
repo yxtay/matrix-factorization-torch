@@ -16,7 +16,6 @@ from mf_torch.data.lightning import InteractionFeaturesType, ItemFeaturesType
 from mf_torch.params import (
     MAX_SEQ_LENGTH,
     METRIC,
-    NEW_HIDDEN_LAYERS,
     TARGET_COL,
     TOP_K,
     TRANSFORMER_NAME,
@@ -38,7 +37,6 @@ class MatrixFactorizationLitModule(LightningModule):
         self,
         *,
         model_name_or_path: str = TRANSFORMER_NAME,  # noqa: ARG002
-        new_hidden_layers: int = NEW_HIDDEN_LAYERS,  # noqa: ARG002
         max_seq_length: int = MAX_SEQ_LENGTH,  # noqa: ARG002
         train_loss: str = "PairwiseHingeLoss",  # noqa: ARG002
         hard_negatives_ratio: float | None = None,  # noqa: ARG002

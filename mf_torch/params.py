@@ -15,7 +15,6 @@ USER_TEXT_COL = "user_text"
 TRANSFORMER_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 BATCH_SIZE = 2**5
 EMBEDDING_DIM = 384
-NEW_HIDDEN_LAYERS = 1
 MAX_SEQ_LENGTH = 256
 PADDING_IDX = 0
 METRIC = {"name": "val/RetrievalNormalizedDCG", "mode": "max"}
