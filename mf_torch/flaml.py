@@ -11,9 +11,11 @@ if TYPE_CHECKING:
 def get_lightning_args(
     config: dict[str, bool | float | int | str],
 ) -> dict[str, bool | float | int | str]:
+    num_negatives = 2 ** config["log_num_negatives"]
+
     model_args = {
         "train_loss": config["train_loss"],
-        "num_negatives": 2 ** config["log_num_negatives"],
+        "num_negatives": num_negatives,
         "sigma": config["sigma"],
         "margin": config["margin"],
         "learning_rate": config["learning_rate"],
