@@ -25,6 +25,7 @@ from mf_torch.params import (
 class Activity(pydantic.BaseModel):
     datetime: datetime.datetime
     rating: int
+    movie_rn: int
     movie_id: int
     movie_text: str
 
