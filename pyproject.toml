@@ -15,7 +15,7 @@ dependencies = [
   "bentoml~=1.3",
   "jsonargparse[signatures]~=4.35",
   "lancedb>=0.19,<1.0",
-  "lightning~=2.5",
+  "lightning~=2.5,<2.5.1",
   "loguru>=0.7,<1.0",
   "mlflow-skinny~=3.1",
   "polars[pandas]~=1.19",
@@ -23,7 +23,6 @@ dependencies = [
   "sentence-transformers[onnx,train]~=5.0",
   "tensorboard~=2.18",
   "torch~=2.5",
-  "xxhash~=3.4",
 ]
 
 [dependency-groups]
@@ -54,7 +53,6 @@ packages = [
   "pandas",
   "pylance",
   "sentence-transformers[onnx]",
-  "xxhash",
 ]
 extra_index_url = ["https://download.pytorch.org/whl/cpu"]
 

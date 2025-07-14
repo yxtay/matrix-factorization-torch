@@ -6,8 +6,10 @@ MLFLOW_DIR = "mlruns"
 
 # data
 TARGET_COL = "rating"
+ITEM_IDX_COL = "movie_rn"
 ITEM_ID_COL = "movie_id"
 ITEM_TEXT_COL = "movie_text"
+USER_IDX_COL = "user_rn"
 USER_ID_COL = "user_id"
 USER_TEXT_COL = "user_text"
 

@@ -23,6 +23,7 @@ from mf_torch.params import (
     BATCH_SIZE,
     DATA_DIR,
     ITEM_ID_COL,
+    ITEM_IDX_COL,
     ITEM_TEXT_COL,
     ITEMS_TABLE_NAME,
     LANCE_DB_PATH,
@@ -30,6 +31,7 @@ from mf_torch.params import (
     TARGET_COL,
     TOP_K,
     USER_ID_COL,
+    USER_IDX_COL,
     USER_TEXT_COL,
     USERS_TABLE_NAME,
 )
@@ -133,6 +135,7 @@ class FeaturesProcessor[FT, BT](pydantic.BaseModel):
 
 
 class LanceDbProcessor(pydantic.BaseModel):
+    idx_col: str
     id_col: str
     text_col: str
     lance_table_name: str
@@ -160,6 +163,7 @@ class LanceDbProcessor(pydantic.BaseModel):
 class ItemProcessor(
     FeaturesProcessor[ItemFeaturesType, ItemBatchType], LanceDbProcessor
 ):
+    idx_col: str = ITEM_IDX_COL
     id_col: str = ITEM_ID_COL
     text_col: str = ITEM_TEXT_COL
     lance_table_name: str = ITEMS_TABLE_NAME
@@ -174,12 +178,10 @@ class ItemProcessor(
         return pathlib.Path(self.data_dir, "ml-1m", "movies.parquet").as_posix()
 
     def process(self, example: dict[str, Any]) -> ItemFeaturesType:
-        import xxhash
-
         return {
             **example,
             "text": example[self.text_col],
-            "idx": xxhash.xxh32_intdigest(str(example[self.id_col])),
+            "idx": example[self.idx_col],
         }
 
     @property
@@ -191,7 +193,7 @@ class ItemProcessor(
     ) -> lancedb.table.Table:
         import pyarrow as pa
 
-        fields = [self.id_col, self.text_col, "embedding"]
+        fields = [self.idx_col, self.id_col, self.text_col, "embedding"]
         dp = (
             self.get_processed_data(subset)
             .map(functools.partial(torch.inference_mode(embed_example), model=model))
@@ -222,6 +224,7 @@ class ItemProcessor(
             schema=schema,
             mode="overwrite",
         )
+        table.create_scalar_index(self.idx_col)
         table.create_scalar_index(self.id_col)
         table.create_index(
             vector_column_name="embedding",
@@ -266,6 +269,7 @@ class ItemProcessor(
 class UserProcessor(
     FeaturesProcessor[UserFeaturesType, UserBatchType], LanceDbProcessor
 ):
+    idx_col: str = USER_IDX_COL
     id_col: str = USER_ID_COL
     text_col: str = USER_TEXT_COL
     lance_table_name: str = USERS_TABLE_NAME
@@ -275,12 +279,7 @@ class UserProcessor(
         return pathlib.Path(self.data_dir, "ml-1m", "users.parquet").as_posix()
 
     def process(self, example: dict[str, Any]) -> UserFeaturesType:
-        import xxhash
-
-        pos_idx = {
-            xxhash.xxh32_intdigest(str(target[ITEM_ID_COL]))
-            for target in example["target"]
-        }
+        pos_idx = {target[ITEM_IDX_COL] for target in example["target"]}
         return {
             **example,
             "text": example[self.text_col],
@@ -295,13 +294,14 @@ class UserProcessor(
         import pyarrow.dataset as ds
         import pyarrow.parquet as pq
 
-        columns = [self.id_col, self.text_col, "history", "target"]
+        columns = [self.idx_col, self.id_col, self.text_col, "history", "target"]
         filters = ds.field(f"is_{subset}")
         pa_table = pq.read_table(self.data_path, columns=columns, filters=filters)
 
         table = self.lance_db.create_table(
             self.lance_table_name, data=pa_table, mode="overwrite"
         )
+        table.create_scalar_index(self.idx_col)
         table.create_scalar_index(self.id_col)
         table.optimize(
             cleanup_older_than=datetime.timedelta(days=0),

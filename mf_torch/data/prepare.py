@@ -77,6 +77,7 @@ def load_movies(src_dir: str = DATA_DIR) -> pl.LazyFrame:
             encoding="iso-8859-1",
         )
         .pipe(pl.from_pandas)
+        .with_row_index("movie_rn", offset=1)
         .with_columns(genres=pl.col("genres").str.split("|"))
         .with_columns(movie_text=pl.struct("title", "genres").struct.json_encode())
         .drop("title", "genres")
@@ -108,6 +109,7 @@ def load_users(src_dir: str = DATA_DIR) -> pl.LazyFrame:
             engine="python",
         )
         .pipe(pl.from_pandas)
+        .with_row_index("user_rn", offset=1)
         .with_columns(
             user_text=pl.struct(
                 "gender", "age", "occupation", "zipcode"
@@ -220,13 +222,14 @@ def process_ratings(
 
 
 def gather_history(ratings: pl.LazyFrame, *, path: pathlib.Path) -> pl.LazyFrame:
+    activity_cols = ["datetime", "rating", "movie_rn", "movie_id", "movie_text"]
     ratings_history = (
         ratings.rolling("datetime", period="4w", closed="none", group_by="user_id")
-        .agg(history=pl.struct("datetime", "rating", "movie_id", "movie_text"))
+        .agg(history=pl.struct(*activity_cols))
         .unique(["user_id", "datetime"])
     )
     ratings_target = ratings.group_by("user_id", "is_train").agg(
-        target=pl.struct("rating", "movie_id")
+        target=pl.struct(*activity_cols)
     )
     ratings_history = ratings.join(
         ratings_history, on=["user_id", "datetime"], validate="m:1"
@@ -274,16 +277,13 @@ def process_users(
         logger.info("users loaded: {}", users_parquet)
         return users_procesed
 
+    activity_cols = ["datetime", "rating", "movie_rn", "movie_id", "movie_text"]
     users_interactions = (
         ratings.lazy()
         .group_by("user_id")
         .agg(
-            history=pl.struct("datetime", "rating", "movie_id", "movie_text").filter(
-                "is_train"
-            ),
-            target=pl.struct("datetime", "rating", "movie_id", "movie_text").filter(
-                ~pl.col("is_train")
-            ),
+            history=pl.struct(*activity_cols).filter("is_train"),
+            target=pl.struct(*activity_cols).filter(~pl.col("is_train")),
             is_train=pl.any("is_train"),
             is_val=pl.any("is_val"),
             is_test=pl.any("is_test"),
