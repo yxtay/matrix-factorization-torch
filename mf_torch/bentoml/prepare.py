@@ -19,9 +19,7 @@ def load_args(ckpt_path: str | None) -> dict[str, Any]:
         return {"model": {}, "data": {}}
 
     # nosemgrep: trailofbits.python.pickles-in-pytorch.pickles-in-pytorch
-    checkpoint = torch.load(  # nosec
-        ckpt_path, weights_only=True, map_location=torch.device("cpu")
-    )
+    checkpoint = torch.load(ckpt_path, map_location="cpu", weights_only=True)  # nosec
     model_args = checkpoint["hyper_parameters"]
     model_args = {
         key: value for key, value in model_args.items() if not key.startswith("_")

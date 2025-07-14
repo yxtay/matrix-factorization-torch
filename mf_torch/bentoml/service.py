@@ -10,11 +10,10 @@ import numpy as np  # noqa: TC002
 import numpy.typing as npt  # noqa: TC002
 import pydantic
 import torch
-from bentoml.validators import DType, Shape
+from bentoml.validators import DType
 from loguru import logger
 
 from mf_torch.params import (
-    EMBEDDING_DIM,
     LANCE_DB_PATH,
     MODEL_NAME,
     PROCESSORS_JSON,
@@ -44,10 +43,7 @@ class ItemQuery(pydantic.BaseModel):
 
 class Query(bentoml.IODescriptor):
     text: str = ""
-    embedding: (
-        Annotated[npt.NDArray[np.float32], Shape((EMBEDDING_DIM,)), DType("float32")]
-        | None
-    ) = None
+    embedding: Annotated[npt.NDArray[np.float32], DType("float32")] | None = None
 
 
 class ItemCandidate(pydantic.BaseModel):
