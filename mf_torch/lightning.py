@@ -14,7 +14,6 @@ from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
 
 from mf_torch.data.lightning import InteractionBatchType, UserFeaturesType
 from mf_torch.params import (
-    MAX_SEQ_LENGTH,
     METRIC,
     TARGET_COL,
     TOP_K,
@@ -37,13 +36,10 @@ class MatrixFactorizationLitModule(LightningModule):
         self,
         *,
         model_name_or_path: str = TRANSFORMER_NAME,  # noqa: ARG002
-        max_seq_length: int = MAX_SEQ_LENGTH,  # noqa: ARG002
         train_loss: str = "PairwiseHingeLoss",  # noqa: ARG002
         num_negatives: int | None = 1,  # noqa: ARG002
         sigma: float = 1.0,  # noqa: ARG002
         margin: float = 1.0,  # noqa: ARG002
-        reg_l1: float = 0.0001,  # noqa: ARG002
-        reg_l2: float = 0.01,  # noqa: ARG002
         learning_rate: float = 0.001,  # noqa: ARG002
         top_k: int = TOP_K,  # noqa: ARG002
     ) -> None:
@@ -65,7 +61,6 @@ class MatrixFactorizationLitModule(LightningModule):
             text,
             padding="max_length",
             truncation="longest_first",
-            # max_length=self.hparams.max_seq_length,
             return_tensors="pt",
         ).to(self.device)
         # shape: (batch_size, seq_len)

@@ -93,21 +93,11 @@ def train_driver_fn(
         # datamodule
         "data_dir": pathlib.Path(DATA_DIR).absolute().as_posix(),
         "num_hashes": 2,
-        # model
-        "log_num_embeddings": 16,
-        "log_embedding_dim": 5,
-        "embedder_type": "base",
-        "log_num_heads": 0,
-        "dropout": 0.0,
-        "normalize": False,
         # lightning module
         "train_loss": "PairwiseHingeLoss",
-        "use_hard_negatives": False,
-        "hard_negatives_ratio": 1.0,
+        "log_num_negatives": 0,
         "sigma": 1.0,
         "margin": 1.0,
-        "reg_l1": 0.0001,
-        "reg_l2": 0.01,
         "learning_rate": 0.1,
     } | config.get("train_loop_config", {})
     scaling_config = ray.train.ScalingConfig(
@@ -144,51 +134,24 @@ def get_tuner() -> ray.tune.Tuner:
         "MutualInformationNeuralEstimationLoss",
     ]
     point_to_evaluate = {
-        "num_hashes": 2,
-        "log_num_embeddings": 16,
-        "log_embedding_dim": 5,
-        "embedder_type": "base",
-        "log_num_heads": 0,
-        "dropout": 0.0,
         "train_loss": "PairwiseHingeLoss",
-        "use_hard_negatives": False,
-        "hard_negatives_ratio": 1.0,
+        "log_num_negatives": 0,
         "sigma": 1.0,
         "margin": 1.0,
-        "reg_l1": 0.0001,
-        "reg_l2": 0.01,
         "learning_rate": 0.1,
     }
     search_space = point_to_evaluate | {
-        "num_hashes": ray.tune.randint(2, 5),
-        "log_num_embeddings": ray.tune.randint(10, 17),
-        "log_embedding_dim": ray.tune.randint(2, 7),
-        # "embedder_type": ray.tune.choice(["base", "attention", "transformer"]),
-        # "log_num_heads": ray.tune.randint(0, 3),
-        # "dropout": ray.tune.quniform(0.0, 0.5, 0.01),
         "train_loss": ray.tune.choice(train_losses),
-        "use_hard_negatives": ray.tune.choice([True, False]),
-        "hard_negatives_ratio": ray.tune.quniform(0.5, 2.0, 0.01),
+        "log_num_negatives": ray.tune.randint(0, 6),
         "sigma": ray.tune.lograndint(1, 1000),
         "margin": ray.tune.quniform(-1.0, 1.0, 0.01),
-        "reg_l1": ray.tune.loguniform(0.0001, 0.01),
-        "reg_l2": ray.tune.loguniform(0.001, 0.1),
         "learning_rate": ray.tune.loguniform(0.001, 0.1),
     }
     low_cost_partial_config = {
-        "num_hashes": 2,
-        "log_num_embeddings": 10,
-        "log_embedding_dim": 2,
-        "embedder_type": "base",
-        "log_num_heads": 0,
-        # "dropout": 0.0,
         # "train_loss": "PairwiseHingeLoss",
-        "use_hard_negatives": True,
-        "hard_negatives_ratio": 1.0,
+        "log_num_negatives": 0,
         # "sigma": 1.0,
         # "margin": 1.0,
-        # "reg_l1": 0.0001,
-        # "reg_l2": 0.01,
         # "learning_rate": 0.1,
     }
     search_alg = flaml.BlendSearch(
