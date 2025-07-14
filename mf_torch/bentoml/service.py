@@ -73,7 +73,6 @@ PACKAGES = [
     "pandas",
     "pylance",
     "sentence-transformers[onnx]",
-    "xxhash",
 ]
 image = bentoml.images.PythonImage().python_packages(*PACKAGES)
 ENVS = [{"name": "UV_NO_CACHE", "value": "1"}]
