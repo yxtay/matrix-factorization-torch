@@ -120,14 +120,15 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
             # shape: (batch_size, num_items)
         return ~accidental_hits
 
+    @torch.no_grad()
     def hard_mining(
         self, logits: torch.Tensor, negative_masks: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> torch.Tensor:
         if self.num_negatives is None:
-            return logits, negative_masks
+            return negative_masks
 
         if self.num_negatives >= logits.size(1):
-            return logits, negative_masks
+            return negative_masks
 
         # negative masks log will be 0 or -inf
         indices = (
@@ -135,20 +136,17 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
             .topk(k=self.num_negatives, dim=-1, sorted=False)
             .indices
         )
-        logits = logits.gather(dim=-1, index=indices)
-        # shape: (batch_size, num_negatives)
-        negative_masks = negative_masks.gather(dim=-1, index=indices)
-        # shape: (batch_size, num_negatives)
-        return logits, negative_masks
+        return torch.scatter(torch.zeros_like(negative_masks), -1, indices, 1.0)
 
+    @torch.no_grad()
     def semi_hard_mining(
         self, logits: torch.Tensor, negative_masks: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> torch.Tensor:
         if self.num_negatives is None:
-            return logits, negative_masks
+            return negative_masks
 
         if self.num_negatives >= logits.size(1):
-            return logits, negative_masks
+            return negative_masks
 
         logits_mod = logits - logits.diag()[:, None]
         # shape: (batch_size, num_items)
@@ -164,12 +162,8 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         # pos: semi hard negatives, neg: hard negatives, -inf: false negatives
         # so take largest
         indices = logits_mod.topk(k=self.num_negatives, dim=-1, sorted=False).indices
-        # shape: (batch_size, num_negatives)
-        logits = logits.gather(dim=-1, index=indices)
-        # shape: (batch_size, num_negatives)
-        negative_masks = negative_masks.gather(dim=-1, index=indices)
-        # shape: (batch_size, num_negatives)
-        return logits, negative_masks
+        # shape: (batch_size, num_items)
+        return torch.scatter(torch.zeros_like(negative_masks), -1, indices, 1.0)
 
     def alignment_loss(
         self, user_embed: torch.Tensor, item_embed: torch.Tensor, target: torch.Tensor
@@ -188,14 +182,16 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         item_idx: torch.Tensor,
         pos_idx: torch.Tensor,
     ) -> torch.Tensor:
-        logits = -squared_distance(user_embed, item_embed) * self.sigma
+        logits = -squared_distance(user_embed, item_embed)
+        # shape: (batch_size, num_items)
+        logits = logits * target.sign()[:, None] * self.sigma
         # shape: (batch_size, num_items)
         negative_masks = self.negative_masks(logits, item_idx=item_idx, pos_idx=pos_idx)
         # shape: (batch_size, num_items)
-        logits, negative_masks = self.semi_hard_mining(logits, negative_masks)
-        # shape: (batch_size, num_negatives)
-        losses = ((logits + self.margin) * target.sign()).relu()
-        # shape: (batch_size, num_negatives)
+        negative_masks = self.semi_hard_mining(logits, negative_masks)
+        # shape: (batch_size, num_items)
+        losses = (logits + target.sign()[:, None] * self.margin).relu()
+        # shape: (batch_size, num_items)
         loss = weighted_mean(losses, negative_masks, dim=-1)
         # shape: (batch_size)
         return (loss * target.abs()).sum()
@@ -213,14 +209,14 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         # shape: (batch_size, num_items)
         logits = logits * target.sign()[:, None] * self.sigma
         # shape: (batch_size, num_items)
-        pos_logit = logits.diag()
-        # shape: (batch_size)
         negative_masks = self.negative_masks(logits, item_idx=item_idx, pos_idx=pos_idx)
         # shape: (batch_size, num_items)
-        logits, negative_masks = self.semi_hard_mining(logits, negative_masks)
-        # shape: (batch_size, num_negatives)
-        logits = torch.cat([pos_logit[:, None], logits + negative_masks.log()], dim=-1)
-        # shape: (batch_size, num_negatives + 1)
+        negative_masks = self.semi_hard_mining(logits, negative_masks)
+        # shape: (batch_size, num_items)
+        pos_logit = logits.diag()[:, None]
+        # shape: (batch_size)
+        logits = torch.cat([pos_logit, logits + negative_masks.log()], dim=-1)
+        # shape: (batch_size, num_items + 1)
         loss = F.cross_entropy(
             logits,
             torch.zeros(logits.size(0), dtype=torch.long, device=logits.device),
@@ -242,15 +238,13 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         # shape: (batch_size, num_items)
         logits = logits * target.sign()[:, None] * self.sigma
         # shape: (batch_size, num_items)
-        pos_logit = logits.diag()
-        # shape: (batch_size)
         negative_masks = self.negative_masks(logits, item_idx=item_idx, pos_idx=pos_idx)
         # shape: (batch_size, num_items)
-        logits, negative_masks = self.semi_hard_mining(logits, negative_masks)
-        # shape: (batch_size, num_negatives)
+        negative_masks = self.semi_hard_mining(logits, negative_masks)
+        # shape: (batch_size, num_items)
         negative_score = (logits + negative_masks.log()).logsumexp(dim=-1)
         # shape: (batch_size)
-        loss = -pos_logit + negative_score
+        loss = -logits.diag() + negative_score
         # shape: (batch_size)
         return (loss * target.abs()).sum()
 
@@ -344,14 +338,14 @@ class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
         # shape: (batch_size, num_items)
         logits = logits * target.sign()[:, None] * self.sigma
         # shape: (batch_size, num_items)
-        pos_logits = logits.diag()
-        # shape: (batch_size,)
         negative_masks = self.negative_masks(logits, item_idx=item_idx, pos_idx=pos_idx)
         # shape: (batch_size, num_items)
-        logits, negative_masks = self.semi_hard_mining(logits, negative_masks)
-        # shape: (batch_size, num_negatives)
-        losses = self.score_loss_fn(logits - pos_logits[:, None] + self.margin)
-        # shape: (batch_size, num_negatives)
+        negative_masks = self.semi_hard_mining(logits, negative_masks)
+        # shape: (batch_size, num_items)
+        pos_logit = logits.diag()[:, None]
+        # shape: (batch_size, 1)
+        losses = self.score_loss_fn(logits - pos_logit + self.margin)
+        # shape: (batch_size, num_items)
         loss = weighted_mean(losses, negative_masks, dim=-1)
         # shape: (batch_size)
         return (loss * target.abs()).sum()
