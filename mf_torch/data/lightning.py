@@ -224,8 +224,8 @@ class ItemProcessor(
             schema=schema,
             mode="overwrite",
         )
-        table.create_scalar_index(self.idx_col)
         table.create_scalar_index(self.id_col)
+        table.create_fts_index(self.text_col)
         table.create_index(
             vector_column_name="embedding",
             metric="cosine",
@@ -301,8 +301,8 @@ class UserProcessor(
         table = self.lance_db.create_table(
             self.lance_table_name, data=pa_table, mode="overwrite"
         )
-        table.create_scalar_index(self.idx_col)
         table.create_scalar_index(self.id_col)
+        table.create_fts_index(self.text_col)
         table.optimize(
             cleanup_older_than=datetime.timedelta(days=0),
             delete_unverified=True,
