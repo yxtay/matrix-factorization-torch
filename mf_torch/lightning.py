@@ -267,6 +267,8 @@ class MatrixFactorizationLitModule(LightningModule):
 
         loss_classes = [
             mf_losses.AlignmentLoss,
+            mf_losses.ContrastiveLoss,
+            mf_losses.AlignmentContrastiveLoss,
             mf_losses.InfomationNoiseContrastiveEstimationLoss,
             mf_losses.MutualInformationNeuralEstimationLoss,
             mf_losses.PairwiseHingeLoss,
