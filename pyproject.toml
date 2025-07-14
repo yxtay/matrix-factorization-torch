@@ -35,7 +35,6 @@ dev = [
   "standard-imghdr~=3.13.0",
 ]
 
-
 [project.scripts]
 data = "mf_torch.data.prepare:main"
 lightning = "mf_torch.lightning:cli_main"
@@ -60,7 +59,7 @@ packages = [
 extra_index_url = ["https://download.pytorch.org/whl/cpu"]
 
 [tool.uv.sources]
-torch = [{ index = "torch-cpu", marker = "sys_platform == 'linux'" }]
+torch = [{ index = "torch-cpu" }]
 
 [[tool.uv.index]]
 name = "torch-cpu"
@@ -77,16 +76,12 @@ select = ["ALL"]
 ignore = [
   "D",       # pydocstyle
   "E501",    # line-too-long
+  "S101",    # assert
   "S311",    # suspicious-non-cryptographic-random-usage
   "COM812",  # missing-trailing-comma, conflicts with ruff formatter
   "ERA001",  # commented-out-code
   "ISC001",  # single-line-implicit-string-concatenation, conflicts with ruff formatter
   "PLC0415", # import-outside-top-level
-]
-
-[tool.ruff.lint.per-file-ignores]
-"**/tests/**" = [
-  "S101", # assert
 ]
 
 [tool.ruff.lint.pycodestyle]

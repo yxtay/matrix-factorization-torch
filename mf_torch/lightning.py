@@ -39,7 +39,7 @@ class MatrixFactorizationLitModule(LightningModule):
         model_name_or_path: str = TRANSFORMER_NAME,  # noqa: ARG002
         max_seq_length: int = MAX_SEQ_LENGTH,  # noqa: ARG002
         train_loss: str = "PairwiseHingeLoss",  # noqa: ARG002
-        hard_negatives_ratio: float | None = None,  # noqa: ARG002
+        num_negatives: int | None = 1,  # noqa: ARG002
         sigma: float = 1.0,  # noqa: ARG002
         margin: float = 1.0,  # noqa: ARG002
         reg_l1: float = 0.0001,  # noqa: ARG002
@@ -267,8 +267,6 @@ class MatrixFactorizationLitModule(LightningModule):
 
         loss_classes = [
             mf_losses.AlignmentLoss,
-            mf_losses.ContrastiveLoss,
-            mf_losses.AlignmentContrastiveLoss,
             mf_losses.InfomationNoiseContrastiveEstimationLoss,
             mf_losses.MutualInformationNeuralEstimationLoss,
             mf_losses.PairwiseHingeLoss,
@@ -276,7 +274,7 @@ class MatrixFactorizationLitModule(LightningModule):
         ]
         loss_fns = [
             loss_class(
-                hard_negatives_ratio=self.hparams.get("hard_negatives_ratio"),
+                num_negatives=self.hparams.get("num_negatives"),
                 sigma=self.hparams.sigma,
                 margin=self.hparams.margin,
             )
