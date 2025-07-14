@@ -126,14 +126,13 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         if self.num_negatives is None:
             return logits, negative_masks
 
-        num_negatives = self.num_negatives
-        if logits.size(1) <= num_negatives:
+        if self.num_negatives >= logits.size(1):
             return logits, negative_masks
 
         # negative masks log will be 0 or -inf
         indices = (
             (logits + negative_masks.log())
-            .topk(k=num_negatives, dim=-1, sorted=False)
+            .topk(k=self.num_negatives, dim=-1, sorted=False)
             .indices
         )
         logits = logits.gather(dim=-1, index=indices)
@@ -145,6 +144,12 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
     def semi_hard_mining(
         self, logits: torch.Tensor, negative_masks: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
+        if self.num_negatives is None:
+            return logits, negative_masks
+
+        if self.num_negatives >= logits.size(1):
+            return logits, negative_masks
+
         logits_mod = logits - logits.diag()[:, None]
         # shape: (batch_size, num_items)
         # neg: semi hard negatives, descending order first, so minus minimum value
@@ -156,11 +161,9 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         logits_mod = logits_mod + negative_masks.log()
         # shape: (batch_size, num_items)
 
-        num_negatives = self.num_negatives or logits.size(1)
-        num_negatives = min(num_negatives, logits.size(1))
         # pos: semi hard negatives, neg: hard negatives, -inf: false negatives
         # so take largest
-        indices = logits_mod.topk(k=num_negatives, dim=-1).indices
+        indices = logits_mod.topk(k=self.num_negatives, dim=-1, sorted=False).indices
         # shape: (batch_size, num_negatives)
         logits = logits.gather(dim=-1, index=indices)
         # shape: (batch_size, num_negatives)
