@@ -55,11 +55,13 @@ class ItemCandidate(pydantic.BaseModel):
 
 
 EXAMPLE_ITEM = ItemQuery(
+    movie_rn=1,
     movie_id=1,
     movie_text='{"title":"Toy Story (1995)","genres":["Animation","Children\'s","Comedy"]}',
 )
 
 EXAMPLE_USER = UserQuery(
+    user_rn=1,
     user_id=1,
     user_text='{"gender":"F","age":1,"occupation":10,"zipcode":"48067"}',
 )
