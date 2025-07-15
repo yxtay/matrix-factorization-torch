@@ -21,16 +21,6 @@ updates:
       github-actions:
         update-types: [minor, patch]
 
-  - package-ecosystem: pip
-    directory: /
-    schedule:
-      interval: daily
-    commit-message:
-      prefix: build(pip)
-    groups:
-      pip:
-        update-types: [minor, patch]
-
   - package-ecosystem: uv
     directory: /
     schedule:
