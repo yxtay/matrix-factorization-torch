@@ -163,7 +163,10 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         # so take largest
         indices = logits_mod.topk(k=self.num_negatives, dim=-1, sorted=False).indices
         # shape: (batch_size, num_items)
-        return torch.scatter(torch.zeros_like(negative_masks), -1, indices, 1.0)
+        negative_masks &= torch.scatter(
+            torch.zeros_like(negative_masks), -1, indices, 1.0
+        )
+        return negative_masks
 
     def alignment_loss(
         self, user_embed: torch.Tensor, item_embed: torch.Tensor, target: torch.Tensor

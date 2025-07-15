@@ -25,11 +25,13 @@ from mf_torch.params import (
 class Activity(pydantic.BaseModel):
     datetime: datetime.datetime
     rating: int
+    movie_rn: int
     movie_id: int
     movie_text: str
 
 
 class UserQuery(pydantic.BaseModel):
+    user_rn: int = 0
     user_id: int = 0
     user_text: str = ""
     history: list[Activity] | None = None
@@ -37,6 +39,7 @@ class UserQuery(pydantic.BaseModel):
 
 
 class ItemQuery(pydantic.BaseModel):
+    movie_rn: int = 0
     movie_id: int = 0
     movie_text: str = ""
 
@@ -53,11 +56,13 @@ class ItemCandidate(pydantic.BaseModel):
 
 
 EXAMPLE_ITEM = ItemQuery(
+    movie_rn=1,
     movie_id=1,
     movie_text='{"title":"Toy Story (1995)","genres":["Animation","Children\'s","Comedy"]}',
 )
 
 EXAMPLE_USER = UserQuery(
+    user_rn=1,
     user_id=1,
     user_text='{"gender":"F","age":1,"occupation":10,"zipcode":"48067"}',
 )
@@ -69,7 +74,6 @@ PACKAGES = [
     "pandas",
     "pylance",
     "sentence-transformers[onnx]",
-    "xxhash",
 ]
 image = bentoml.images.PythonImage().python_packages(*PACKAGES)
 ENVS = [{"name": "UV_NO_CACHE", "value": "1"}]

@@ -38,7 +38,7 @@ def evaluation_function(
         for key, value in config.items()
     }
 
-    trainer_args = {"max_epochs": config["max_epochs"]}
+    trainer_args = {"limit_train_batches": config["limit_train_batches"]}
     args = {"trainer": trainer_args, **get_lightning_args(config)}
     cli = cli_main(args, run=False, log_model=False)
     try:
@@ -93,9 +93,9 @@ def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
         points_to_evaluate=[point_to_evaluate],
         time_budget_s=60 * 60 * 24,
         num_samples=-1,
-        resource_attr="max_epochs",
-        min_resource=1,
-        max_resource=32,
+        resource_attr="limit_train_batches",
+        min_resource=1 / 16,
+        max_resource=1.0,
         reduction_factor=2,
     )
 

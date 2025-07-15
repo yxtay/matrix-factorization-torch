@@ -37,7 +37,7 @@ class MatrixFactorizationLitModule(LightningModule):
         *,
         model_name_or_path: str = TRANSFORMER_NAME,  # noqa: ARG002
         train_loss: str = "PairwiseHingeLoss",  # noqa: ARG002
-        num_negatives: int | None = 1,  # noqa: ARG002
+        num_negatives: int | None = 2,  # noqa: ARG002
         sigma: float = 1.0,  # noqa: ARG002
         margin: float = 1.0,  # noqa: ARG002
         learning_rate: float = 0.001,  # noqa: ARG002
@@ -149,8 +149,9 @@ class MatrixFactorizationLitModule(LightningModule):
             msg = "`metrics` must be initialised first"
             raise ValueError(msg)
 
-        user_id_col = self.trainer.datamodule.user_processor.id_col
         item_id_col = self.trainer.datamodule.item_processor.id_col
+        user_idx_col = self.trainer.datamodule.user_processor.idx_col
+
         pred_scores = self.predict_step(example, 0)
         pred_scores = dict(
             zip(pred_scores[item_id_col], pred_scores["score"], strict=True)
@@ -167,7 +168,7 @@ class MatrixFactorizationLitModule(LightningModule):
         preds = torch.as_tensor(preds)
         target = [target_scores.get(item_id, 0) for item_id in item_ids]
         target = torch.as_tensor(target)
-        indexes = torch.ones_like(preds, dtype=torch.long) * example[user_id_col]
+        indexes = torch.ones_like(preds, dtype=torch.long) * example[user_idx_col]
 
         metrics: torchmetrics.MetricCollection = self.metrics[step_name]
         for metric in metrics.values():
@@ -397,7 +398,8 @@ def cli_main(
         "logger": [tensorboard_logger, mlflow_logger],
         "callbacks": [progress_bar],
         "max_epochs": 1,
-        "max_time": "00:02:00:00",
+        "max_time": "01:00:00:00",
+        "val_check_interval": 1 / 16,
         "num_sanity_val_steps": 0,
     }
     return LightningCLI(
