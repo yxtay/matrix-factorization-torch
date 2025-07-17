@@ -13,12 +13,7 @@ from lightning.fabric.utilities.rank_zero import rank_zero_only
 from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
 
 from mf_torch.data.lightning import InteractionBatchType, UserFeaturesType
-from mf_torch.params import (
-    METRIC,
-    TARGET_COL,
-    TOP_K,
-    TRANSFORMER_NAME,
-)
+from mf_torch.params import METRIC, TARGET_COL, TOP_K, TRANSFORMER_NAME
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -37,7 +32,7 @@ class MatrixFactorizationLitModule(LightningModule):
         *,
         model_name_or_path: str = TRANSFORMER_NAME,  # noqa: ARG002
         train_loss: str = "PairwiseHingeLoss",  # noqa: ARG002
-        num_negatives: int | None = 2,  # noqa: ARG002
+        num_negatives: int | None = 1,  # noqa: ARG002
         sigma: float = 1.0,  # noqa: ARG002
         margin: float = 1.0,  # noqa: ARG002
         learning_rate: float = 0.001,  # noqa: ARG002
@@ -336,20 +331,20 @@ class LoggerSaveConfigCallback(SaveConfigCallback):
         import tempfile
 
         for logger in trainer.loggers:
-            if isinstance(logger, lp_loggers.MLFlowLogger):
-                with tempfile.TemporaryDirectory() as path:
-                    config_path = pathlib.Path(path, self.config_filename)
-                    self.parser.save(
-                        self.config,
-                        config_path,
-                        skip_none=False,
-                        overwrite=self.overwrite,
-                        multifile=self.multifile,
-                    )
-                    mlflow_client: MlflowClient = logger.experiment
-                    mlflow_client.log_artifact(
-                        run_id=logger.run_id, local_path=config_path
-                    )
+            if not isinstance(logger, lp_loggers.MLFlowLogger):
+                continue
+
+            with tempfile.TemporaryDirectory() as path:
+                config_path = pathlib.Path(path, self.config_filename)
+                self.parser.save(
+                    self.config,
+                    config_path,
+                    skip_none=False,
+                    overwrite=self.overwrite,
+                    multifile=self.multifile,
+                )
+                mlflow_client: MlflowClient = logger.experiment
+                mlflow_client.log_artifact(run_id=logger.run_id, local_path=config_path)
 
 
 def time_now_isoformat() -> str:
@@ -425,9 +420,8 @@ if __name__ == "__main__":
     model = MatrixFactorizationLitModule()
     model.configure_model()
 
-    with torch.inference_mode():
-        rich.print(model(model.example_input_array))
-        rich.print(model.compute_losses(next(iter(datamodule.train_dataloader()))))
+    rich.print(model(*model.example_input_array))
+    rich.print(model.compute_losses(next(iter(datamodule.train_dataloader()))))
 
     trainer_args = {
         "accelerator": "cpu",

@@ -47,18 +47,6 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
     ) -> torch.Tensor:
         # target shape: (num_users, num_items)
         self.check_inputs(user_embed, item_embed, target)
-
-        # row_idx, col_idx = target.indices()
-        # # shape: (2, num_target)
-        # col_idx = torch.cat([col_idx, torch.arange(item_embed.size(0)).to(col_idx)])
-        # # shape: (num_target + num_items,)
-
-        # user_embed = user_embed[row_idx, :]
-        # # shape: (num_target, embed_size)
-        # item_embed = item_embed[col_idx, :]
-        # # shape: (num_target + num_items, embed_size)
-        # target = target.values()
-        # # shape: (num_target,)
         return self.loss(
             user_embed, item_embed, target, item_idx=item_idx, pos_idx=pos_idx
         )
@@ -101,6 +89,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         pos_idx: torch.Tensor,
     ) -> torch.Tensor: ...
 
+    @torch.no_grad()
     def negative_masks(
         self,
         logits: torch.Tensor,
@@ -136,7 +125,11 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
             .topk(k=self.num_negatives, dim=-1, sorted=False)
             .indices
         )
-        return torch.scatter(torch.zeros_like(negative_masks), -1, indices, 1.0)
+        negative_masks &= torch.scatter(
+            torch.zeros_like(negative_masks), -1, indices, 1.0
+        )
+        # shape: (batch_size, num_items)
+        return negative_masks
 
     @torch.no_grad()
     def semi_hard_mining(
@@ -162,10 +155,10 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         # pos: semi hard negatives, neg: hard negatives, -inf: false negatives
         # so take largest
         indices = logits_mod.topk(k=self.num_negatives, dim=-1, sorted=False).indices
-        # shape: (batch_size, num_items)
         negative_masks &= torch.scatter(
             torch.zeros_like(negative_masks), -1, indices, 1.0
         )
+        # shape: (batch_size, num_items)
         return negative_masks
 
     def alignment_loss(
