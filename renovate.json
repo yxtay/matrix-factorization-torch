@@ -23,6 +23,14 @@
       "groupName": "python",
       "matchPackageNames": ["python"],
       "matchUpdateTypes": ["minor"]
+    },
+    {
+      "matchPackageNames": ["lightning"],
+      "allowedVersions": "<2.5.1"
+    },
+    {
+      "matchPackageNames": ["lightning"],
+      "allowedVersions": ">=2.5.3"
     }
   ]
 }
