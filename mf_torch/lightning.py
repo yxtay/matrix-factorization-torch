@@ -144,8 +144,8 @@ class MatrixFactorizationLitModule(LightningModule):
             msg = "`metrics` must be initialised first"
             raise ValueError(msg)
 
-        item_id_col = self.trainer.datamodule.item_processor.id_col
-        user_idx_col = self.trainer.datamodule.user_processor.idx_col
+        item_id_col = self.item_processor.id_col
+        user_idx_col = self.user_processor.idx_col
 
         pred_scores = self.predict_step(example, 0)
         pred_scores = dict(
@@ -187,7 +187,7 @@ class MatrixFactorizationLitModule(LightningModule):
         self.log_dict(metrics)
 
     def predict_step(self, batch: UserFeaturesType, _: int) -> pd.DataFrame:
-        user_id_col = self.trainer.datamodule.user_processor.id_col
+        user_id_col = self.user_processor.id_col
         return self.recommend(
             batch["text"], top_k=self.hparams.top_k, user_id=batch[user_id_col]
         )
@@ -420,8 +420,18 @@ if __name__ == "__main__":
     model = MatrixFactorizationLitModule()
     model.configure_model()
 
+    # train
     rich.print(model(*model.example_input_array))
     rich.print(model.compute_losses(next(iter(datamodule.train_dataloader()))))
+
+    # validate
+    model.user_processor = datamodule.user_processor
+    model.user_processor.get_index()
+    model.item_processor = datamodule.item_processor
+    model.item_processor.get_index(model)
+    rich.print(
+        model.update_metrics(next(iter(datamodule.val_dataloader())), "val").compute()
+    )
 
     trainer_args = {
         "accelerator": "cpu",
@@ -437,3 +447,4 @@ if __name__ == "__main__":
         cli.trainer.fit(cli.model, datamodule=cli.datamodule)
         cli.trainer.validate(cli.model, datamodule=cli.datamodule)
         cli.trainer.test(cli.model, datamodule=cli.datamodule)
+        cli.trainer.predict(cli.model, datamodule=cli.datamodule)
