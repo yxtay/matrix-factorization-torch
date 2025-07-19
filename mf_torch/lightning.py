@@ -394,7 +394,7 @@ def cli_main(
         "callbacks": [progress_bar],
         "max_epochs": 1,
         "max_time": "01:00:00:00",
-        "val_check_interval": 1 / 16,
+        "val_check_interval": 1 / 4,
         "num_sanity_val_steps": 0,
     }
     return LightningCLI(
