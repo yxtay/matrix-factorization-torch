@@ -209,13 +209,14 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         # shape: (batch_size, num_items)
         negative_masks = self.semi_hard_mining(logits, negative_masks)
         # shape: (batch_size, num_items)
-        pos_logit = logits.diag()[:, None]
-        # shape: (batch_size)
-        logits = torch.cat([pos_logit, logits + negative_masks.log()], dim=-1)
-        # shape: (batch_size, num_items + 1)
+        # include positive logits in the diagonal for cross entropy
+        negative_masks |= torch.eye(
+            *negative_masks.size(), out=torch.empty_like(negative_masks)
+        )
+        # shape: (batch_size, num_items)
         loss = F.cross_entropy(
-            logits,
-            torch.zeros(logits.size(0), dtype=torch.long, device=logits.device),
+            logits + negative_masks.log(),
+            torch.arange(logits.size(0), dtype=torch.long, device=logits.device),
             reduction="none",
         )
         # shape: (batch_size)
@@ -338,9 +339,7 @@ class PairwiseEmbeddingLoss(EmbeddingLoss, abc.ABC):
         # shape: (batch_size, num_items)
         negative_masks = self.semi_hard_mining(logits, negative_masks)
         # shape: (batch_size, num_items)
-        pos_logit = logits.diag()[:, None]
-        # shape: (batch_size, 1)
-        losses = self.score_loss_fn(logits - pos_logit + self.margin)
+        losses = self.score_loss_fn(logits - logits.diag()[:, None] + self.margin)
         # shape: (batch_size, num_items)
         loss = weighted_mean(losses, negative_masks, dim=-1)
         # shape: (batch_size)
