@@ -194,7 +194,7 @@ wheels = [
 
 [[package]]
 name = "bentoml"
-version = "1.4.17"
+version = "1.4.18"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "a2wsgi" },
@@ -238,9 +238,9 @@ dependencies = [
     { name = "uvicorn" },
     { name = "watchfiles" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/46/85/53f93761121864fccf96a7e7a4213bb6be46d391e576e7a430bcabac737d/bentoml-1.4.17.tar.gz", hash = "sha256:7e3a451b7b98303f79b8324b55e52a0ecf6096c7beb3a4eee74b1749dd62b63f", size = 974080, upload-time = "2025-06-30T02:34:02.19Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/84/fc/abf61452b631f8839e0baaf1245735a50f052b14efa1f8f0f9f930a608ce/bentoml-1.4.18.tar.gz", hash = "sha256:0a2213313ba6f6361cd715a687b21d7220a0d61d354a6ab4e6ca119737f1d211", size = 973975, upload-time = "2025-07-24T03:49:07.333Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/67/06/564a7e6520a195944e0323d393edbb8de64ff56af25c74d3f064ed20378f/bentoml-1.4.17-py3-none-any.whl", hash = "sha256:eb0930685ce761be4f3f5d67b06034ae7f1161ea6197b3d927b18c6b37e2c2b6", size = 1154236, upload-time = "2025-06-30T02:33:59.783Z" },
+    { url = "https://files.pythonhosted.org/packages/81/3f/4131edf5deefdabb609bf490e0842baf8714b0e5421b5b8589dcfb3441d4/bentoml-1.4.18-py3-none-any.whl", hash = "sha256:1ecba58440bfb70169797dad6127cf23ffbeb7a4743274f5e3980d8c66ee1ed3", size = 1153738, upload-time = "2025-07-24T03:49:04.712Z" },
 ]
 
 [[package]]
@@ -1417,7 +1417,7 @@ dev = [
 
 [[package]]
 name = "mlflow"
-version = "3.1.3"
+version = "3.1.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "alembic" },
@@ -1435,14 +1435,14 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "waitress", marker = "sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b5/0c/3713781a91e6483696ef2a45344edca4eea440357c6d75b6e0e3a29e46d4/mlflow-3.1.3.tar.gz", hash = "sha256:3153670babbb6e93ef2ebe1f40cfbc31ec38c20dfe9d236ea17f4feb3db795b2", size = 24104585, upload-time = "2025-07-22T12:42:49.92Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/46/2e/acafb34dec24bc6d592aa68105511685861b24819350469f2f580e677334/mlflow-3.1.4.tar.gz", hash = "sha256:6f56c52905a9b71eca2083fcde7eed935614705d33a34b95e139b0b84a8d7842", size = 24104603, upload-time = "2025-07-23T05:33:27.539Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/53/4d/b0c24eb35109f7ea7695a665beb661b5b5076c279b97b04fa587d5a6d319/mlflow-3.1.3-py3-none-any.whl", hash = "sha256:2970c8081e198a1aa05ea33d4125fcd4bc16298d244ef47953a0da37a844a4da", size = 24679693, upload-time = "2025-07-22T12:42:47.038Z" },
+    { url = "https://files.pythonhosted.org/packages/df/4e/f558c87edb2f31d3c6d31dcab57eb50fbf842f21a1520826a20e5b67ed26/mlflow-3.1.4-py3-none-any.whl", hash = "sha256:77edeac35d470aacd12745362f14e7ceefb2cde686667c7956d648fa72996bde", size = 24679835, upload-time = "2025-07-23T05:33:24.181Z" },
 ]
 
 [[package]]
 name = "mlflow-skinny"
-version = "3.1.3"
+version = "3.1.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cachetools" },
@@ -1463,9 +1463,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "uvicorn" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b1/5f/2867e9cc4e7b9aa4b6c4eaa0ed4bf5a249d9791bb03fc5f32e05c17d26f8/mlflow_skinny-3.1.3.tar.gz", hash = "sha256:784a008f01ab148cff774fcf969376d2abbed50ae6f50c07a32dccaa1d007e66", size = 1607809, upload-time = "2025-07-22T11:59:55.4Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/72/15/426a94b130062f9899482e197e7d1e73089fe9283f646c6823137f7c1ecd/mlflow_skinny-3.1.4.tar.gz", hash = "sha256:7e05139512c3baf06fb9fcd339e028d9f725d424ce7014d9b0957f8d532ba240", size = 1608162, upload-time = "2025-07-23T05:23:24.386Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/81/79/2342498857403c2a2ab947bc012a4410818a7284cafd18040b6c9af33daa/mlflow_skinny-3.1.3-py3-none-any.whl", hash = "sha256:0ae3089166b457349b884d009bc1efad04a4be02797d9780da7658f494f18d07", size = 1932062, upload-time = "2025-07-22T11:59:53.651Z" },
+    { url = "https://files.pythonhosted.org/packages/98/d8/2731884d38948379f03f35acb816997fa6a2cc8bcacc94736bddaf1b381a/mlflow_skinny-3.1.4-py3-none-any.whl", hash = "sha256:7d53259365d09404fc2b2e99a2701cbb1f3bfe44f127ff8c7a7b27e3720aba23", size = 1932209, upload-time = "2025-07-23T05:23:22.347Z" },
 ]
 
 [[package]]
@@ -2253,20 +2253,20 @@ wheels = [
 
 [[package]]
 name = "pylance"
-version = "0.31.1"
+version = "0.32.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
     { name = "pyarrow" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/13/29/73a31da6c2fe7ea182b322a84b35cdf2a4b35527e09dae4355ec6acb38f5/pylance-0.31.1-cp39-abi3-macosx_10_15_x86_64.whl", hash = "sha256:a1cc4d55f2c43625b16604855b32ff7a281d4075d1d57b7c9d4ab810036c9228", size = 39395338, upload-time = "2025-07-10T17:18:16.256Z" },
-    { url = "https://files.pythonhosted.org/packages/5e/3e/6ffb31c284fa142d8aac0292fac11bcb78337e56ecfa006ac475fa77325a/pylance-0.31.1-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:865b174a75e6b8c71b4ee4074d2f4e668c279b862d13cb7e11180165fd63f355", size = 36188470, upload-time = "2025-07-10T17:04:17.034Z" },
-    { url = "https://files.pythonhosted.org/packages/ae/a3/d44b5cc4571b69060ea77aac88975066f185374825c9b10fcf8e912dd3d8/pylance-0.31.1-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:39e15153f814ad08049bf3701d5dd47c13ecd4695bc5f7ebe7dd6e41f235bb02", size = 37957399, upload-time = "2025-07-10T17:04:15.461Z" },
-    { url = "https://files.pythonhosted.org/packages/02/f3/8cbce87a43bef898a5ce1aed8d41f64d454ddc51cc36b7bf1abbc8fd4a5a/pylance-0.31.1-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7e89c39178ce58691cd27194b7ad485c5b317c6e2f44ea72cdecd27f2c62109e", size = 41290355, upload-time = "2025-07-10T17:04:01.149Z" },
-    { url = "https://files.pythonhosted.org/packages/02/6d/a8142cc4575784c9ddf7bea80a49deff74f91f45fe3019a2f4c579b79c61/pylance-0.31.1-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:141a6f3812a57c7afa90fd770dc86b31d9a9f1fd771c923bc5bead8742009947", size = 38000499, upload-time = "2025-07-10T17:01:02.694Z" },
-    { url = "https://files.pythonhosted.org/packages/1e/a8/0ebb4ac98d467101def0c40d4e24f4376079d45dc2a997ea8a9060ce4f12/pylance-0.31.1-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:514586591e0e028ef02ce4ecf55c716318a46930cf862fa018053249b9d1dbf5", size = 41290903, upload-time = "2025-07-10T17:04:50.309Z" },
-    { url = "https://files.pythonhosted.org/packages/e1/94/b15e2538ffcf9eddf20dd0c5a9a048ab1367e782268e70f4350199537ab3/pylance-0.31.1-cp39-abi3-win_amd64.whl", hash = "sha256:378dabd34c72bce3ce73cec4fda6c30f56bedb1db1afdd2e0437d0ece1b4eea3", size = 42201334, upload-time = "2025-07-10T17:19:14.285Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/ff/35c1939d0ba4eca22fc718dfc2f1b18772db880adde545fe90a67fba6c51/pylance-0.32.0-cp39-abi3-macosx_10_15_x86_64.whl", hash = "sha256:476351feca8e398a879f3d8536b0d104dfb261c7bc88eab1273a29d19a3d733d", size = 40886545, upload-time = "2025-07-23T22:23:18.053Z" },
+    { url = "https://files.pythonhosted.org/packages/43/a7/d6b7dfdc78eb29e267d739a2a753460468797dbf4d97a8a657dfdb1deef8/pylance-0.32.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:94f9ab7a37cd941172ee8c75076377193d41afcfee9c51e293fc06b4ee163001", size = 37598534, upload-time = "2025-07-23T22:05:14.931Z" },
+    { url = "https://files.pythonhosted.org/packages/25/e0/ddc4e2708ba1fb3a78ec1020f6491ae919b3bf428882559856226c0c3e3a/pylance-0.32.0-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:50e30e96a9b52f7329d4bd2570d46a83c5ba5fff9dafef21cb7a7c8e6ee800fd", size = 39432383, upload-time = "2025-07-23T22:03:07.266Z" },
+    { url = "https://files.pythonhosted.org/packages/35/ff/c5965f985ba59721f28fa77717de04190a1c9859a6974ac014a560d3215e/pylance-0.32.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2cb52eb178733ececd640075d8b5c057ce8405d05b19d1f41d88cf8625d92a90", size = 42846183, upload-time = "2025-07-23T22:07:13.38Z" },
+    { url = "https://files.pythonhosted.org/packages/51/c9/37f54d3931c9fb66a7b916aa5f7f4cc9d5c51cbe587fac90631d5b8dfd54/pylance-0.32.0-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:b43e667c0543e9d69fdc33023b30f3f506ac6f704e634f9f44779a00cb054e48", size = 39461297, upload-time = "2025-07-23T22:03:31.97Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/7f/d2e87068d02753aece33a08aa815d53798c6f3b89fe47e51469c8260dccf/pylance-0.32.0-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:ed160d10db8bd70455a136252e2030fcda8f1a27baea94430815fa3c9c5cc8af", size = 42839109, upload-time = "2025-07-23T22:07:48.511Z" },
+    { url = "https://files.pythonhosted.org/packages/eb/16/a9b5bb3eff1eb85ef938d91c3aee2c266e33c4891e872fedea21629cc149/pylance-0.32.0-cp39-abi3-win_amd64.whl", hash = "sha256:f752d5d09ae029bdef0068e9cedbbcdb3e326eb23c09e9448fa11cad82597487", size = 43761312, upload-time = "2025-07-23T22:23:49.753Z" },
 ]
 
 [[package]]
