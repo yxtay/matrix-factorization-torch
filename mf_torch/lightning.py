@@ -254,7 +254,7 @@ class MatrixFactorizationLitModule(LightningModule):
             param.requires_grad = False
 
         # if num_layers_finetune is not set, finetune all layers
-        if not self.hparams.num_layers_finetune:
+        if self.hparams.num_layers_finetune <= 0:
             return model
 
         bert_layers = model[0].auto_model.encoder.layer
