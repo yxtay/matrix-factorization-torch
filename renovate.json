@@ -25,6 +25,14 @@
       "matchUpdateTypes": ["minor"]
     },
     {
+      "matchPackageNames": ["lightning"],
+      "allowedVersions": "<2.5.1"
+    },
+    {
+      "matchPackageNames": ["lightning"],
+      "allowedVersions": ">2.5.2"
+    },
+    {
       "matchPackageNames": ["rich"],
       "allowedVersions": "!=14.1.0"
     }
