@@ -506,11 +506,11 @@ wheels = [
 
 [[package]]
 name = "datasets"
-version = "2.14.4"
+version = "4.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "aiohttp" },
     { name = "dill" },
+    { name = "filelock" },
     { name = "fsspec", extra = ["http"] },
     { name = "huggingface-hub" },
     { name = "multiprocess" },
@@ -523,9 +523,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "xxhash" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1d/69/8cc725b5d38968fd118e4ce56a483b16e75b7793854c1a392ec4a34eeb31/datasets-2.14.4.tar.gz", hash = "sha256:ef29c2b5841de488cd343cfc26ab979bff77efa4d2285af51f1ad7db5c46a83b", size = 2178719, upload-time = "2023-08-08T15:45:43.015Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e3/9d/348ed92110ba5f9b70b51ca1078d4809767a835aa2b7ce7e74ad2b98323d/datasets-4.0.0.tar.gz", hash = "sha256:9657e7140a9050db13443ba21cb5de185af8af944479b00e7ff1e00a61c8dbf1", size = 569566, upload-time = "2025-07-09T14:35:52.431Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/66/f8/38298237d18d4b6a8ee5dfe390e97bed5adb8e01ec6f9680c0ddf3066728/datasets-2.14.4-py3-none-any.whl", hash = "sha256:29336bd316a7d827ccd4da2236596279b20ca2ac78f64c04c9483da7cbc2459b", size = 519335, upload-time = "2023-08-08T15:45:38.837Z" },
+    { url = "https://files.pythonhosted.org/packages/eb/62/eb8157afb21bd229c864521c1ab4fa8e9b4f1b06bafdd8c4668a7a31b5dd/datasets-4.0.0-py3-none-any.whl", hash = "sha256:7ef95e62025fd122882dbce6cb904c8cd3fbc829de6669a5eb939c77d50e203d", size = 494825, upload-time = "2025-07-09T14:35:50.658Z" },
 ]
 
 [[package]]
@@ -747,11 +747,11 @@ wheels = [
 
 [[package]]
 name = "fsspec"
-version = "2025.7.0"
+version = "2025.3.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/8b/02/0835e6ab9cfc03916fe3f78c0956cfcdb6ff2669ffa6651065d5ebf7fc98/fsspec-2025.7.0.tar.gz", hash = "sha256:786120687ffa54b8283d942929540d8bc5ccfa820deb555a2b5d0ed2b737bf58", size = 304432, upload-time = "2025-07-15T16:05:21.19Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/34/f4/5721faf47b8c499e776bc34c6a8fc17efdf7fdef0b00f398128bc5dcb4ac/fsspec-2025.3.0.tar.gz", hash = "sha256:a935fd1ea872591f2b5148907d103488fc523295e6c64b835cfad8c3eca44972", size = 298491, upload-time = "2025-03-07T21:47:56.461Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2f/e0/014d5d9d7a4564cf1c40b5039bc882db69fd881111e03ab3657ac0b218e2/fsspec-2025.7.0-py3-none-any.whl", hash = "sha256:8b012e39f63c7d5f10474de957f3ab793b47b45ae7d39f2fb735f8bbe25c0e21", size = 199597, upload-time = "2025-07-15T16:05:19.529Z" },
+    { url = "https://files.pythonhosted.org/packages/56/53/eb690efa8513166adef3e0669afd31e95ffde69fb3c52ec2ac7223ed6018/fsspec-2025.3.0-py3-none-any.whl", hash = "sha256:efb87af3efa9103f94ca91a7f8cb7a4df91af9f74fc106c9c7ea0efd7277c1b3", size = 193615, upload-time = "2025-03-07T21:47:54.809Z" },
 ]
 
 [package.optional-dependencies]
@@ -1411,13 +1411,13 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "bentoml" },
+    { name = "datasets" },
     { name = "jsonargparse", extra = ["signatures"] },
     { name = "lancedb" },
     { name = "lightning" },
     { name = "loguru" },
     { name = "mlflow-skinny" },
     { name = "polars", extra = ["pandas"] },
-    { name = "pylance" },
     { name = "rich" },
     { name = "sentence-transformers", extra = ["onnx", "train"] },
     { name = "tensorboard" },
@@ -1437,13 +1437,13 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "bentoml", specifier = "~=1.3" },
+    { name = "datasets", specifier = "~=4.0" },
     { name = "jsonargparse", extras = ["signatures"], specifier = "~=4.35" },
     { name = "lancedb", specifier = ">=0.19,<1.0" },
     { name = "lightning", specifier = "~=2.5" },
     { name = "loguru", specifier = ">=0.7,<1.0" },
     { name = "mlflow-skinny", specifier = "~=3.1" },
     { name = "polars", extras = ["pandas"], specifier = "~=1.19" },
-    { name = "pylance", specifier = ">=0.23,<1.0" },
     { name = "rich", specifier = "!=14.1.0" },
     { name = "sentence-transformers", extras = ["onnx", "train"], specifier = "~=5.0" },
     { name = "tensorboard", specifier = "~=2.18" },
@@ -2334,24 +2334,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b0/77/a5b8c569bf593b0140bde72ea885a803b82086995367bf2037de0159d924/pygments-2.19.2.tar.gz", hash = "sha256:636cb2477cec7f8952536970bc533bc43743542f70392ae026374600add5b887", size = 4968631, upload-time = "2025-06-21T13:39:12.283Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c7/21/705964c7812476f378728bdf590ca4b771ec72385c533964653c68e86bdc/pygments-2.19.2-py3-none-any.whl", hash = "sha256:86540386c03d588bb81d44bc3928634ff26449851e99741617ecb9037ee5ec0b", size = 1225217, upload-time = "2025-06-21T13:39:07.939Z" },
-]
-
-[[package]]
-name = "pylance"
-version = "0.32.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-    { name = "pyarrow" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/c1/ac/86e56eebe94c5d8a08008745bfa4839984bff24badb5aec828e1bef67162/pylance-0.32.1-cp39-abi3-macosx_10_15_x86_64.whl", hash = "sha256:153b7fff2f145b089bd1206e46d895e2f53cbacfc44a534cbc129401b1419ea0", size = 40939549, upload-time = "2025-08-06T17:10:53.19Z" },
-    { url = "https://files.pythonhosted.org/packages/db/46/f631859ed4e9176e7432ab007df58b873636453a30688d2fbc9d1df3bcf5/pylance-0.32.1-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:83afa21fa5423d149b6a50dbd138faec90bfc7fc54cbced17a7fbc2b6178fc4a", size = 37646084, upload-time = "2025-08-06T16:36:18.294Z" },
-    { url = "https://files.pythonhosted.org/packages/47/b3/fb4cb53fead5f1c9b0f5330ee3530d95d3c83d842ce75fce78fed9148bc7/pylance-0.32.1-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:b54a53320e9f6e9237e0682f0abe9ed3e118cfa6f1d99993f1addb131224631e", size = 39475951, upload-time = "2025-08-06T16:32:22.487Z" },
-    { url = "https://files.pythonhosted.org/packages/90/ec/d1502a9eb8e98dcdd7476d7b8692e5b3bb9dc50fb494788408ad13f6ebac/pylance-0.32.1-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:54338cc0f2207550564d61fa60c679bd19631b92c7b139c6a7a140abc7e0ae00", size = 42886387, upload-time = "2025-08-06T16:36:54.673Z" },
-    { url = "https://files.pythonhosted.org/packages/68/98/c0d02813d0dec427e729a4a180e5ff06242a066f7beb01ba4a19541da2ae/pylance-0.32.1-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:29912efc1ed227644a75a5f9e7cc3585676d6ea59a8cf2a06b30d5d5532c4add", size = 39506334, upload-time = "2025-08-06T16:32:49.852Z" },
-    { url = "https://files.pythonhosted.org/packages/2e/4f/9ecc9e7ad3dd764331c6458a7457f1d53e85ac7812f16e8a1d68455564c3/pylance-0.32.1-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:b4a1a2c79320e3b4d46b17d323331d32a73f0658abd88cbf67641758e98da8db", size = 42896527, upload-time = "2025-08-06T16:37:19.862Z" },
-    { url = "https://files.pythonhosted.org/packages/c7/76/2a7b2eb4ef5e1d10e5bfadd046bb19c6744bb39b9f00bba7495029561e90/pylance-0.32.1-cp39-abi3-win_amd64.whl", hash = "sha256:0eabe5bd82e8548a9bb85351a39e32bc4c2c468ece5ff4f56da7fd5733d72dd4", size = 43811121, upload-time = "2025-08-06T16:53:41.655Z" },
 ]
 
 [[package]]
