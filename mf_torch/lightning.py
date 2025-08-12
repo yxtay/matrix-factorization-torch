@@ -31,6 +31,7 @@ class MatrixFactorizationLitModule(LightningModule):
         self,
         *,
         model_name_or_path: str = TRANSFORMER_NAME,  # noqa: ARG002
+        num_layers_finetune: int = 1,  # noqa: ARG002
         train_loss: str = "PairwiseHingeLoss",  # noqa: ARG002
         num_negatives: int | None = 1,  # noqa: ARG002
         sigma: float = 1.0,  # noqa: ARG002
@@ -251,6 +252,16 @@ class MatrixFactorizationLitModule(LightningModule):
         for name, param in model.named_parameters():
             if name.endswith("embeddings.weight"):
                 param.requires_grad = False
+
+        # if num_layers_finetune is not set, finetune all layers
+        if not self.hparams.num_layers_finetune:
+            return model
+
+        bert_layers = model[0].auto_model.encoder.layer
+        for layer in bert_layers[: -self.hparams.num_layers_finetune]:
+            for param in layer.parameters():
+                param.requires_grad = False
+
         return model
 
     def get_loss_fns(self) -> torch.nn.ModuleList:
