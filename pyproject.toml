@@ -19,7 +19,6 @@ dependencies = [
   "loguru>=0.7,<1.0",
   "mlflow-skinny~=3.1",
   "polars[pandas]~=1.19",
-  "pylance>=0.23,<1.0",
   "rich!=14.1.0",
   "sentence-transformers[onnx,train]~=5.0",
   "tensorboard~=2.18",
@@ -48,13 +47,7 @@ include = ["**/*.py", "README.md"]
 envs = [{ name = "UV_NO_CACHE", value = "1" }]
 
 [tool.bentoml.build.python]
-packages = [
-  "lancedb",
-  "loguru",
-  "pandas",
-  "pylance",
-  "sentence-transformers[onnx]",
-]
+packages = ["lancedb", "loguru", "pandas", "sentence-transformers[onnx]"]
 extra_index_url = ["https://download.pytorch.org/whl/cpu"]
 
 [tool.uv.sources]
