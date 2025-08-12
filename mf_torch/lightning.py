@@ -36,7 +36,7 @@ class MatrixFactorizationLitModule(LightningModule):
         num_negatives: int | None = 1,  # noqa: ARG002
         sigma: float = 1.0,  # noqa: ARG002
         margin: float = 1.0,  # noqa: ARG002
-        learning_rate: float = 0.001,  # noqa: ARG002
+        learning_rate: float = 0.00001,  # noqa: ARG002
         top_k: int = TOP_K,  # noqa: ARG002
     ) -> None:
         super().__init__()
@@ -248,10 +248,10 @@ class MatrixFactorizationLitModule(LightningModule):
         from sentence_transformers import SentenceTransformer
 
         model = SentenceTransformer(self.hparams.model_name_or_path, device=self.device)
+        embedding_layer = model[0].auto_model.embeddings
         # freeze embeddings layer
-        for name, param in model.named_parameters():
-            if name.endswith("embeddings.weight"):
-                param.requires_grad = False
+        for param in embedding_layer.parameters():
+            param.requires_grad = False
 
         # if num_layers_finetune is not set, finetune all layers
         if not self.hparams.num_layers_finetune:
@@ -405,7 +405,7 @@ def cli_main(
         "callbacks": [progress_bar],
         "max_epochs": 1,
         "max_time": "01:00:00:00",
-        "val_check_interval": 1 / 4,
+        "val_check_interval": 1 / 16,
         "num_sanity_val_steps": 0,
     }
     return LightningCLI(
