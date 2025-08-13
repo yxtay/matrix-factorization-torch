@@ -41,7 +41,8 @@ EOF
 
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends \
-        build-essential \
+    build-essential \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 ARG PYTHONDONTWRITEBYTECODE=1
