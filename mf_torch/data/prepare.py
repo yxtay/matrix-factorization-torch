@@ -26,7 +26,7 @@ def download_data(
     if not dest.exists() or overwrite:
         dest.parent.mkdir(parents=True, exist_ok=True)
         logger.info("downloading data: {}", url)
-        response = requests.get(url, timeout=10, stream=True, verify=False)
+        response = requests.get(url, timeout=10, stream=True)
         response.raise_for_status()
         with dest.open("wb") as f:
             shutil.copyfileobj(response.raw, f)
