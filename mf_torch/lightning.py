@@ -33,7 +33,7 @@ class MatrixFactorizationLitModule(LightningModule):
         model_name_or_path: str = TRANSFORMER_NAME,  # noqa: ARG002
         num_layers_finetune: int = 1,  # noqa: ARG002
         train_loss: str = "PairwiseHingeLoss",  # noqa: ARG002
-        num_negatives: int | None = 1,  # noqa: ARG002
+        num_negatives: int = 1,  # noqa: ARG002
         sigma: float = 1.0,  # noqa: ARG002
         margin: float = 1.0,  # noqa: ARG002
         learning_rate: float = 0.00001,  # noqa: ARG002
@@ -248,17 +248,17 @@ class MatrixFactorizationLitModule(LightningModule):
         from sentence_transformers import SentenceTransformer
 
         model = SentenceTransformer(self.hparams.model_name_or_path, device=self.device)
-        embedding_layer = model[0].auto_model.embeddings
-        # freeze embeddings layer
-        for param in embedding_layer.parameters():
+        auto_model = model[0].auto_model
+        # freeze embeddings
+        for param in auto_model.embeddings.parameters():
             param.requires_grad = False
 
-        # if num_layers_finetune is not set, finetune all layers
-        if self.hparams.num_layers_finetune <= 0:
+        # if num_finetune is 0, finetune all layers
+        num_finetune = self.hparams.num_layers_finetune
+        if num_finetune <= 0:
             return model
 
-        bert_layers = model[0].auto_model.encoder.layer
-        for layer in bert_layers[: -self.hparams.num_layers_finetune]:
+        for layer in auto_model.encoder.layer[:-num_finetune]:
             for param in layer.parameters():
                 param.requires_grad = False
 
@@ -278,7 +278,7 @@ class MatrixFactorizationLitModule(LightningModule):
         ]
         loss_fns = [
             loss_class(
-                num_negatives=self.hparams.get("num_negatives"),
+                num_negatives=self.hparams.num_negatives,
                 sigma=self.hparams.sigma,
                 margin=self.hparams.margin,
             )
@@ -370,7 +370,7 @@ def cli_main(
     *,
     run: bool = True,
     experiment_name: str = time_now_isoformat(),
-    run_name: str | None = None,
+    run_name: str = "",
     log_model: bool = True,
 ) -> LightningCLI:
     from jsonargparse import lazy_instance
@@ -405,7 +405,7 @@ def cli_main(
         "callbacks": [progress_bar],
         "max_epochs": 1,
         "max_time": "01:00:00:00",
-        "val_check_interval": 1 / 16,
+        "val_check_interval": 1 / 4,
         "num_sanity_val_steps": 0,
     }
     return LightningCLI(
