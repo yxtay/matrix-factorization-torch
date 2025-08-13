@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from mf_torch.lightning import MatrixFactorizationLitModule
 
 
-def load_args(ckpt_path: str | None) -> dict[str, Any]:
+def load_args(ckpt_path: str) -> dict[str, Any]:
     if not ckpt_path:
         return {"model": {}, "data": {}}
 
@@ -33,11 +33,11 @@ def load_args(ckpt_path: str | None) -> dict[str, Any]:
 
 
 def prepare_trainer(
-    ckpt_path: str | None = None, stage: str = "validate", fast_dev_run: int = 0
+    ckpt_path: str = "", stage: str = "validate", fast_dev_run: int = 0
 ) -> Trainer:
     from mf_torch.lightning import cli_main
 
-    if ckpt_path is None:
+    if not ckpt_path:
         args = {"trainer": {"accelerator": "cpu", "fast_dev_run": True}}
         return cli_main({"fit": args}).trainer
 
@@ -114,7 +114,7 @@ def test_queries() -> None:
     rich.print(user_recs)
 
 
-def main(ckpt_path: str | None = None) -> None:
+def main(ckpt_path: str = "") -> None:
     trainer = prepare_trainer(ckpt_path)
     save_model(trainer=trainer)
     test_queries()
