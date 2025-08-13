@@ -253,7 +253,7 @@ class MatrixFactorizationLitModule(LightningModule):
         for param in auto_model.embeddings.parameters():
             param.requires_grad = False
 
-        # if num_finetune is 0, finetune all layers
+        # if num_layers_finetune is less than or equal to 0, all encoder layers are fine-tuned
         num_finetune = self.hparams.num_layers_finetune
         if num_finetune <= 0:
             return model
