@@ -17,7 +17,7 @@ from mf_torch.params import DATA_DIR, MOVIELENS_1M_URL
 def download_data(
     url: str = MOVIELENS_1M_URL, dest_dir: str = DATA_DIR, *, overwrite: bool = False
 ) -> pathlib.Path:
-    import requests
+    import httpx
 
     # prepare destination
     dest = pathlib.Path(dest_dir, pathlib.Path(url).name)
@@ -26,10 +26,11 @@ def download_data(
     if not dest.exists() or overwrite:
         dest.parent.mkdir(parents=True, exist_ok=True)
         logger.info("downloading data: {}", url)
-        response = requests.get(url, timeout=10, stream=True)
-        response.raise_for_status()
-        with dest.open("wb") as f:
-            shutil.copyfileobj(response.raw, f)
+        with httpx.stream("GET", url) as response:
+            response.raise_for_status()
+            raw_stream = response.extensions["network_stream"]
+            with dest.open("wb") as f:
+                shutil.copyfileobj(raw_stream, f)
 
     logger.info("data downloaded: {}", dest)
     return dest
