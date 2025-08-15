@@ -31,11 +31,12 @@ class MatrixFactorizationLitModule(LightningModule):
         self,
         *,
         model_name_or_path: str = TRANSFORMER_NAME,  # noqa: ARG002
+        num_layers_finetune: int = 1,  # noqa: ARG002
         train_loss: str = "PairwiseHingeLoss",  # noqa: ARG002
-        num_negatives: int | None = 1,  # noqa: ARG002
+        num_negatives: int = 1,  # noqa: ARG002
         sigma: float = 1.0,  # noqa: ARG002
         margin: float = 1.0,  # noqa: ARG002
-        learning_rate: float = 0.001,  # noqa: ARG002
+        learning_rate: float = 0.00001,  # noqa: ARG002
         top_k: int = TOP_K,  # noqa: ARG002
     ) -> None:
         super().__init__()
@@ -247,10 +248,20 @@ class MatrixFactorizationLitModule(LightningModule):
         from sentence_transformers import SentenceTransformer
 
         model = SentenceTransformer(self.hparams.model_name_or_path, device=self.device)
-        # freeze embeddings layer
-        for name, param in model.named_parameters():
-            if name.endswith("embeddings.weight"):
+        auto_model = model[0].auto_model
+        # freeze embeddings
+        for param in auto_model.embeddings.parameters():
+            param.requires_grad = False
+
+        # if num_layers_finetune is less than or equal to 0, all encoder layers are fine-tuned
+        num_finetune = self.hparams.num_layers_finetune
+        if num_finetune <= 0:
+            return model
+
+        for layer in auto_model.encoder.layer[:-num_finetune]:
+            for param in layer.parameters():
                 param.requires_grad = False
+
         return model
 
     def get_loss_fns(self) -> torch.nn.ModuleList:
@@ -267,7 +278,7 @@ class MatrixFactorizationLitModule(LightningModule):
         ]
         loss_fns = [
             loss_class(
-                num_negatives=self.hparams.get("num_negatives"),
+                num_negatives=self.hparams.num_negatives,
                 sigma=self.hparams.sigma,
                 margin=self.hparams.margin,
             )
@@ -359,7 +370,7 @@ def cli_main(
     *,
     run: bool = True,
     experiment_name: str = time_now_isoformat(),
-    run_name: str | None = None,
+    run_name: str = "",
     log_model: bool = True,
 ) -> LightningCLI:
     from jsonargparse import lazy_instance

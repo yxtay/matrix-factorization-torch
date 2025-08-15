@@ -118,23 +118,24 @@ class CyclerIterDataPipe(torch_data.IterDataPipe[dict[str, Any]]):
     def __init__(
         self,
         source_datapipe: torch_data.IterDataPipe[dict[str, Any]],
-        count: int | None = None,
+        count: int = 1,
     ) -> None:
         super().__init__()
         self.source_datapipe = source_datapipe
         self.count = count
-        if count is not None and count < 0:
+        if count < 0:
             msg = f"requires count >= 0, but {count = }"
             raise ValueError(msg)
 
     def __len__(self) -> int:
-        if self.count is None:
+        if self.count <= 0:
             # use arbitrary large number so that valid length is shown for zip
             return 2**31 - 1  # max 32-bit signed integer
         return len(self.source_datapipe) * self.count
 
     def __iter__(self) -> Iterator[dict[str, Any]]:
         i = 0
-        while self.count is None or i < self.count:
+        # if count <= 0, cycle indefinitely
+        while self.count <= 0 or i < self.count:
             yield from self.source_datapipe
             i += 1

@@ -27,7 +27,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
     def __init__(
         self,
         *,
-        num_negatives: int | None = None,
+        num_negatives: int = 0,
         sigma: float = 1.0,
         margin: float = 1.0,
     ) -> None:
@@ -113,7 +113,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
     def hard_mining(
         self, logits: torch.Tensor, negative_masks: torch.Tensor
     ) -> torch.Tensor:
-        if self.num_negatives is None:
+        if self.num_negatives <= 0:
             return negative_masks
 
         if self.num_negatives >= logits.size(1):
@@ -135,7 +135,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
     def semi_hard_mining(
         self, logits: torch.Tensor, negative_masks: torch.Tensor
     ) -> torch.Tensor:
-        if self.num_negatives is None:
+        if self.num_negatives <= 0:
             return negative_masks
 
         if self.num_negatives >= logits.size(1):

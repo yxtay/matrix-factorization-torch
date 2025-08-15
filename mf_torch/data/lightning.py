@@ -124,7 +124,7 @@ class FeaturesProcessor[FT, BT](pydantic.BaseModel):
         return self.get_data(subset, cycle=cycle).map(self.process)
 
     def get_batch_data(
-        self, subset: str, cycle: int | None = 1
+        self, subset: str, cycle: int = 1
     ) -> torch_data.IterDataPipe[BT]:
         return (
             self.get_processed_data(subset, cycle=cycle)
@@ -352,7 +352,7 @@ class InteractionProcessor(
         self, subset: str
     ) -> torch_data.IterDataPipe[InteractionFeaturesType]:
         neg_item_dp = (
-            self.item_processor.get_processed_data(subset, cycle=None)
+            self.item_processor.get_processed_data(subset, cycle=0)
             .map(functools.partial(select_fields, fields=self.item_processor.fields))
             .map(functools.partial(nest_example, key="neg_item"))
         )

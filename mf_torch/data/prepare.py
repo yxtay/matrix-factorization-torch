@@ -17,19 +17,23 @@ from mf_torch.params import DATA_DIR, MOVIELENS_1M_URL
 def download_data(
     url: str = MOVIELENS_1M_URL, dest_dir: str = DATA_DIR, *, overwrite: bool = False
 ) -> pathlib.Path:
-    import requests
+    import tempfile
+
+    import httpx
 
     # prepare destination
     dest = pathlib.Path(dest_dir, pathlib.Path(url).name)
+    dest.parent.mkdir(parents=True, exist_ok=True)
 
     # download zip
     if not dest.exists() or overwrite:
-        dest.parent.mkdir(parents=True, exist_ok=True)
         logger.info("downloading data: {}", url)
-        response = requests.get(url, timeout=10, stream=True)
-        response.raise_for_status()
-        with dest.open("wb") as f:
-            shutil.copyfileobj(response.raw, f)
+        # download to temp file, then move to dest
+        with httpx.stream("GET", url) as resp, tempfile.NamedTemporaryFile() as f:
+            resp.raise_for_status()
+            for chunk in resp.iter_bytes():
+                f.write(chunk)
+            pathlib.Path(f.name).rename(dest)
 
     logger.info("data downloaded: {}", dest)
     return dest
