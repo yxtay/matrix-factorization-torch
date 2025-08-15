@@ -30,7 +30,7 @@
     },
     {
       "matchPackageNames": ["lightning"],
-      "allowedVersions": ">2.5.2"
+      "allowedVersions": ">2.5.3"
     },
     {
       "matchPackageNames": ["rich"],
