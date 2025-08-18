@@ -12,12 +12,14 @@ if TYPE_CHECKING:
 
 
 def to_sentence_transformer(
-    model: PreTrainedModel, pooling_mode: str = "mean"
+    model: PreTrainedModel,
+    *,
+    tokenizer_name: str = "google-bert/bert-base-uncased",
+    pooling_mode: str = "mean",
 ) -> SentenceTransformer:
     with tempfile.TemporaryDirectory() as tmpdir:
         model.save_pretrained(tmpdir)
 
-        tokenizer_name = "google-bert/bert-base-uncased"
         transformer = models.Transformer(tmpdir, tokenizer_name_or_path=tokenizer_name)
         pooling = models.Pooling(
             transformer.get_word_embedding_dimension(), pooling_mode=pooling_mode
@@ -35,9 +37,10 @@ class PoolingTransformer(torch.nn.Module):
         *,
         model_name_or_path: str | None = None,
         hidden_size: int = 384,
-        num_hidden_layers: int = 3,
+        num_hidden_layers: int = 1,
         num_attention_heads: int = 12,
         max_position_embeddings: int = 32,
+        tokenizer_name: str = "google-bert/bert-base-uncased",
         pooling_mode: str = "mean",
     ) -> None:
         super().__init__()
@@ -52,7 +55,9 @@ class PoolingTransformer(torch.nn.Module):
             num_attention_heads=num_attention_heads,
             max_position_embeddings=max_position_embeddings,
         )
-        self.model = to_sentence_transformer(model, pooling_mode=pooling_mode)
+        self.model = to_sentence_transformer(
+            model, tokenizer_name=tokenizer_name, pooling_mode=pooling_mode
+        )
 
     def init_model(
         self,
