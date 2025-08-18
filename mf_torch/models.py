@@ -73,7 +73,7 @@ class PoolingTransformer(torch.nn.Module):
         return BertModel(config)
 
     def forward(self, inputs_embeds: torch.Tensor) -> torch.Tensor:
-        attention_mask = (inputs_embeds != 0).any(dim=-1).short()
+        attention_mask = (inputs_embeds != 0).any(dim=-1).to(self.model.dtype)
         features = {"inputs_embeds": inputs_embeds, "attention_mask": attention_mask}
         return self.model(features)["sentence_embedding"]
 
