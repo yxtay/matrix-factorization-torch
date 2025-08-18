@@ -65,7 +65,7 @@ class PoolingTransformer(torch.nn.Module):
         config = BertConfig(
             vocab_size=2,
             hidden_size=hidden_size,
-            intermediate_size=hidden_size,
+            intermediate_size=4 * hidden_size,
             num_hidden_layers=num_hidden_layers,
             num_attention_heads=num_attention_heads,
             max_position_embeddings=max_position_embeddings,
