@@ -1,4 +1,5 @@
 # paths
+MOVIELENS_1M_URL = "http://files.grouplens.org/datasets/movielens/ml-1m.zip"
 DATA_DIR = "data"
 TENSORBOARD_DIR = "lightning_logs"
 MLFLOW_DIR = "mlruns"
