@@ -368,37 +368,42 @@ class InteractionProcessor(
         )
 
 
+class MatrixFactorizationDataConfig(pydantic.BaseModel):
+    data_dir: str = DATA_DIR
+    batch_size: int = BATCH_SIZE
+    num_partitions: int | None = None
+    num_sub_vectors: int | None = None
+    num_probes: int = 8
+    refine_factor: int = 4
+    num_workers: int | None = 1
+
+
 class MatrixFactorizationDataModule(LightningDataModule):
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
-        data_dir: str = DATA_DIR,
-        batch_size: int = BATCH_SIZE,
-        num_partitions: int | None = None,
-        num_sub_vectors: int | None = None,
-        num_probes: int = 8,
-        refine_factor: int = 4,
-        num_workers: int | None = 1,  # noqa: ARG002
+        config: MatrixFactorizationDataConfig = MatrixFactorizationDataConfig(),
     ) -> None:
         super().__init__()
+        self.config = config
         self.save_hyperparameters()
 
         self.item_processor = ItemProcessor(
-            batch_size=batch_size,
-            num_partitions=num_partitions,
-            num_sub_vectors=num_sub_vectors,
-            num_probes=num_probes,
-            refine_factor=refine_factor,
-            data_dir=data_dir,
+            batch_size=config.batch_size,
+            num_partitions=config.num_partitions,
+            num_sub_vectors=config.num_sub_vectors,
+            num_probes=config.num_probes,
+            refine_factor=config.refine_factor,
+            data_dir=config.data_dir,
         )
         self.user_processor = UserProcessor(
-            batch_size=batch_size,
-            data_dir=data_dir,
+            batch_size=config.batch_size,
+            data_dir=config.data_dir,
         )
         self.interaction_processor = InteractionProcessor(
             item_processor=self.item_processor,
             user_processor=self.user_processor,
-            batch_size=batch_size,
-            data_dir=data_dir,
+            batch_size=config.batch_size,
+            data_dir=config.data_dir,
         )
 
     def prepare_data(self, *, overwrite: bool = False) -> pl.LazyFrame:
@@ -406,7 +411,7 @@ class MatrixFactorizationDataModule(LightningDataModule):
 
         from mf_torch.data.prepare import download_unpack_data, prepare_movielens
 
-        data_dir = self.hparams.data_dir
+        data_dir = self.config.data_dir
         with FileLock(f"{data_dir}.lock"):
             download_unpack_data(MOVIELENS_1M_URL, data_dir, overwrite=overwrite)
             return prepare_movielens(data_dir, overwrite=overwrite)
@@ -432,7 +437,7 @@ class MatrixFactorizationDataModule(LightningDataModule):
         collate_fn: Callable[[list[FT]], BT] | None = None,
         shuffle: bool = False,
     ) -> torch_data.DataLoader[BT]:
-        num_workers = self.hparams.get("num_workers")
+        num_workers = self.config.num_workers
 
         if num_workers is None:
             num_workers = os.cpu_count() or 1
@@ -451,7 +456,7 @@ class MatrixFactorizationDataModule(LightningDataModule):
         )
 
     def train_dataloader(self) -> torch_data.DataLoader[InteractionBatchType]:
-        batch_size = self.hparams.get("batch_size")
+        batch_size = self.config.batch_size
         return self.get_dataloader(
             self.train_data,
             batch_size=batch_size,

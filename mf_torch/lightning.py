@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import lightning.pytorch.callbacks as lp_callbacks
 import lightning.pytorch.loggers as lp_loggers
+import pydantic
 import torch
 from lightning import LightningModule
 from lightning.fabric.utilities.rank_zero import rank_zero_only
@@ -26,21 +27,26 @@ if TYPE_CHECKING:
     from mf_torch.data.lightning import ItemProcessor, UserProcessor
 
 
+class MatrixFactorizationLitConfig(pydantic.BaseModel):
+    model_name_or_path: str = TRANSFORMER_NAME
+    num_layers_finetune: int = 1
+    train_loss: str = "PairwiseHingeLoss"
+    num_negatives: int = 1
+    sigma: float = 1.0
+    margin: float = 1.0
+    learning_rate: float = 0.00001
+    top_k: int = TOP_K
+
+
 class MatrixFactorizationLitModule(LightningModule):
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         *,
-        model_name_or_path: str = TRANSFORMER_NAME,  # noqa: ARG002
-        num_layers_finetune: int = 1,  # noqa: ARG002
-        train_loss: str = "PairwiseHingeLoss",  # noqa: ARG002
-        num_negatives: int = 1,  # noqa: ARG002
-        sigma: float = 1.0,  # noqa: ARG002
-        margin: float = 1.0,  # noqa: ARG002
-        learning_rate: float = 0.00001,  # noqa: ARG002
-        top_k: int = TOP_K,  # noqa: ARG002
+        config: MatrixFactorizationLitConfig = MatrixFactorizationLitConfig(),
     ) -> None:
         super().__init__()
-        self.save_hyperparameters()
+        self.config = config
+        self.save_hyperparameters(self.config.model_dump())
         self.model: SentenceTransformer | None = None
         self.loss_fns: torch.nn.ModuleList | None = None
         self.metrics: torch.nn.ModuleDict | None = None
@@ -177,7 +183,7 @@ class MatrixFactorizationLitModule(LightningModule):
     def training_step(self, batch: InteractionBatchType, _: int) -> torch.Tensor:
         losses = self.compute_losses(batch, step_name="train")
         self.log_dict(losses)
-        return losses[f"train/{self.hparams.train_loss}"]
+        return losses[f"train/{self.config.train_loss}"]
 
     def validation_step(self, batch: UserFeaturesType, _: int) -> None:
         metrics = self.update_metrics(batch, step_name="val")
@@ -190,7 +196,7 @@ class MatrixFactorizationLitModule(LightningModule):
     def predict_step(self, batch: UserFeaturesType, _: int) -> pd.DataFrame:
         user_id_col = self.user_processor.id_col
         return self.recommend(
-            batch["text"], top_k=self.hparams.top_k, user_id=batch[user_id_col]
+            batch["text"], top_k=self.config.top_k, user_id=batch[user_id_col]
         )
 
     def on_train_start(self) -> None:
@@ -224,7 +230,7 @@ class MatrixFactorizationLitModule(LightningModule):
         self.on_validation_start()
 
     def configure_optimizers(self) -> torch.optim.Optimizer:
-        return torch.optim.AdamW(self.parameters(), lr=self.hparams.learning_rate)
+        return torch.optim.AdamW(self.parameters(), lr=self.config.learning_rate)
 
     def configure_callbacks(self) -> list[Callback]:
         checkpoint = lp_callbacks.ModelCheckpoint(
@@ -247,14 +253,14 @@ class MatrixFactorizationLitModule(LightningModule):
     def get_model(self) -> torch.nn.Module:
         from sentence_transformers import SentenceTransformer
 
-        model = SentenceTransformer(self.hparams.model_name_or_path, device=self.device)
+        model = SentenceTransformer(self.config.model_name_or_path, device=self.device)
         auto_model = model[0].auto_model
         # freeze embeddings
         for param in auto_model.embeddings.parameters():
             param.requires_grad = False
 
         # if num_layers_finetune is less than or equal to 0, all encoder layers are fine-tuned
-        num_finetune = self.hparams.num_layers_finetune
+        num_finetune = self.config.num_layers_finetune
         if num_finetune <= 0:
             return model
 
@@ -278,9 +284,9 @@ class MatrixFactorizationLitModule(LightningModule):
         ]
         loss_fns = [
             loss_class(
-                num_negatives=self.hparams.num_negatives,
-                sigma=self.hparams.sigma,
-                margin=self.hparams.margin,
+                num_negatives=self.config.num_negatives,
+                sigma=self.config.sigma,
+                margin=self.config.margin,
             )
             for loss_class in loss_classes
         ]
@@ -290,7 +296,7 @@ class MatrixFactorizationLitModule(LightningModule):
         import torchmetrics
         import torchmetrics.retrieval as tm_retrieval
 
-        top_k = self.hparams.top_k
+        top_k = self.config.top_k
         metrics = {
             step_name: torchmetrics.MetricCollection(
                 tm_retrieval.RetrievalNormalizedDCG(top_k=top_k),
@@ -447,9 +453,9 @@ if __name__ == "__main__":
     trainer_args = {
         "accelerator": "cpu",
         "fast_dev_run": True,
-        # "max_epochs": -1,
-        # "limit_train_batches": 1,
-        # "limit_val_batches": 1,
+        "max_epochs": 1,
+        "limit_train_batches": 1,
+        "limit_val_batches": 1,
         # "overfit_batches": 1,
     }
     cli = cli_main(args={"trainer": trainer_args}, run=False)
