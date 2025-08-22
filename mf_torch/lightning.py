@@ -46,7 +46,7 @@ class MatrixFactorizationLitModule(LightningModule):
     ) -> None:
         super().__init__()
         self.config = config
-        self.save_hyperparameters()
+        self.save_hyperparameters(config.model_dump())
         self.model: SentenceTransformer | None = None
         self.loss_fns: torch.nn.ModuleList | None = None
         self.metrics: torch.nn.ModuleDict | None = None

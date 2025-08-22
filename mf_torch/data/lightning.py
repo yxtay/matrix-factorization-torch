@@ -385,7 +385,7 @@ class MatrixFactorizationDataModule(LightningDataModule):
     ) -> None:
         super().__init__()
         self.config = config
-        self.save_hyperparameters()
+        self.save_hyperparameters(config.model_dump())
 
         self.item_processor = ItemProcessor(
             batch_size=config.batch_size,
