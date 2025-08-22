@@ -17,11 +17,11 @@ def load_args(ckpt_path: str) -> dict[str, Any]:
         return {"model": {"config": {}}, "data": {"config": {}}}
 
     # nosemgrep: trailofbits.python.pickles-in-pytorch.pickles-in-pytorch
-    model_config = MatrixFactorizationLitModule.load_from_checkpoint(ckpt_path).config
-    data_config = MatrixFactorizationDataModule.load_from_checkpoint(ckpt_path).config
+    model = MatrixFactorizationLitModule.load_from_checkpoint(ckpt_path)
+    datamodule = MatrixFactorizationDataModule.load_from_checkpoint(ckpt_path)
     return {
-        "model": {"config": model_config.model_dump()},
-        "data": {"config": data_config.model_dump()},
+        "model": {"config": model.config.model_dump()},
+        "data": {"config": datamodule.config.model_dump()},
     }
 
 
