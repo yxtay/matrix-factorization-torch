@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 def load_args(ckpt_path: str) -> dict[str, Any]:
     if not ckpt_path:
-        return {"model": {"config": {}}, "data": {"config": {}}}
+        return {}
 
     # nosemgrep: trailofbits.python.pickles-in-pytorch.pickles-in-pytorch
     model = MatrixFactorizationLitModule.load_from_checkpoint(ckpt_path)
