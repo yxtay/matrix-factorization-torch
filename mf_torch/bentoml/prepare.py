@@ -3,15 +3,13 @@ from __future__ import annotations
 import tempfile
 from typing import TYPE_CHECKING, Any
 
-import torch
-
+from mf_torch.data.lightning import MatrixFactorizationDataModule
+from mf_torch.lightning import MatrixFactorizationLitModule
 from mf_torch.params import MODEL_NAME
 
 if TYPE_CHECKING:
     import bentoml
     from lightning import Trainer
-
-    from mf_torch.lightning import MatrixFactorizationLitModule
 
 
 def load_args(ckpt_path: str) -> dict[str, Any]:
@@ -19,10 +17,12 @@ def load_args(ckpt_path: str) -> dict[str, Any]:
         return {"model": {"config": {}}, "data": {"config": {}}}
 
     # nosemgrep: trailofbits.python.pickles-in-pytorch.pickles-in-pytorch
-    checkpoint = torch.load(ckpt_path, map_location="cpu", weights_only=True)  # nosec
-    model_args = checkpoint["hyper_parameters"]
-    data_args = checkpoint["datamodule_hyper_parameters"]
-    return {"model": {"config": model_args}, "data": {"config": data_args}}
+    model_config = MatrixFactorizationLitModule.load_from_checkpoint(ckpt_path).config
+    data_config = MatrixFactorizationDataModule.load_from_checkpoint(ckpt_path).config
+    return {
+        "model": {"config": model_config.model_dump()},
+        "data": {"config": data_config.model_dump()},
+    }
 
 
 def prepare_trainer(

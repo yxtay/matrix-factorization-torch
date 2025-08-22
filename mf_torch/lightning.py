@@ -45,8 +45,8 @@ class MatrixFactorizationLitModule(LightningModule):
         config: MatrixFactorizationLitConfig = MatrixFactorizationLitConfig(),
     ) -> None:
         super().__init__()
-        self.config = config
-        self.save_hyperparameters(config.model_dump())
+        self.config = MatrixFactorizationLitConfig.model_validate(config)
+        self.save_hyperparameters(self.config.model_dump())
         self.model: SentenceTransformer | None = None
         self.loss_fns: torch.nn.ModuleList | None = None
         self.metrics: torch.nn.ModuleDict | None = None
@@ -316,15 +316,9 @@ class MatrixFactorizationLitModule(LightningModule):
         return (["", "{}"],)
 
     def save(self, path: str | pathlib.Path) -> None:
-        from mf_torch.params import (
-            CHECKPOINT_PATH,
-            LANCE_DB_PATH,
-            PROCESSORS_JSON,
-            TRANSFORMER_PATH,
-        )
+        from mf_torch.params import LANCE_DB_PATH, PROCESSORS_JSON, TRANSFORMER_PATH
 
         path = pathlib.Path(path)
-        self.trainer.save_checkpoint(path / CHECKPOINT_PATH)
         self.model.save_pretrained((path / TRANSFORMER_PATH).as_posix())
 
         processors_args = {

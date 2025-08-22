@@ -384,26 +384,26 @@ class MatrixFactorizationDataModule(LightningDataModule):
         config: MatrixFactorizationDataConfig = MatrixFactorizationDataConfig(),
     ) -> None:
         super().__init__()
-        self.config = config
-        self.save_hyperparameters(config.model_dump())
+        self.config = MatrixFactorizationDataConfig.model_validate(config)
+        self.save_hyperparameters(self.config.model_dump())
 
         self.item_processor = ItemProcessor(
-            batch_size=config.batch_size,
-            num_partitions=config.num_partitions,
-            num_sub_vectors=config.num_sub_vectors,
-            num_probes=config.num_probes,
-            refine_factor=config.refine_factor,
-            data_dir=config.data_dir,
+            batch_size=self.config.batch_size,
+            num_partitions=self.config.num_partitions,
+            num_sub_vectors=self.config.num_sub_vectors,
+            num_probes=self.config.num_probes,
+            refine_factor=self.config.refine_factor,
+            data_dir=self.config.data_dir,
         )
         self.user_processor = UserProcessor(
-            batch_size=config.batch_size,
-            data_dir=config.data_dir,
+            batch_size=self.config.batch_size,
+            data_dir=self.config.data_dir,
         )
         self.interaction_processor = InteractionProcessor(
             item_processor=self.item_processor,
             user_processor=self.user_processor,
-            batch_size=config.batch_size,
-            data_dir=config.data_dir,
+            batch_size=self.config.batch_size,
+            data_dir=self.config.data_dir,
         )
 
     def prepare_data(self, *, overwrite: bool = False) -> pl.LazyFrame:
