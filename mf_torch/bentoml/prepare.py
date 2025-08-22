@@ -3,33 +3,26 @@ from __future__ import annotations
 import tempfile
 from typing import TYPE_CHECKING, Any
 
-import torch
-
+from mf_torch.data.lightning import MatrixFactorizationDataModule
+from mf_torch.lightning import MatrixFactorizationLitModule
 from mf_torch.params import MODEL_NAME
 
 if TYPE_CHECKING:
     import bentoml
     from lightning import Trainer
 
-    from mf_torch.lightning import MatrixFactorizationLitModule
-
 
 def load_args(ckpt_path: str) -> dict[str, Any]:
     if not ckpt_path:
-        return {"model": {}, "data": {}}
+        return {}
 
     # nosemgrep: trailofbits.python.pickles-in-pytorch.pickles-in-pytorch
-    checkpoint = torch.load(ckpt_path, map_location="cpu", weights_only=True)  # nosec
-    model_args = checkpoint["hyper_parameters"]
-    model_args = {
-        key: value for key, value in model_args.items() if not key.startswith("_")
+    model = MatrixFactorizationLitModule.load_from_checkpoint(ckpt_path)
+    datamodule = MatrixFactorizationDataModule.load_from_checkpoint(ckpt_path)
+    return {
+        "model": {"config": model.config.model_dump()},
+        "data": {"config": datamodule.config.model_dump()},
     }
-
-    data_args = checkpoint["datamodule_hyper_parameters"]
-    data_args = {
-        key: value for key, value in data_args.items() if not key.startswith("_")
-    }
-    return {"model": model_args, "data": data_args}
 
 
 def prepare_trainer(
@@ -115,7 +108,7 @@ def test_queries() -> None:
 
 
 def main(ckpt_path: str = "") -> None:
-    trainer = prepare_trainer(ckpt_path)
+    trainer = prepare_trainer(ckpt_path=ckpt_path)
     save_model(trainer=trainer)
     test_queries()
 
