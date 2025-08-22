@@ -16,12 +16,12 @@ if TYPE_CHECKING:
 
 def load_args(ckpt_path: str) -> dict[str, Any]:
     if not ckpt_path:
-        return {"model": {}, "data": {}}
+        return {"model": {"config": {}}, "data": {"config": {}}}
 
     # nosemgrep: trailofbits.python.pickles-in-pytorch.pickles-in-pytorch
     checkpoint = torch.load(ckpt_path, map_location="cpu", weights_only=True)  # nosec
-    model_args = checkpoint["hyper_parameters"]["config"]
-    data_args = checkpoint["datamodule_hyper_parameters"]["config"]
+    model_args = checkpoint["hyper_parameters"]
+    data_args = checkpoint["datamodule_hyper_parameters"]
     return {"model": {"config": model_args}, "data": {"config": data_args}}
 
 
@@ -108,7 +108,7 @@ def test_queries() -> None:
 
 
 def main(ckpt_path: str = "") -> None:
-    trainer = prepare_trainer(ckpt_path)
+    trainer = prepare_trainer(ckpt_path=ckpt_path)
     save_model(trainer=trainer)
     test_queries()
 
