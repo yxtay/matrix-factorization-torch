@@ -29,19 +29,18 @@ if TYPE_CHECKING:
 
 class MatrixFactorizationLitConfig(pydantic.BaseModel):
     model_name_or_path: str = TRANSFORMER_NAME
-    num_layers_finetune: int = 1
+    num_hidden_layers: int = 1
     train_loss: str = "PairwiseHingeLoss"
     num_negatives: int = 1
     sigma: float = 1.0
     margin: float = 1.0
-    learning_rate: float = 0.00001
+    learning_rate: float = 0.001
     top_k: int = TOP_K
 
 
 class MatrixFactorizationLitModule(LightningModule):
     def __init__(
         self,
-        *,
         config: MatrixFactorizationLitConfig = MatrixFactorizationLitConfig(),
     ) -> None:
         super().__init__()
@@ -253,20 +252,17 @@ class MatrixFactorizationLitModule(LightningModule):
     def get_model(self) -> torch.nn.Module:
         from sentence_transformers import SentenceTransformer
 
-        model = SentenceTransformer(self.config.model_name_or_path, device=self.device)
-        auto_model = model[0].auto_model
+        config_kwargs = {"num_hidden_layers": self.config.num_hidden_layers}
+        model = SentenceTransformer(
+            self.config.model_name_or_path,
+            device=self.device,
+            config_kwargs=config_kwargs,
+        )
+
         # freeze embeddings
+        auto_model = model[0].auto_model
         for param in auto_model.embeddings.parameters():
             param.requires_grad = False
-
-        # if num_layers_finetune is less than or equal to 0, all encoder layers are fine-tuned
-        num_finetune = self.config.num_layers_finetune
-        if num_finetune <= 0:
-            return model
-
-        for layer in auto_model.encoder.layer[:-num_finetune]:
-            for param in layer.parameters():
-                param.requires_grad = False
 
         return model
 
