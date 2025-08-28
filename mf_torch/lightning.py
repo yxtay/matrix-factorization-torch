@@ -34,7 +34,7 @@ class MatrixFactorizationLitConfig(pydantic.BaseModel):
     num_negatives: int = 1
     sigma: float = 1.0
     margin: float = 1.0
-    learning_rate: float = 0.001
+    learning_rate: float = 0.00001
     top_k: int = TOP_K
 
 
