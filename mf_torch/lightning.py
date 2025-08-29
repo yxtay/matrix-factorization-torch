@@ -3,18 +3,18 @@ from __future__ import annotations
 import json
 import pathlib
 import shutil
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import lightning.pytorch.callbacks as lp_callbacks
 import lightning.pytorch.loggers as lp_loggers
-import pydantic
 import torch
 from lightning import LightningModule
 from lightning.fabric.utilities.rank_zero import rank_zero_only
 from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
 
 from mf_torch.data.lightning import InteractionBatchType, UserFeaturesType
-from mf_torch.params import METRIC, TARGET_COL, TOP_K, TRANSFORMER_NAME
+from mf_torch.models import ModelConfig
+from mf_torch.params import METRIC, TARGET_COL, TOP_K
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -27,21 +27,25 @@ if TYPE_CHECKING:
     from mf_torch.data.lightning import ItemProcessor, UserProcessor
 
 
-class MatrixFactorizationLitConfig(pydantic.BaseModel):
-    model_name_or_path: str = TRANSFORMER_NAME
+class MatrixFactorizationLitConfig(ModelConfig):
+    hidden_size: int = 32
     num_hidden_layers: int = 1
+    num_attention_heads: int = 4
+    intermediate_size: int = 32
+
     train_loss: str = "PairwiseHingeLoss"
     num_negatives: int = 1
     sigma: float = 1.0
     margin: float = 1.0
-    learning_rate: float = 0.00001
+    learning_rate: float = 0.001
     top_k: int = TOP_K
 
 
 class MatrixFactorizationLitModule(LightningModule):
     def __init__(
         self,
-        config: MatrixFactorizationLitConfig = MatrixFactorizationLitConfig(),
+        config: MatrixFactorizationLitConfig
+        | dict[str, Any] = MatrixFactorizationLitConfig(),
     ) -> None:
         super().__init__()
         self.config = MatrixFactorizationLitConfig.model_validate(config)
@@ -250,21 +254,25 @@ class MatrixFactorizationLitModule(LightningModule):
             self.metrics = self.get_metrics()
 
     def get_model(self) -> torch.nn.Module:
-        from sentence_transformers import SentenceTransformer
+        from mf_torch.models import init_bert, to_sentence_transformer
 
-        config_kwargs = {"num_hidden_layers": self.config.num_hidden_layers}
-        model = SentenceTransformer(
-            self.config.model_name_or_path,
-            device=self.device,
-            config_kwargs=config_kwargs,
-        )
+        bert_model = init_bert(self.config)
+        return to_sentence_transformer(bert_model)
+        # from sentence_transformers import SentenceTransformer
 
-        # freeze embeddings
-        auto_model = model[0].auto_model
-        for param in auto_model.embeddings.parameters():
-            param.requires_grad = False
+        # config_kwargs = {"num_hidden_layers": self.config.num_hidden_layers}
+        # model = SentenceTransformer(
+        #     self.config.model_name_or_path,
+        #     device=self.device,
+        #     config_kwargs=config_kwargs,
+        # )
 
-        return model
+        # # freeze embeddings
+        # auto_model = model[0].auto_model
+        # for param in auto_model.embeddings.parameters():
+        #     param.requires_grad = False
+
+        # return model
 
     def get_loss_fns(self) -> torch.nn.ModuleList:
         import mf_torch.losses as mf_losses
