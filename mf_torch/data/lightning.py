@@ -385,8 +385,6 @@ class MatrixFactorizationDataModule(LightningDataModule):
         | dict[str, Any] = MatrixFactorizationDataConfig(),
     ) -> None:
         super().__init__()
-        if issubclass(type(config), MatrixFactorizationDataConfig):
-            config = config.model_dump()
         self.config = MatrixFactorizationDataConfig.model_validate(config)
         self.save_hyperparameters(self.config.model_dump())
 

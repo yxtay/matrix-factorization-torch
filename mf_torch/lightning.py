@@ -28,10 +28,10 @@ if TYPE_CHECKING:
 
 
 class MatrixFactorizationLitConfig(ModelConfig):
-    hidden_size: int = 64
+    hidden_size: int = 32
     num_hidden_layers: int = 1
     num_attention_heads: int = 4
-    intermediate_size: int = 64
+    intermediate_size: int = 32
 
     train_loss: str = "PairwiseHingeLoss"
     num_negatives: int = 1
@@ -48,8 +48,6 @@ class MatrixFactorizationLitModule(LightningModule):
         | dict[str, Any] = MatrixFactorizationLitConfig(),
     ) -> None:
         super().__init__()
-        if issubclass(type(config), MatrixFactorizationLitConfig):
-            config = config.model_dump()
         self.config = MatrixFactorizationLitConfig.model_validate(config)
         self.save_hyperparameters(self.config.model_dump())
         self.model: SentenceTransformer | None = None

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import tempfile
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Literal
 
 import pydantic
 import torch
@@ -20,9 +20,6 @@ class ModelConfig(pydantic.BaseModel):
     intermediate_size: int = 1536
     hidden_act: Literal["gelu", "relu", "silu", "gelu_new"] = "gelu"
     max_position_embeddings: int = 512
-    position_embedding_type: Literal[
-        "absolute", "relative_key", "relative_key_query"
-    ] = "absolute"
 
     tokenizer_name: str = "google-bert/bert-base-uncased"
     pooling_mode: Literal["mean", "max", "cls", "pooler"] = "mean"
@@ -37,7 +34,6 @@ def init_bert(config: ModelConfig) -> BertModel:
         intermediate_size=config.intermediate_size,
         hidden_act=config.hidden_act,
         max_position_embeddings=config.max_position_embeddings,
-        position_embedding_type=config.position_embedding_type,
     )
     return BertModel(bert_config)
 
@@ -65,11 +61,9 @@ def to_sentence_transformer(
 class PoolingTransformer(torch.nn.Module):
     def __init__(
         self,
-        config: ModelConfig | dict[str, Any] = ModelConfig(),
+        config: ModelConfig,
     ) -> None:
         super().__init__()
-        if issubclass(type(config), ModelConfig):
-            config = config.model_dump()
         self.config = ModelConfig.model_validate(config)
 
         model = init_bert(self.config)
