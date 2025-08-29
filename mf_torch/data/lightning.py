@@ -5,7 +5,7 @@ import functools
 import math
 import os
 import pathlib
-from typing import TYPE_CHECKING, TypedDict, TypeVar
+from typing import TYPE_CHECKING, Any, TypedDict, TypeVar
 
 import pydantic
 import torch
@@ -381,9 +381,12 @@ class MatrixFactorizationDataConfig(pydantic.BaseModel):
 class MatrixFactorizationDataModule(LightningDataModule):
     def __init__(
         self,
-        config: MatrixFactorizationDataConfig = MatrixFactorizationDataConfig(),
+        config: MatrixFactorizationDataConfig
+        | dict[str, Any] = MatrixFactorizationDataConfig(),
     ) -> None:
         super().__init__()
+        if issubclass(type(config), MatrixFactorizationDataConfig):
+            config = config.model_dump()
         self.config = MatrixFactorizationDataConfig.model_validate(config)
         self.save_hyperparameters(self.config.model_dump())
 

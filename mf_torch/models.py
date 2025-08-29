@@ -1,14 +1,45 @@
 from __future__ import annotations
 
 import tempfile
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Literal
 
+import pydantic
 import torch
 from sentence_transformers import SentenceTransformer, models
 from transformers.models.bert import BertConfig, BertModel
 
 if TYPE_CHECKING:
     from transformers.modeling_utils import PreTrainedModel
+
+
+class ModelConfig(pydantic.BaseModel):
+    vocab_size: int = 30522
+    hidden_size: int = 384
+    num_hidden_layers: int = 3
+    num_attention_heads: int = 12
+    intermediate_size: int = 1536
+    hidden_act: Literal["gelu", "relu", "silu", "gelu_new"] = "gelu"
+    max_position_embeddings: int = 512
+    position_embedding_type: Literal[
+        "absolute", "relative_key", "relative_key_query"
+    ] = "absolute"
+
+    tokenizer_name: str = "google-bert/bert-base-uncased"
+    pooling_mode: Literal["mean", "max", "cls", "pooler"] = "mean"
+
+
+def init_bert(config: ModelConfig) -> BertModel:
+    bert_config = BertConfig(
+        vocab_size=config.vocab_size,
+        hidden_size=config.hidden_size,
+        num_hidden_layers=config.num_hidden_layers,
+        num_attention_heads=config.num_attention_heads,
+        intermediate_size=config.intermediate_size,
+        hidden_act=config.hidden_act,
+        max_position_embeddings=config.max_position_embeddings,
+        position_embedding_type=config.position_embedding_type,
+    )
+    return BertModel(bert_config)
 
 
 def to_sentence_transformer(
@@ -32,50 +63,21 @@ def to_sentence_transformer(
 
 
 class PoolingTransformer(torch.nn.Module):
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
-        *,
-        model_name_or_path: str | None = None,
-        hidden_size: int = 384,
-        num_hidden_layers: int = 1,
-        num_attention_heads: int = 12,
-        max_position_embeddings: int = 32,
-        tokenizer_name: str = "google-bert/bert-base-uncased",
-        pooling_mode: str = "mean",
+        config: ModelConfig | dict[str, Any] = ModelConfig(),
     ) -> None:
         super().__init__()
+        if issubclass(type(config), ModelConfig):
+            config = config.model_dump()
+        self.config = ModelConfig.model_validate(config)
 
-        if model_name_or_path:
-            self.model = SentenceTransformer(model_name_or_path)
-            return
-
-        model = self.init_model(
-            hidden_size=hidden_size,
-            num_hidden_layers=num_hidden_layers,
-            num_attention_heads=num_attention_heads,
-            max_position_embeddings=max_position_embeddings,
-        )
+        model = init_bert(self.config)
         self.model = to_sentence_transformer(
-            model, tokenizer_name=tokenizer_name, pooling_mode=pooling_mode
+            model,
+            tokenizer_name=self.config.tokenizer_name,
+            pooling_mode=self.config.pooling_mode,
         )
-
-    def init_model(
-        self,
-        *,
-        hidden_size: int = 384,
-        num_hidden_layers: int = 3,
-        num_attention_heads: int = 12,
-        max_position_embeddings: int = 32,
-    ) -> BertModel:
-        config = BertConfig(
-            vocab_size=2,
-            hidden_size=hidden_size,
-            intermediate_size=4 * hidden_size,
-            num_hidden_layers=num_hidden_layers,
-            num_attention_heads=num_attention_heads,
-            max_position_embeddings=max_position_embeddings,
-        )
-        return BertModel(config)
 
     def forward(self, inputs_embeds: torch.Tensor) -> torch.Tensor:
         attention_mask = (inputs_embeds != 0).any(dim=-1).to(self.model.dtype)
