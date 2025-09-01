@@ -86,7 +86,11 @@ jobs:
       GHCR_IMAGE_NAME: ghcr.io/${{ github.repository }}
       HF_HOME: /tmp/huggingface
       PROJECT_NAME: mf_torch
-      DOCKER_RUN_CMD: docker run --mount type=bind,source=/tmp/huggingface,target=/tmp/huggingface -e "HF_HOME=/tmp/huggingface"
+      DOCKER_RUN_CMD: |
+        docker run \
+          --env "HF_HOME=/tmp/huggingface" \
+          --volume /tmp/huggingface:/tmp/huggingface \
+          --volume $(pwd)/data:/work/app/data
 
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
