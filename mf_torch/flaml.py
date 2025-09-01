@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from mf_torch.params import DATA_DIR, METRIC
-
 if TYPE_CHECKING:
     import flaml.tune.tune
 
@@ -56,6 +54,8 @@ def evaluation_function(
 def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
     import flaml.tune
 
+    from mf_torch.params import DATA_DIR, METRIC
+
     train_losses = [
         "PairwiseHingeLoss",
         "PairwiseLogisticLoss",
@@ -98,6 +98,10 @@ def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
         max_resource=1.0,
         reduction_factor=2,
     )
+
+
+def main() -> None:
+    flaml_tune()
 
 
 if __name__ == "__main__":

@@ -2,23 +2,15 @@ from __future__ import annotations
 
 import datetime
 import functools
-import math
-import os
 import pathlib
-from typing import TYPE_CHECKING, Any, TypedDict, TypeVar
+from typing import TYPE_CHECKING, TypedDict, TypeVar
 
 import pydantic
 import torch
 import torch.utils.data as torch_data
 from lightning import LightningDataModule
 
-from mf_torch.data.load import (
-    embed_example,
-    merge_examples,
-    nest_example,
-    select_fields,
-    torch_collate,
-)
+from mf_torch.data.load import embed_example, select_fields, torch_collate
 from mf_torch.params import (
     BATCH_SIZE,
     DATA_DIR,
@@ -45,7 +37,6 @@ if TYPE_CHECKING:
     import numpy.typing as npt
     import pandas as pd
     import polars as pl
-
 
 FT = TypeVar("FT")
 BT = TypeVar("BT")
@@ -191,6 +182,8 @@ class ItemProcessor(
     def get_index(
         self, model: torch.nn.Module, subset: str = "predict"
     ) -> lancedb.table.Table:
+        import math
+
         import pyarrow as pa
 
         fields = [self.idx_col, self.id_col, self.text_col, "embedding"]
@@ -351,6 +344,8 @@ class InteractionProcessor(
     def get_processed_data(
         self, subset: str
     ) -> torch_data.IterDataPipe[InteractionFeaturesType]:
+        from mf_torch.data.load import merge_examples, nest_example
+
         neg_item_dp = (
             self.item_processor.get_processed_data(subset, cycle=0)
             .map(functools.partial(select_fields, fields=self.item_processor.fields))
@@ -381,8 +376,7 @@ class MatrixFactorizationDataConfig(pydantic.BaseModel):
 class MatrixFactorizationDataModule(LightningDataModule):
     def __init__(
         self,
-        config: MatrixFactorizationDataConfig
-        | dict[str, Any] = MatrixFactorizationDataConfig(),
+        config: MatrixFactorizationDataConfig,
     ) -> None:
         super().__init__()
         self.config = MatrixFactorizationDataConfig.model_validate(config)
@@ -438,6 +432,8 @@ class MatrixFactorizationDataModule(LightningDataModule):
         collate_fn: Callable[[list[FT]], BT] | None = None,
         shuffle: bool = False,
     ) -> torch_data.DataLoader[BT]:
+        import os
+
         num_workers = self.config.num_workers
 
         if num_workers is None:

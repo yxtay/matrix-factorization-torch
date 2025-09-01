@@ -1,22 +1,22 @@
 from __future__ import annotations
 
-import tempfile
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from mf_torch.data.lightning import MatrixFactorizationDataModule
 from mf_torch.lightning import MatrixFactorizationLitModule
-from mf_torch.params import MODEL_NAME
 
 if TYPE_CHECKING:
+    from typing import Any
+
     import bentoml
     from lightning import Trainer
 
 
 def load_args(ckpt_path: str) -> dict[str, Any]:
-    if not ckpt_path:
-        return {}
+    from mf_torch.data.lightning import MatrixFactorizationDataModule
 
-    # nosemgrep: trailofbits.python.pickles-in-pytorch.pickles-in-pytorch
+    if not ckpt_path:
+        return {"data": {"config": {"num_workers": 0}}}
+
     model = MatrixFactorizationLitModule.load_from_checkpoint(ckpt_path)
     datamodule = MatrixFactorizationDataModule.load_from_checkpoint(ckpt_path)
     return {
@@ -28,6 +28,8 @@ def load_args(ckpt_path: str) -> dict[str, Any]:
 def prepare_trainer(
     ckpt_path: str = "", stage: str = "validate", fast_dev_run: int = 0
 ) -> Trainer:
+    import tempfile
+
     from mf_torch.lightning import cli_main
 
     if not ckpt_path:
@@ -47,6 +49,8 @@ def prepare_trainer(
 
 def save_model(trainer: Trainer) -> None:
     import bentoml
+
+    from mf_torch.params import MODEL_NAME
 
     with bentoml.models.create(MODEL_NAME) as model_ref:
         model: MatrixFactorizationLitModule = trainer.model
