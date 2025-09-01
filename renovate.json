@@ -26,7 +26,7 @@
     },
     {
       "matchPackageNames": ["lightning"],
-      "allowedVersions": "<2.5.1 || >=2.5.4"
+      "allowedVersions": "<2.5.1 || >=2.5.5"
     },
     {
       "matchPackageNames": ["rich"],
