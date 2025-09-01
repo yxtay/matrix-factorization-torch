@@ -38,8 +38,8 @@ dev = [
 
 [project.scripts]
 data = "mf_torch.data.prepare:main"
-lightning = "mf_torch.lightning:cli_main"
-flaml = "mf_torch.flaml:flaml_tune"
+lightning = "mf_torch.lightning:main"
+flaml = "mf_torch.flaml:main"
 bentoml_cli = "mf_torch.bentoml.prepare:main"
 
 [tool.bentoml.build]

@@ -100,6 +100,10 @@ def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
     )
 
 
+def main() -> None:
+    flaml_tune()
+
+
 if __name__ == "__main__":
     import rich
 
