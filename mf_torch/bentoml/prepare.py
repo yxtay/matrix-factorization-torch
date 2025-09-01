@@ -15,7 +15,7 @@ def load_args(ckpt_path: str) -> dict[str, Any]:
     from mf_torch.data.lightning import MatrixFactorizationDataModule
 
     if not ckpt_path:
-        return {}
+        return {"data": {"config": {"num_workers": 0}}}
 
     model = MatrixFactorizationLitModule.load_from_checkpoint(ckpt_path)
     datamodule = MatrixFactorizationDataModule.load_from_checkpoint(ckpt_path)
