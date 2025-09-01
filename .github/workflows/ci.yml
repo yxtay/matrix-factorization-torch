@@ -58,6 +58,12 @@ jobs:
         run: uv run lightning fit --print_config
 
       - if: ${{ success() || failure() }}
+        run: |
+          uv run lightning fit \
+            --trainer.limit_train_batches 1 \
+            --trainer.limit_val_batches 1
+
+      - if: ${{ success() || failure() }}
         run: uv run python -m "${PROJECT_NAME}.bentoml.prepare"
 
       - if: ${{ failure() }}
@@ -79,7 +85,7 @@ jobs:
       GHCR_IMAGE_NAME: ghcr.io/${{ github.repository }}
       HF_HOME: /tmp/huggingface
       PROJECT_NAME: mf_torch
-      DOCKER_RUN_CMD: docker run --mount type=bind,source=/tmp/huggingface,target=/tmp/huggingface -e "HF_HOME=/tmp/huggingface"
+      DOCKER_RUN_CMD: docker run --mount type=bind,source=${HF_HOME},target=${HF_HOME} -e "HF_HOME=${HF_HOME}"
 
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
@@ -110,6 +116,15 @@ jobs:
 
       - if: ${{ success() || failure() }}
         run: ${DOCKER_RUN_CMD} "${IMAGE_ID}" uv run lightning fit --print_config
+        env:
+          IMAGE_ID: ${{ steps.build.outputs.imageid }}
+
+      - if: ${{ success() || failure() }}
+        run: |
+          ${DOCKER_RUN_CMD} "${IMAGE_ID}" \
+            uv run lightning fit \
+            --trainer.limit_train_batches 1 \
+            --trainer.limit_val_batches 1
         env:
           IMAGE_ID: ${{ steps.build.outputs.imageid }}
 
