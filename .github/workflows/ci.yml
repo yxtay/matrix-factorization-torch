@@ -86,10 +86,10 @@ jobs:
       GHCR_IMAGE_NAME: ghcr.io/${{ github.repository }}
       HF_HOME: /tmp/huggingface
       PROJECT_NAME: mf_torch
-      DOCKER_RUN_CMD: |
-        docker run \
-          --env "HF_HOME=/tmp/huggingface" \
-          --volume /tmp/huggingface:/tmp/huggingface \
+      DOCKER_RUN_CMD: >-
+        docker run
+          --env "HF_HOME=/tmp/huggingface"
+          --volume /tmp/huggingface:/tmp/huggingface
           --volume $(pwd)/data:/work/app/data
 
     steps:
