@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-import tempfile
 from typing import TYPE_CHECKING, Literal
 
 import pydantic
 import torch
-from sentence_transformers import SentenceTransformer, models
-from transformers.models.bert import BertConfig, BertModel
 
 if TYPE_CHECKING:
+    from sentence_transformers import SentenceTransformer
     from transformers.modeling_utils import PreTrainedModel
+    from transformers.models.bert import BertModel
 
 
 class ModelConfig(pydantic.BaseModel):
@@ -26,6 +25,8 @@ class ModelConfig(pydantic.BaseModel):
 
 
 def init_bert(config: ModelConfig) -> BertModel:
+    from transformers.models.bert import BertConfig, BertModel
+
     bert_config = BertConfig(
         vocab_size=config.vocab_size,
         hidden_size=config.hidden_size,
@@ -44,6 +45,10 @@ def to_sentence_transformer(
     tokenizer_name: str = "google-bert/bert-base-uncased",
     pooling_mode: str = "mean",
 ) -> SentenceTransformer:
+    import tempfile
+
+    from sentence_transformers import SentenceTransformer, models
+
     with tempfile.TemporaryDirectory() as tmpdir:
         model.save_pretrained(tmpdir)
 

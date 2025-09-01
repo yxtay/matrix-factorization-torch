@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import json
 import pathlib
-import shutil
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import lightning.pytorch.callbacks as lp_callbacks
 import lightning.pytorch.loggers as lp_loggers
@@ -12,9 +10,8 @@ from lightning import LightningModule
 from lightning.fabric.utilities.rank_zero import rank_zero_only
 from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
 
-from mf_torch.data.lightning import InteractionBatchType, UserFeaturesType
 from mf_torch.models import ModelConfig
-from mf_torch.params import METRIC, TARGET_COL, TOP_K
+from mf_torch.params import TOP_K
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -24,7 +21,12 @@ if TYPE_CHECKING:
     from mlflow import MlflowClient
     from sentence_transformers import SentenceTransformer
 
-    from mf_torch.data.lightning import ItemProcessor, UserProcessor
+    from mf_torch.data.lightning import (
+        InteractionBatchType,
+        ItemProcessor,
+        UserFeaturesType,
+        UserProcessor,
+    )
 
 
 class MatrixFactorizationLitConfig(ModelConfig):
@@ -34,7 +36,7 @@ class MatrixFactorizationLitConfig(ModelConfig):
     intermediate_size: int = 32
 
     train_loss: str = "PairwiseHingeLoss"
-    num_negatives: int = 1
+    num_negatives: int = 4
     sigma: float = 1.0
     margin: float = 1.0
     learning_rate: float = 0.001
@@ -44,8 +46,7 @@ class MatrixFactorizationLitConfig(ModelConfig):
 class MatrixFactorizationLitModule(LightningModule):
     def __init__(
         self,
-        config: MatrixFactorizationLitConfig
-        | dict[str, Any] = MatrixFactorizationLitConfig(),
+        config: MatrixFactorizationLitConfig,
     ) -> None:
         super().__init__()
         self.config = MatrixFactorizationLitConfig.model_validate(config)
@@ -150,6 +151,8 @@ class MatrixFactorizationLitModule(LightningModule):
     ) -> torchmetrics.MetricCollection:
         import torchmetrics.retrieval as tm_retrieval
 
+        from mf_torch.params import TARGET_COL
+
         if self.metrics is None:
             msg = "`metrics` must be initialised first"
             raise ValueError(msg)
@@ -236,6 +239,8 @@ class MatrixFactorizationLitModule(LightningModule):
         return torch.optim.AdamW(self.parameters(), lr=self.config.learning_rate)
 
     def configure_callbacks(self) -> list[Callback]:
+        from mf_torch.params import METRIC
+
         checkpoint = lp_callbacks.ModelCheckpoint(
             monitor=METRIC["name"], mode=METRIC["mode"]
         )
@@ -258,21 +263,6 @@ class MatrixFactorizationLitModule(LightningModule):
 
         bert_model = init_bert(self.config)
         return to_sentence_transformer(bert_model)
-        # from sentence_transformers import SentenceTransformer
-
-        # config_kwargs = {"num_hidden_layers": self.config.num_hidden_layers}
-        # model = SentenceTransformer(
-        #     self.config.model_name_or_path,
-        #     device=self.device,
-        #     config_kwargs=config_kwargs,
-        # )
-
-        # # freeze embeddings
-        # auto_model = model[0].auto_model
-        # for param in auto_model.embeddings.parameters():
-        #     param.requires_grad = False
-
-        # return model
 
     def get_loss_fns(self) -> torch.nn.ModuleList:
         import mf_torch.losses as mf_losses
@@ -320,6 +310,9 @@ class MatrixFactorizationLitModule(LightningModule):
         return (["", "{}"],)
 
     def save(self, path: str | pathlib.Path) -> None:
+        import json
+        import shutil
+
         from mf_torch.params import LANCE_DB_PATH, PROCESSORS_JSON, TRANSFORMER_PATH
 
         path = pathlib.Path(path)

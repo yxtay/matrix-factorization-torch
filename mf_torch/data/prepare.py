@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pathlib
-import shutil
 from concurrent.futures import ThreadPoolExecutor
 
 import polars as pl
@@ -42,6 +41,8 @@ def download_data(
 def unpack_data(
     archive_file: str | pathlib.Path, *, overwrite: bool = False
 ) -> list[str]:
+    import shutil
+
     archive_file = pathlib.Path(archive_file)
     dest_dir = archive_file.parent / archive_file.stem
 
