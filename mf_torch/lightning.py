@@ -449,7 +449,8 @@ if __name__ == "__main__":
         "limit_val_batches": 1,
         # "overfit_batches": 1,
     }
-    cli = cli_main(args={"trainer": trainer_args}, run=False)
+    data_args = {"num_workers": 0}
+    cli = cli_main(args={"trainer": trainer_args, "data": data_args}, run=False)
     with contextlib.suppress(ReferenceError):
         # suppress weak reference on ModelCheckpoint callback
         cli.trainer.fit(cli.model, datamodule=cli.datamodule)
