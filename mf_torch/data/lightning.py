@@ -38,36 +38,42 @@ if TYPE_CHECKING:
     import pandas as pd
     import polars as pl
 
-    FT = TypeVar("FT")
-    BT = TypeVar("BT")
+FT = TypeVar("FT")
+BT = TypeVar("BT")
 
-    class ItemFeaturesType(TypedDict):
-        idx: int
-        text: str
 
-    class ItemBatchType(TypedDict):
-        idx: torch.Tensor
-        text: list[str]
+class ItemFeaturesType(TypedDict):
+    idx: int
+    text: str
 
-    class UserFeaturesType(TypedDict):
-        pos_idx: torch.Tensor
-        text: str
 
-    class UserBatchType(TypedDict):
-        pos_idx: torch.Tensor
-        text: list[str]
+class ItemBatchType(TypedDict):
+    idx: torch.Tensor
+    text: list[str]
 
-    class InteractionFeaturesType(TypedDict):
-        target: int
-        user: UserFeaturesType
-        item: ItemFeaturesType
-        neg_item: ItemFeaturesType
 
-    class InteractionBatchType(TypedDict):
-        target: torch.Tensor
-        user: UserBatchType
-        item: ItemBatchType
-        neg_item: ItemBatchType
+class UserFeaturesType(TypedDict):
+    pos_idx: torch.Tensor
+    text: str
+
+
+class UserBatchType(TypedDict):
+    pos_idx: torch.Tensor
+    text: list[str]
+
+
+class InteractionFeaturesType(TypedDict):
+    target: int
+    user: UserFeaturesType
+    item: ItemFeaturesType
+    neg_item: ItemFeaturesType
+
+
+class InteractionBatchType(TypedDict):
+    target: torch.Tensor
+    user: UserBatchType
+    item: ItemBatchType
+    neg_item: ItemBatchType
 
 
 class FeaturesProcessor[FT, BT](pydantic.BaseModel):
