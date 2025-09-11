@@ -1337,7 +1337,7 @@ wheels = [
 
 [[package]]
 name = "lightning"
-version = "2.5.0.post0"
+version = "2.5.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fsspec", extra = ["http"] },
@@ -1351,9 +1351,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e6/6d/d9d209d9ab3d270ee89afb8f71a3d84d48d41a1880e89d8215d26e8018b7/lightning-2.5.0.post0.tar.gz", hash = "sha256:f720fe4f6d03a7f15f9aef3112c5a0d1eafd8d27b903f4a1354b609685b2ec70", size = 628132, upload-time = "2024-12-21T01:36:50.746Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0f/dd/86bb3bebadcdbc6e6e5a63657f0a03f74cd065b5ea965896679f76fec0b4/lightning-2.5.5.tar.gz", hash = "sha256:4d3d66c5b1481364a7e6a1ce8ddde1777a04fa740a3145ec218a9941aed7dd30", size = 640770, upload-time = "2025-09-05T16:01:21.026Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d4/54/2de887e964a561776ac49c5e715ca8a56138ea7e2b95325e0a79aa46a070/lightning-2.5.0.post0-py3-none-any.whl", hash = "sha256:b08463326e6fb39cb3e4db8ff2660a80ce3372a0688c80e3370c091346ea220c", size = 815241, upload-time = "2024-12-21T01:36:46.586Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/d0/4b4fbafc3b18df91207a6e46782d9fd1905f9f45cb2c3b8dfbb239aef781/lightning-2.5.5-py3-none-any.whl", hash = "sha256:69eb248beadd7b600bf48eff00a0ec8af171ec7a678d23787c4aedf12e225e8f", size = 828490, upload-time = "2025-09-05T16:01:17.845Z" },
 ]
 
 [[package]]
@@ -1553,7 +1553,7 @@ requires-dist = [
     { name = "datasets", specifier = "~=4.0" },
     { name = "jsonargparse", extras = ["signatures"], specifier = "~=4.35" },
     { name = "lancedb", specifier = ">=0.19,<1.0" },
-    { name = "lightning", specifier = "~=2.5,<2.5.1" },
+    { name = "lightning", specifier = "~=2.5,<2.5.6" },
     { name = "loguru", specifier = ">=0.7,<1.0" },
     { name = "mlflow-skinny", specifier = "~=3.1" },
     { name = "polars", extras = ["pandas"], specifier = "~=1.19" },
