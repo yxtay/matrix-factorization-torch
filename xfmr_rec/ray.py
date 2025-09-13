@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import ray.train
 import ray.tune
 
-from mf_torch.params import METRIC
+from xfmr_rec.params import METRIC
 
 if TYPE_CHECKING:
     from lightning import Trainer
@@ -14,8 +14,8 @@ if TYPE_CHECKING:
 
 
 def get_cli(config: dict[str, bool | float | int | str]) -> LightningCLI:
-    from mf_torch.flaml import get_lightning_args
-    from mf_torch.lightning import cli_main
+    from xfmr_rec.flaml import get_lightning_args
+    from xfmr_rec.lightning import cli_main
 
     experiment_name = ray.tune.get_context().get_experiment_name()
     trial_name = ray.tune.get_context().get_trial_name()
@@ -85,7 +85,7 @@ def train_driver_fn(
 
     import ray.train.torch as ray_torch
 
-    from mf_torch.params import DATA_DIR, MLFLOW_DIR, TENSORBOARD_DIR
+    from xfmr_rec.params import DATA_DIR, MLFLOW_DIR, TENSORBOARD_DIR
 
     config = config or {}
     train_loop_config = {

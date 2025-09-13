@@ -13,7 +13,7 @@ import torch
 from bentoml.validators import DType
 from loguru import logger
 
-from mf_torch.params import (
+from xfmr_rec.params import (
     LANCE_DB_PATH,
     MODEL_NAME,
     PROCESSORS_JSON,
@@ -105,7 +105,7 @@ class ItemProcessor:
 
     @logger.catch(reraise=True)
     def __init__(self) -> None:
-        from mf_torch.data.lightning import ItemProcessor
+        from xfmr_rec.data.lightning import ItemProcessor
 
         lance_db_path = self.model_ref.path_of(LANCE_DB_PATH)
         processors_args = json.loads(
@@ -154,7 +154,7 @@ class UserProcessor:
 
     @logger.catch(reraise=True)
     def __init__(self) -> None:
-        from mf_torch.data.lightning import UserProcessor
+        from xfmr_rec.data.lightning import UserProcessor
 
         lance_db_path = self.model_ref.path_of(LANCE_DB_PATH)
         processors_args = json.loads(

@@ -3,9 +3,9 @@ requires = ["poetry-core>=2.0,<3.0"]
 build-backend = "poetry.core.masonry.api"
 
 [project]
-name = "mf_torch"
+name = "xfmr_rec"
 version = "0.1.0"
-description = "Matrix Factorization Recommender Models in PyTorch with MovieLens"
+description = "Transformers Recommender Models in PyTorch with MovieLens"
 authors = [
   { name = "YuXuan Tay", email = "5795122+yxtay@users.noreply.github.com" },
 ]
@@ -33,17 +33,17 @@ dev = [
   "mlflow",
   "pytest~=8.4",
   "ray[train,tune]~=2.42",
-  "standard-imghdr~=3.13.0",
+  "standard-imghdr~=3.13",
 ]
 
 [project.scripts]
-data = "mf_torch.data.prepare:main"
-lightning = "mf_torch.lightning:main"
-flaml = "mf_torch.flaml:main"
-bentoml_cli = "mf_torch.bentoml.prepare:main"
+data = "xfmr_rec.data.prepare:main"
+lightning = "xfmr_rec.lightning:main"
+flaml = "xfmr_rec.flaml:main"
+bentoml_cli = "xfmr_rec.bentoml.prepare:main"
 
 [tool.bentoml.build]
-service = "mf_torch.bentoml.service:Service"
+service = "xfmr_rec.bentoml.service:Service"
 description = "file: ./README.md"
 include = ["**/*.py", "README.md"]
 envs = [{ name = "UV_NO_CACHE", value = "1" }]

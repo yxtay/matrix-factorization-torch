@@ -23,7 +23,7 @@ TOP_K = 20
 # serving
 ITEMS_TABLE_NAME = "movies"
 LANCE_DB_PATH = "lance_db"
-MODEL_NAME = "mf_torch"
+MODEL_NAME = "xfmr_rec"
 PROCESSORS_JSON = "processors.json"
 TRANSFORMER_PATH = "transformer"
 USERS_TABLE_NAME = "users"

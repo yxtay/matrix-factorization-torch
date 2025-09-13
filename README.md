@@ -1,6 +1,6 @@
-# matrix-factorization-pytorch
+# transformers-recommender
 
-Matrix Factorization Recommender Models in PyTorch with MovieLens
+Transformers Recommender Models in PyTorch with MovieLens
 
 ## Entrypoints
 
