@@ -33,7 +33,7 @@ dev = [
   "mlflow",
   "pytest~=8.4",
   "ray[train,tune]~=2.42",
-  "standard-imghdr~=3.13.0",
+  "standard-imghdr~=3.13",
 ]
 
 [project.scripts]
