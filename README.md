@@ -1,4 +1,4 @@
-# matrix-factorization-pytorch
+# transformers-recommender-pytorch
 
 Matrix Factorization Recommender Models in PyTorch with MovieLens
 
