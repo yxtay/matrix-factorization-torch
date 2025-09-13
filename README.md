@@ -1,6 +1,6 @@
 # transformer-recommenders
 
-Transformers Recommender Models in PyTorch with MovieLens
+Transformer Recommender Models in PyTorch with MovieLens
 
 ## Entrypoints
 
