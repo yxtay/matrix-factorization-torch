@@ -5,7 +5,7 @@ build-backend = "poetry.core.masonry.api"
 [project]
 name = "xfmr_rec"
 version = "0.1.0"
-description = "Matrix Factorization Recommender Models in PyTorch with MovieLens"
+description = "Transformers Recommender Models in PyTorch with MovieLens"
 authors = [
   { name = "YuXuan Tay", email = "5795122+yxtay@users.noreply.github.com" },
 ]
