@@ -1,4 +1,4 @@
-# transformers-recommender
+# transformer-recommenders
 
 Transformers Recommender Models in PyTorch with MovieLens
 

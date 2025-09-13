@@ -1,10 +1,10 @@
 services:
   app:
-    image: ghcr.io/yxtay/transformers-recommender:main
+    image: ghcr.io/yxtay/transformer-recommenders:main
     build:
       cache_from:
-        - ghcr.io/yxtay/transformers-recommender:cache
-        - ghcr.io/yxtay/transformers-recommender:main
+        - ghcr.io/yxtay/transformer-recommenders:cache
+        - ghcr.io/yxtay/transformer-recommenders:main
     volumes:
       - ./data:/work/app/data
     healthcheck:

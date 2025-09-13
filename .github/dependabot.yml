@@ -32,6 +32,6 @@ updates:
         update-types: [minor, patch]
     ignore:
       - dependency-name: lightning
-        versions: [">=2.5.1", <2.5.7]
+        versions: [">=2.5.1", <2.5.6]
       - dependency-name: rich
         versions: [14.1.0]
