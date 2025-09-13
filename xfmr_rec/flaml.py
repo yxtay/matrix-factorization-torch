@@ -28,8 +28,7 @@ def evaluation_function(
     config: dict[str, bool | float | int | str],
 ) -> dict[str, float]:
     import numpy as np
-
-    from mf_torch.lightning import cli_main
+    from xfrm_rec.lightning import cli_main
 
     config = {
         key: value.tolist() if isinstance(value, np.generic) else value
@@ -53,8 +52,7 @@ def evaluation_function(
 
 def flaml_tune() -> flaml.tune.tune.ExperimentAnalysis:
     import flaml.tune
-
-    from mf_torch.params import DATA_DIR, METRIC
+    from xfrm_rec.params import DATA_DIR, METRIC
 
     train_losses = [
         "PairwiseHingeLoss",

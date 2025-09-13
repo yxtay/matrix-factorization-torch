@@ -105,7 +105,7 @@ class EmbeddingLoss(torch.nn.Module, abc.ABC):
         if pos_idx is not None:
             # shape: (batch_size, num_positives)
             # mask shape: (batch_size, num_items, num_positives)
-            accidental_hits |= (pos_idx.unsqueeze(1) == item_idx[None, :, None]).any(-1)
+            accidental_hits |= (pos_idx[:, None, :] == item_idx[None, :, None]).any(-1)
             # shape: (batch_size, num_items)
         return ~accidental_hits
 

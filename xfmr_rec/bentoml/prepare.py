@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from mf_torch.lightning import MatrixFactorizationLitModule
+from xfrm_rec.lightning import MatrixFactorizationLitModule
 
 if TYPE_CHECKING:
     from typing import Any
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 def load_args(ckpt_path: str) -> dict[str, Any]:
-    from mf_torch.data.lightning import MatrixFactorizationDataModule
+    from xfrm_rec.data.lightning import MatrixFactorizationDataModule
 
     if not ckpt_path:
         return {"data": {"config": {"num_workers": 0}}}
@@ -30,7 +30,7 @@ def prepare_trainer(
 ) -> Trainer:
     import tempfile
 
-    from mf_torch.lightning import cli_main
+    from xfrm_rec.lightning import cli_main
 
     if not ckpt_path:
         args = {"trainer": {"accelerator": "cpu", "fast_dev_run": True}}
@@ -49,8 +49,7 @@ def prepare_trainer(
 
 def save_model(trainer: Trainer) -> None:
     import bentoml
-
-    from mf_torch.params import MODEL_NAME
+    from xfrm_rec.params import MODEL_NAME
 
     with bentoml.models.create(MODEL_NAME) as model_ref:
         model: MatrixFactorizationLitModule = trainer.model
@@ -75,8 +74,7 @@ def test_bento(
 def test_queries() -> None:
     import pydantic
     import rich
-
-    from mf_torch.bentoml.service import (
+    from xfrm_rec.bentoml.service import (
         EXAMPLE_ITEM,
         EXAMPLE_USER,
         ItemCandidate,

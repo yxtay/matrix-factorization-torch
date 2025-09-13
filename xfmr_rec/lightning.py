@@ -9,9 +9,8 @@ import torch
 from lightning import LightningModule
 from lightning.fabric.utilities.rank_zero import rank_zero_only
 from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
-
-from mf_torch.models import ModelConfig
-from mf_torch.params import TOP_K
+from xfrm_rec.models import ModelConfig
+from xfrm_rec.params import TOP_K
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -20,8 +19,7 @@ if TYPE_CHECKING:
     from lightning.pytorch.cli import ArgsType
     from mlflow import MlflowClient
     from sentence_transformers import SentenceTransformer
-
-    from mf_torch.data.lightning import (
+    from xfrm_rec.data.lightning import (
         InteractionBatchType,
         ItemProcessor,
         UserFeaturesType,
@@ -39,7 +37,7 @@ class MatrixFactorizationLitConfig(ModelConfig):
     num_negatives: int = 4
     sigma: float = 1.0
     margin: float = 1.0
-    learning_rate: float = 0.001
+    learning_rate: float = 0.0001
     top_k: int = TOP_K
 
 
@@ -150,8 +148,7 @@ class MatrixFactorizationLitModule(LightningModule):
         self, example: dict[str, torch.Tensor], step_name: str = "train"
     ) -> torchmetrics.MetricCollection:
         import torchmetrics.retrieval as tm_retrieval
-
-        from mf_torch.params import TARGET_COL
+        from xfrm_rec.params import TARGET_COL
 
         if self.metrics is None:
             msg = "`metrics` must be initialised first"
@@ -239,7 +236,7 @@ class MatrixFactorizationLitModule(LightningModule):
         return torch.optim.AdamW(self.parameters(), lr=self.config.learning_rate)
 
     def configure_callbacks(self) -> list[Callback]:
-        from mf_torch.params import METRIC
+        from xfrm_rec.params import METRIC
 
         checkpoint = lp_callbacks.ModelCheckpoint(
             monitor=METRIC["name"], mode=METRIC["mode"]
@@ -259,13 +256,13 @@ class MatrixFactorizationLitModule(LightningModule):
             self.metrics = self.get_metrics()
 
     def get_model(self) -> torch.nn.Module:
-        from mf_torch.models import init_bert, to_sentence_transformer
+        from xfrm_rec.models import init_bert, to_sentence_transformer
 
         bert_model = init_bert(self.config)
         return to_sentence_transformer(bert_model)
 
     def get_loss_fns(self) -> torch.nn.ModuleList:
-        import mf_torch.losses as mf_losses
+        import xfrm_rec.losses as mf_losses
 
         loss_classes = [
             mf_losses.AlignmentLoss,
@@ -313,7 +310,7 @@ class MatrixFactorizationLitModule(LightningModule):
         import json
         import shutil
 
-        from mf_torch.params import LANCE_DB_PATH, PROCESSORS_JSON, TRANSFORMER_PATH
+        from xfrm_rec.params import LANCE_DB_PATH, PROCESSORS_JSON, TRANSFORMER_PATH
 
         path = pathlib.Path(path)
         self.model.save_pretrained((path / TRANSFORMER_PATH).as_posix())
@@ -371,9 +368,8 @@ def cli_main(
     log_model: bool = True,
 ) -> LightningCLI:
     from jsonargparse import lazy_instance
-
-    from mf_torch.data.lightning import MatrixFactorizationDataModule
-    from mf_torch.params import MLFLOW_DIR, TENSORBOARD_DIR
+    from xfrm_rec.data.lightning import MatrixFactorizationDataModule
+    from xfrm_rec.params import MLFLOW_DIR, TENSORBOARD_DIR
 
     run_name = run_name or time_now_isoformat()
     tensorboard_logger = {
@@ -423,8 +419,7 @@ if __name__ == "__main__":
     import contextlib
 
     import rich
-
-    from mf_torch.data.lightning import (
+    from xfrm_rec.data.lightning import (
         MatrixFactorizationDataConfig,
         MatrixFactorizationDataModule,
     )

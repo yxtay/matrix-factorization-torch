@@ -57,7 +57,7 @@ RUN uv python install && \
     uv pip list
 
 # set up project
-COPY mf_torch mf_torch
+COPY xfmr_rec xfmr_rec
 RUN uv sync --no-default-groups
 
 USER ${USER}
